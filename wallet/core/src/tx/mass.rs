@@ -6,7 +6,7 @@ use crate::error::Error;
 use crate::result::Result;
 use kaspa_consensus_client as kcc;
 use kaspa_consensus_client::UtxoEntryReference;
-use kaspa_consensus_core::mass::calc_storage_mass as consensus_calc_storage_mass;
+use kaspa_consensus_core::mass::{calc_storage_mass as consensus_calc_storage_mass, UtxoCell};
 use kaspa_consensus_core::tx::{Transaction, TransactionInput, TransactionOutput, SCRIPT_VECTOR_SIZE};
 use kaspa_consensus_core::{config::params::Params, constants::*, subnets::SUBNETWORK_ID_SIZE};
 use kaspa_hashes::HASH_SIZE;
@@ -340,6 +340,13 @@ impl MassCalculator {
             .iter()
             .map(|out| self.storage_mass_parameter.checked_div(out.value))
             .try_fold(0u64, |total, current| current.and_then(|current| total.checked_add(current)))
+    }
+
+    pub fn calc_storage_mass_ins_harmonic(&self, utxo_cells: &[UtxoCell]) -> u64 {
+        let harmonic_ins = utxo_cells.iter()
+        .map(|UtxoCell { plurality, amount }| self.storage_mass_parameter * plurality * plurality / amount) // we assume no overflow (see verify_utxo_plurality_limits)
+        .fold(0u64, |total, current| total.saturating_add(current));
+        harmonic_ins
     }
 
     pub fn calc_storage_mass_output_harmonic_single(&self, output_value: u64) -> u64 {

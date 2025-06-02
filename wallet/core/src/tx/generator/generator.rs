@@ -64,8 +64,10 @@ use crate::tx::{
     PendingTransactionStream,
 };
 use crate::utxo::{NetworkParams, UtxoContext, UtxoEntryReference};
+use itertools::Itertools;
 use kaspa_consensus_client::UtxoEntry;
 use kaspa_consensus_core::constants::UNACCEPTED_DAA_SCORE;
+use kaspa_consensus_core::mass::UtxoCell;
 use kaspa_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
 use kaspa_consensus_core::tx::{Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
 use kaspa_txscript::pay_to_address_script;
@@ -723,8 +725,27 @@ impl Generator {
     /// Calculate storage mass using inputs from `Data`
     /// and `output_harmonics` supplied by the user
     fn calc_storage_mass(&self, data: &Data, output_harmonics: u64) -> u64 {
+        // let number_of_inputs = data.inputs.len() as u64;
         let calc = &self.inner.mass_calculator;
-        calc.calc_storage_mass(output_harmonics, data.aggregate_input_value, data.inputs.len() as u64)
+
+        return calc.calc_storage_mass(output_harmonics, data.aggregate_input_value, data.inputs.len() as u64);
+
+        // if number_of_inputs == 1 {
+        //     let utxo_entries = data.inputs.iter().map(|input| input.previous_outpoint).map(|outpoint| {
+        //         return data.utxo_entry_references.iter().find(|utxo_entry_reference| {
+        //             utxo_entry_reference.utxo.outpoint.transaction_id() == outpoint.transaction_id
+        //                 && utxo_entry_reference.utxo.outpoint.index() == outpoint.index
+        //         });
+        //     });
+        //     // only keep some, remove None
+        //     let utxo_entries = utxo_entries.filter_map(|x| x).map_into::<UtxoCell>().collect::<Vec<_>>();
+
+        //     let harmonic_ins = calc.calc_storage_mass_ins_harmonic(&utxo_entries);
+
+        //     return output_harmonics.saturating_sub(harmonic_ins);
+        // }
+
+        // return calc.calc_storage_mass(output_harmonics, data.aggregate_input_value, number_of_inputs);
     }
 
     /// Check if the current state has sufficient funds for the final transaction,
@@ -859,9 +880,16 @@ impl Generator {
                 absorb_change_to_fees = true;
                 self.calc_storage_mass(data, self.inner.final_transaction_outputs_harmonic)
             } else {
+                println!(
+                    "final transaction outputs harmonic {}\nchange value {}\n",
+                    self.inner.final_transaction_outputs_harmonic, change_value
+                );
+
                 let output_harmonic_with_change =
                     calc.calc_storage_mass_output_harmonic_single(change_value) + self.inner.final_transaction_outputs_harmonic;
                 let storage_mass_with_change = self.calc_storage_mass(data, output_harmonic_with_change);
+
+                println!("storage mass with change {}", storage_mass_with_change);
 
                 // TODO - review and potentially simplify:
                 // this profiles the storage mass with change and without change
@@ -1149,5 +1177,68 @@ impl Generator {
             final_transaction_id: context.final_transaction_id,
             number_of_generated_transactions: context.number_of_transactions,
         }
+    }
+}
+
+// tests
+
+#[cfg(test)]
+mod tests {
+    use kaspa_consensus_client::TransactionOutpoint;
+    use kaspa_consensus_core::tx::SCRIPT_VECTOR_SIZE;
+
+    use crate::{
+        tx::{PaymentOutput, PaymentOutputs},
+        utils::kaspa_to_sompi,
+    };
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_generator_settings() {
+        let vec: Vec<u8> = (0..SCRIPT_VECTOR_SIZE as u8).collect();
+        let spk = ScriptPublicKey::from_vec(0, vec.clone());
+        let network_id = NetworkId::new(NetworkType::Mainnet);
+        let address = Address::try_from("kaspa:qpauqsvk7yf9unexwmxsnmg547mhyga37csh0kj53q6xxgl24ydxjsgzthw5j").unwrap();
+        let utxo_iterator: Box<dyn Iterator<Item = UtxoEntryReference> + Send + Sync + 'static> = Box::new(
+            vec![UtxoEntryReference {
+                utxo: Arc::new(UtxoEntry {
+                    address: None,
+                    outpoint: TransactionOutpoint::new(
+                        TransactionId::from_str(&"8e40af02265360d59f4ecf9ae9ebf8f00a3118408f5a9cdcbcc9c0f93642f3af").unwrap(),
+                        0,
+                    ),
+                    amount: kaspa_to_sompi(1000.0),
+                    script_public_key: spk,
+                    block_daa_score: 0,
+                    is_coinbase: false,
+                }),
+            }]
+            .into_iter(),
+        );
+
+        let generator_settings = GeneratorSettings::try_new_with_iterator(
+            network_id,
+            utxo_iterator,
+            None,
+            address.clone(),
+            0,
+            1,
+            PaymentDestination::PaymentOutputs(PaymentOutputs {
+                outputs: vec![PaymentOutput { address, amount: kaspa_to_sompi(0.02) }],
+            }),
+            Fees::SenderPays(0),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let generator = Generator::try_new(generator_settings, None, None).unwrap();
+
+        let mut stream = generator.stream();
+
+        let transaction_result = stream.try_next().await;
+
+        println!("{:?}", transaction_result);
     }
 }
