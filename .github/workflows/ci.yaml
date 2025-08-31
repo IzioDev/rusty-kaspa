@@ -1,6 +1,9 @@
 name: Tests
 
-on: [push, pull_request]
+on:
+  #push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   check:
@@ -52,7 +55,7 @@ jobs:
           sudo apt -y autoclean
           sudo apt clean
           rm --recursive --force "$AGENT_TOOLSDIRECTORY"
-          df -h          
+          df -h
 
           # remove large packages manually (all but llvm)
           sudo apt-get remove -y '^aspnetcore-.*' || echo "::warning::The command [sudo apt-get remove -y '^aspnetcore-.*'] failed to complete successfully. Proceeding..."
@@ -65,7 +68,7 @@ jobs:
           sudo apt-get remove -y google-cloud-cli --fix-missing || echo "::debug::The command [sudo apt-get remove -y google-cloud-cli --fix-missing] failed to complete successfully. Proceeding..."
           sudo apt-get autoremove -y || echo "::warning::The command [sudo apt-get autoremove -y] failed to complete successfully. Proceeding..."
           sudo apt-get clean || echo "::warning::The command [sudo apt-get clean] failed to complete successfully. Proceeding..."
-          df -h          
+          df -h
 
       # Free up disk space on Ubuntu
       - name: Free Disk Space (Ubuntu)
@@ -95,10 +98,10 @@ jobs:
 
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Set up cache
         uses: Swatinem/rust-cache@v2
-      
+
       - name: Install cargo-nextest
         run: cargo install cargo-nextest
 
@@ -132,7 +135,6 @@ jobs:
         run: cargo doc --release --no-deps --workspace
       - name: Run kip-10 example
         run: cargo run --example kip-10
-
 
   # test-release:
   #   name: Test Suite Release
@@ -216,7 +218,6 @@ jobs:
 
       - name: Run cargo clippy
         run: cargo clippy --workspace --tests --benches --examples -- -D warnings
-
 
   check-wasm32:
     name: Check WASM32
@@ -319,34 +320,26 @@ jobs:
           sudo apt-get update
           sudo apt install -y gcc-multilib
 
-      - name: Install stable toolchain
-        if: steps.install_llvm.outcome == 'success' && steps.install_llvm.conclusion == 'success'
-        uses: dtolnay/rust-toolchain@stable
+      # install rust
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.89.0
+          target: wasm32-unknown-unknown
+          # key based on branch name
+          cache-shared-key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          cache-workspaces: ./cipher -> target
+          cache-workspace-crates: true
 
       - name: Install wasm-pack
         run: cargo install wasm-pack
 
-      - name: Add wasm32 target
-        run: rustup target add wasm32-unknown-unknown
-
       - name: Install NodeJS
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install NodeJS dependencies
         run: npm install --global typedoc typescript
-
-      - name: Cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build wasm release
         run: |
@@ -356,9 +349,9 @@ jobs:
           popd
           mv wasm/release/kaspa-wasm32-sdk.zip wasm/release/kaspa-wasm32-sdk-${{ env.SHORT_SHA }}.zip
 
-      - name: Upload WASM build to GitHub 
+      - name: Upload WASM build to GitHub
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: kaspa-wasm32-sdk-${{ env.SHORT_SHA }}.zip
           path: wasm/release/kaspa-wasm32-sdk-${{ env.SHORT_SHA }}.zip
   build-release:
@@ -388,7 +381,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-        
+
       - name: Cache Toolchain
         uses: actions/cache@v4
         with:
@@ -398,7 +391,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-musl-
 
-      
       - name: Build RK with musl toolchain
         if: runner.os == 'Linux'
         run: |
