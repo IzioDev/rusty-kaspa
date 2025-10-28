@@ -1,0 +1,24 @@
+p4/192.168.215.0/tcp/51016
+2025-10-28T00:00:40.510714Z  INFO dcutr_example: Listening on address address=/i
+p4/192.168.107.0/tcp/51016
+2025-10-28T00:00:40.510727Z  INFO dcutr_example: Listening on address address=/i
+p4/127.0.0.1/udp/51553/quic-v1
+2025-10-28T00:00:40.510759Z  INFO dcutr_example: Listening on address address=/i
+p4/172.20.10.3/udp/51553/quic-v1
+2025-10-28T00:00:40.510771Z  INFO dcutr_example: Listening on address address=/i
+p4/192.168.139.3/udp/51553/quic-v1
+2025-10-28T00:00:40.510779Z  INFO dcutr_example: Listening on address address=/i
+p4/192.168.97.0/udp/51553/quic-v1
+2025-10-28T00:00:40.510786Z  INFO dcutr_example: Listening on address address=/i
+p4/192.168.215.0/udp/51553/quic-v1
+2025-10-28T00:00:40.510792Z  INFO dcutr_example: Listening on address address=/i
+p4/192.168.107.0/udp/51553/quic-v1
+2025-10-28T00:00:42.552113Z  INFO dcutr_example: Told relay its public address
+2025-10-28T00:00:42.554791Z  INFO dcutr_example: Relay told us our observed addr
+ess address=/ip4/HOTSPOTIP/tcp/5199
+2025-10-28T00:00:43.245109Z  INFO dcutr_example: Relay accepted our reservation
+request
+2025-10-28T00:00:43.245250Z  INFO dcutr_example: Listening on address address=/i
+p4/RELAYIP/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6
+X/p2p-circuit/p2p/12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3
+

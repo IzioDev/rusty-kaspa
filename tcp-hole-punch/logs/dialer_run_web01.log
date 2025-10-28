@@ -1,0 +1,24 @@
+2025-10-28T00:06:47.334572Z  INFO dcutr_example: Listening on address address=/i
+p4/172.22.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334575Z  INFO dcutr_example: Listening on address address=/i
+p4/172.18.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334579Z  INFO dcutr_example: Listening on address address=/i
+p4/172.21.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334583Z  INFO dcutr_example: Listening on address address=/i
+p4/172.19.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334587Z  INFO dcutr_example: Listening on address address=/i
+p4/172.25.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334589Z  INFO dcutr_example: Listening on address address=/i
+p4/172.17.0.1/udp/49375/quic-v1
+2025-10-28T00:06:47.334594Z  INFO dcutr_example: Listening on address address=/i
+p4/172.20.0.1/udp/49375/quic-v1
+2025-10-28T00:06:49.107401Z  INFO dcutr_example: Told relay its public address
+2025-10-28T00:06:49.107474Z  INFO dcutr_example: Relay told us our observed addr
+ess address=/ip4/HOMEIP/tcp/37879
+2025-10-28T00:06:49.614743Z  INFO dcutr_example: Outgoing connection failed: Fai
+led to negotiate transport protocol(s): [(/ip4/RELAYIP/tcp/4001/p2p/12D3Koo
+WPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X/p2p-circuit/p2p/12D3KooWH3uVF6wv47
+WnArKHk5p6cvgCJEb74UTmxztmQDc298L3: : Failed to connect to destination.: Failed
+to connect to destination.: Relay has no reservation for destination.)] peer=Som
+e(PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"))
+

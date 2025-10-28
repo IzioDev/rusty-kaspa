@@ -1,0 +1,33 @@
+    Finished `release` profile [optimized] target(s) in 0.46s
+     Running `target/release/relay-server-example --secret-key-seed 1 --port 4001`
+Listening on /ip4/127.0.0.1/tcp/4001
+Listening on /ip4/10.0.0.150/tcp/4001
+Listening on /ip4/192.168.139.3/tcp/4001
+Listening on /ip4/192.168.97.0/tcp/4001
+Listening on /ip4/192.168.215.0/tcp/4001
+Listening on /ip4/192.168.107.0/tcp/4001
+Listening on /ip4/10.0.0.163/tcp/4001
+Listening on /ip4/127.0.0.1/udp/4001/quic-v1
+Listening on /ip4/10.0.0.150/udp/4001/quic-v1
+Listening on /ip4/192.168.139.3/udp/4001/quic-v1
+Listening on /ip4/192.168.97.0/udp/4001/quic-v1
+Listening on /ip4/192.168.215.0/udp/4001/quic-v1
+Listening on /ip4/192.168.107.0/udp/4001/quic-v1
+Listening on /ip4/10.0.0.163/udp/4001/quic-v1
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3") }
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 6b79c57e6a95239282c4818e96112f3f3a401ba97a564c23852a3f1ea5fc) }, protocol_version: "/TODO/0.0.1", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.97.0/udp/58398/quic-v1, /ip4/192.168.97.0/tcp/64681, /ip4/192.168.215.0/udp/58398/quic-v1, /ip4/192.168.139.3/tcp/64681, /ip4/127.0.0.1/tcp/64681, /ip4/10.0.0.150/tcp/64681, /ip4/10.0.0.163/udp/58398/quic-v1, /ip4/127.0.0.1/udp/58398/quic-v1, /ip4/192.168.107.0/tcp/64681, /ip4/10.0.0.163/tcp/64681, /ip4/192.168.107.0/udp/58398/quic-v1, /ip4/10.0.0.150/udp/58398/quic-v1, /ip4/192.168.139.3/udp/58398/quic-v1, /ip4/192.168.215.0/tcp/64681], protocols: ["/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/127.0.0.1/tcp/4001, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(463.208µs) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), renewed: false }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo") }
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): dadbd184a2d526f1ebdd5c6fdad9359b228759b4d7f79d66689fa254aad8546) }, protocol_version: "/TODO/0.0.1", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/udp/60931/quic-v1, /ip4/10.0.0.150/udp/60931/quic-v1, /ip4/10.0.0.150/tcp/64687, /ip4/127.0.0.1/udp/60931/quic-v1, /ip4/192.168.107.0/tcp/64687, /ip4/10.0.0.163/udp/60931/quic-v1, /ip4/192.168.139.3/udp/60931/quic-v1, /ip4/192.168.97.0/udp/60931/quic-v1, /ip4/192.168.215.0/udp/60931/quic-v1, /ip4/127.0.0.1/tcp/64687, /ip4/192.168.139.3/tcp/64687, /ip4/192.168.215.0/tcp/64687, /ip4/192.168.97.0/tcp/64687, /ip4/10.0.0.163/tcp/64687], protocols: ["/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/127.0.0.1/tcp/4001, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo"), connection: ConnectionId(2), result: Ok(176.791µs) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo"), dst_peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3") }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(288µs) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo"), dst_peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), error: None }
+BehaviourEvent: Event { peer: PeerId("12D3KooWQYhTNQdmr3ArTeUHRYzFg94BKyTkoWBDWez9kSCVe2Xo"), connection: ConnectionId(2), result: Ok(384.583µs) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(1.504083ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(164.333µs) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(229.917µs) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(651.792µs) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3"), connection: ConnectionId(1), result: Ok(407.416µs) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3") }

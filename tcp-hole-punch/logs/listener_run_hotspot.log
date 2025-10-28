@@ -1,0 +1,24 @@
+reamMuxer::poll: yamux::frame::io: 895c45ee: write: (WriteState::Init)
+2025-10-28T00:08:32.696249Z TRACE new_established_connection{remote_addr=/ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X id=
+1 peer=12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X}:Connection::poll:St
+reamMuxer::poll: yamux::frame::io: 895c45ee: write: (WriteState::Init)
+2025-10-28T00:08:32.696260Z TRACE new_established_connection{remote_addr=/ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X id=
+1 peer=12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X}:Connection::poll:St
+reamMuxer::poll: yamux::frame::io: 895c45ee: read: (ReadState::Header (offset 0)
+)
+2025-10-28T00:08:32.696357Z TRACE new_established_connection{remote_addr=/ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X id=
+1 peer=12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X}:Connection::poll:St
+reamMuxer::poll_inbound: yamux::frame::io: 895c45ee: write: (WriteState::Init)
+2025-10-28T00:08:32.696369Z TRACE new_established_connection{remote_addr=/ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X id=
+1 peer=12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X}:Connection::poll:St
+reamMuxer::poll_inbound: yamux::frame::io: 895c45ee: write: (WriteState::Init)
+2025-10-28T00:08:32.696483Z TRACE new_established_connection{remote_addr=/ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X id=
+1 peer=12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X}:Connection::poll:St
+reamMuxer::poll_inbound: yamux::frame::io: 895c45ee: read: (ReadState::Header (o
+ffset 0))
+

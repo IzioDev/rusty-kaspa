@@ -1,0 +1,24 @@
+tpqUY, role_override: Dialer, port_use: Reuse }
+2025-10-28T00:54:22.890260Z  INFO dcutr_example: event=Event { remote_peer_id: P
+eerId("12D3KooWDMCQbZZvLgHiHntG1KwcHoqHPAxL37KvhgibWqFtpqUY"), result: Ok(Connec
+tionId(3)) }
+2025-10-28T00:54:23.096612Z  INFO dcutr_example: event=Sent { connection_id: Con
+nectionId(3), peer_id: PeerId("12D3KooWDMCQbZZvLgHiHntG1KwcHoqHPAxL37KvhgibWqFtp
+qUY") }
+2025-10-28T00:54:23.096754Z  INFO dcutr_example: event=Received { connection_id:
+ ConnectionId(3), peer_id: PeerId("12D3KooWDMCQbZZvLgHiHntG1KwcHoqHPAxL37KvhgibW
+qFtpqUY"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(com
+pressed): 3479764308eb7b5f7cc9d5cdd29845fd82a03df53d2cffef3c228547487c5) }, prot
+ocol_version: "/TODO/0.0.1", agent_version: "rust-libp2p/0.47.0", listen_addrs:
+[/ip4/192.168.107.0/udp/50832/quic-v1, /ip4/127.0.0.1/tcp/52346, /ip4/127.0.0.1/
+udp/50832/quic-v1, /ip4/10.0.0.150/tcp/52346, /ip4/192.168.97.0/udp/50832/quic-v
+1, /ip4/192.168.215.0/udp/50832/quic-v1, /ip4/10.0.0.150/udp/50832/quic-v1, /ip4
+/192.168.97.0/tcp/52346, /ip4/192.168.139.3/tcp/52346, /ip4/192.168.139.3/udp/50
+832/quic-v1, /ip4/192.168.107.0/tcp/52346, /ip4/192.168.215.0/tcp/52346, /ip4/78
+.47.77.153/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X/p2p
+-circuit/p2p/12D3KooWDMCQbZZvLgHiHntG1KwcHoqHPAxL37KvhgibWqFtpqUY], protocols: [
+"/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/re
+lay/0.2.0/stop"], observed_addr: /ip4/VPSIP/tcp/41803, signed_peer_reco
+rd: None } }
+^C
+root@sensor-nyc-vultr:~/rust-libp2p#
