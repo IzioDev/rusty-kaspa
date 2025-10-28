@@ -4,6 +4,8 @@ use std::{
     task::{Context, Poll},
 };
 
+use hyper::rt::{Read as HyperRead, Write as HyperWrite};
+use hyper_util::rt::tokio::WithHyperIo;
 use libp2p::{multiaddr::Protocol, swarm::Stream as Libp2pSubstream, Multiaddr, PeerId};
 use tokio::io::{AsyncRead as TokioAsyncRead, AsyncWrite as TokioAsyncWrite, ReadBuf};
 use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
@@ -51,12 +53,12 @@ impl Libp2pConnectInfo {
 /// Wrapper that implements tonic's `Connected` trait and Tokio IO traits.
 pub struct Libp2pStream {
     pub info: Libp2pConnectInfo,
-    inner: Compat<Libp2pSubstream>,
+    inner: WithHyperIo<Compat<Libp2pSubstream>>,
 }
 
 impl Libp2pStream {
     fn new(inner: Libp2pSubstream, info: Libp2pConnectInfo) -> Self {
-        Self { info, inner: inner.compat() }
+        Self { info, inner: WithHyperIo::new(inner.compat()) }
     }
 }
 
@@ -73,21 +75,64 @@ impl fmt::Debug for Libp2pStream {
 
 impl TokioAsyncRead for Libp2pStream {
     fn poll_read(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_read(cx, buf)
+        TokioAsyncRead::poll_read(std::pin::Pin::new(&mut self.get_mut().inner), cx, buf)
     }
 }
 
 impl TokioAsyncWrite for Libp2pStream {
     fn poll_write(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_write(cx, buf)
+        TokioAsyncWrite::poll_write(std::pin::Pin::new(&mut self.get_mut().inner), cx, buf)
     }
 
     fn poll_flush(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_flush(cx)
+        TokioAsyncWrite::poll_flush(std::pin::Pin::new(&mut self.get_mut().inner), cx)
     }
 
     fn poll_shutdown(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        std::pin::Pin::new(&mut self.get_mut().inner).poll_shutdown(cx)
+        TokioAsyncWrite::poll_shutdown(std::pin::Pin::new(&mut self.get_mut().inner), cx)
+    }
+}
+
+impl HyperRead for Libp2pStream {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: hyper::rt::ReadBufCursor<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        HyperRead::poll_read(std::pin::Pin::new(&mut self.get_mut().inner), cx, buf)
+    }
+}
+
+impl HyperWrite for Libp2pStream {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        HyperWrite::poll_write(std::pin::Pin::new(&mut self.get_mut().inner), cx, buf)
+    }
+
+    fn poll_flush(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        HyperWrite::poll_flush(std::pin::Pin::new(&mut self.get_mut().inner), cx)
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        HyperWrite::poll_shutdown(std::pin::Pin::new(&mut self.get_mut().inner), cx)
+    }
+
+    fn is_write_vectored(&self) -> bool {
+        HyperWrite::is_write_vectored(&self.inner)
+    }
+
+    fn poll_write_vectored(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[std::io::IoSlice<'_>],
+    ) -> Poll<std::io::Result<usize>> {
+        HyperWrite::poll_write_vectored(std::pin::Pin::new(&mut self.get_mut().inner), cx, bufs)
     }
 }
 

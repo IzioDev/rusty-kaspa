@@ -12,15 +12,15 @@
 
 ## Bridge Components
 1. **Swarm Service (Actor)**
-   - Owns libp2p `Swarm<Behaviour>` configured with TCP + Noise + Yamux, QUIC, relay client, identify, ping, DCUtR.
+   - Owns a libp2p `Swarm<Behaviour>` configured with TCP + Noise + Yamux together with the identify, ping and `libp2p-stream` behaviours. (Relay/DCUtR remain future work once Kaspa’s adaptor is wired in.)
    - Runs in a dedicated task; communicates with application via async channels (`mpsc` for commands, `oneshot` for responses).
    - Responsibilities:
-     - Dial peers via relay/DCUtR when instructed (`DialPeer` command).
-     - Listen for inbound connections, perform DCUtR upgrades, and surface negotiated substreams.
-     - Manage shutdown and relay reservations.
+     - Dial peers when instructed (`Dial` command) using the multiaddrs supplied over the channel (the swarm re-appends the `/p2p/<peer>` suffix before dialling).
+     - Listen for inbound connections and surface negotiated substreams via a bounded `mpsc` queue.
+     - Manage clean shutdowns and emit tracing around clone/drop counts so leaks are easy to spot in integration tests.
 
 2. **Stream Wrapper**
-   - Wraps `libp2p::Stream` (or `libp2p_stream::Stream`) implementing `tokio::io::AsyncRead + AsyncWrite`.
+   - Wraps a `libp2p_stream::Stream` with `tokio_util::compat::Compat` and `hyper_util::rt::tokio::WithHyperIo` so the same type implements both Tokio’s `AsyncRead/AsyncWrite` and Hyper’s `rt::Read/Write` traits.
    - Implements tonic's `Connected` trait to provide metadata:
      ```rust
      impl Connected for Libp2pStreamWrapper {
@@ -50,12 +50,47 @@
 3. Failure cases:
    - If hole punch fails, wrapper indicates relay fallback and includes metrics for decision logic (optionally keep the relayed stream or retry later).
 
+## Usage Guide
+
+1. **Spawn a swarm**
+   ```rust
+   let keypair = libp2p::identity::Keypair::generate_ed25519();
+   let mut swarm_handle = spawn_swarm(keypair)?;
+   ```
+   Each call owns the background task. Use `SwarmHandle::shutdown()` to terminate gracefully.
+
+2. **Accept inbound connections**
+   ```rust
+   let incoming = incoming_from_handle(&mut swarm_handle)?; // can only be called once
+   Server::builder()
+       .add_service(MyService::new())
+       .serve_with_incoming(incoming)
+       .await?;
+   ```
+
+3. **Dial outbound connections**
+   ```rust
+   let connector = Libp2pConnector::new(swarm_handle.command_tx());
+   let uri = format!("libp2p://{peer_id}?addr={}", urlencoding::encode("/ip4/203.0.113.5/tcp/16111/p2p/…"));
+   let channel = Endpoint::from_shared(uri)?.connect_with_connector(connector).await?;
+   ```
+   `parse_target` sanitises the multiaddr and the swarm reattaches the `/p2p/<peer>` suffix before dialling. If the URI is malformed the connector returns `BridgeError::DialFailed` immediately.
+
+4. **Inspect metadata**
+   Every accepted stream implements `Connected` and exposes `Libp2pConnectInfo` (peer id, first observed multiaddr, relay flag, synthesised socket address). This can be threaded into Kaspa’s logging/metrics without additional plumbing.
+
+## Test Coverage
+- `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically.
+- `tonic_server_accepts_libp2p_stream` feeds the same stream through a tonic Echo service using `serve_with_incoming` + `Libp2pConnector`.
+- Additional tests cover URI failure modes (`missing addr`, malformed multiaddr, missing `/p2p/`, mismatched peer).
+
+All integration tests run in ~20 ms and are part of `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`.
+
 ## Open Questions
-- Should we rely on `libp2p-stream` crate for substream extraction or build a lightweight Behaviour ourselves? (Gemini recommends `libp2p_stream` for explicit accept/open APIs.)
-- How do we expose relay statistics (e.g., connection duration, DCUtR retries) to Kaspa metrics? Possibly extend `Libp2pConnectInfo` with counters or pass a side-channel.
-- Do we support QUIC fallback automatically? The swarm can register both TCP and QUIC; decision logic may live inside the behaviour.
+- Extend metrics once Phase 3 threads `Libp2pConnectInfo` into Kaspa’s adaptor (e.g., relay/DCUtR counters).
+- Evaluate QUIC support when Kaspa’s networking layer is ready for parallel TCP/QUIC dial attempts.
 
 ## Next Steps
-1. Prototype the Swarm actor interface in a separate module (no tonic integration yet).
-2. Evaluate `libp2p-stream` vs. custom behaviour by coding minimal extraction.
-3. Sketch the tonic connector/server wrappers (`bridge::client::Connector`, `bridge::server::Incoming`).
+1. Extend Kaspa’s adaptor/router to consume `Libp2pStream` directly (Phase 3).
+2. Record relay/DCUtR metrics once the adaptor exposes them downstream.
+3. Re-enable relay/DCUtR/QUIC behaviours after the router can select transports at runtime.

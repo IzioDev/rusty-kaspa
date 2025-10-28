@@ -6,7 +6,7 @@ use futures::{
     SinkExt,
 };
 use http::Uri;
-use libp2p::{multiaddr::Multiaddr, PeerId};
+use libp2p::{multiaddr::{Multiaddr, Protocol}, PeerId};
 use tower::Service;
 
 use crate::{
@@ -119,9 +119,13 @@ fn parse_target(uri: &Uri) -> Result<DialTarget> {
                 let decoded = percent_decode(value)?;
                 let addr = Multiaddr::from_str(&decoded)
                     .map_err(|e| BridgeError::DialFailed(format!("invalid multiaddr '{decoded}': {e}")))?;
-                addrs.push(addr);
+                addrs.push(sanitize_multiaddr(addr, peer_id)?);
             }
         }
+    }
+
+    if addrs.is_empty() {
+        return Err(BridgeError::DialFailed("missing addr query parameters".into()));
     }
 
     Ok(DialTarget { peer_id, addresses: addrs })
@@ -133,5 +137,56 @@ fn percent_decode(input: &str) -> Result<String> {
         Ok(decoded.into_owned())
     } else {
         Ok(input.to_owned())
+    }
+}
+
+fn sanitize_multiaddr(mut addr: Multiaddr, peer_id: PeerId) -> Result<Multiaddr> {
+    match addr.iter().last() {
+        Some(Protocol::P2p(id)) if id == peer_id => {
+            addr.pop();
+            Ok(addr)
+        }
+        Some(Protocol::P2p(id)) => Err(BridgeError::DialFailed(format!(
+            "multiaddr '{addr}' targets peer {id} instead of {peer_id}"
+        ))),
+        _ => Err(BridgeError::DialFailed(format!("multiaddr '{addr}' missing terminal /p2p/ component"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_target_sanitizes_terminal_peer_component() {
+        let peer = PeerId::random();
+        let multiaddr = format!("/ip4/127.0.0.1/tcp/12345/p2p/{peer}");
+        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr))
+            .parse()
+            .expect("uri");
+
+        let target = parse_target(&uri).expect("target");
+        assert_eq!(target.peer_id, peer);
+        assert_eq!(target.addresses.len(), 1);
+        assert_eq!(target.addresses[0].to_string(), "/ip4/127.0.0.1/tcp/12345");
+    }
+
+    #[test]
+    fn parse_target_rejects_missing_addresses() {
+        let peer = PeerId::random();
+        let uri: Uri = format!("libp2p://{peer}").parse().unwrap();
+        assert!(matches!(parse_target(&uri), Err(BridgeError::DialFailed(msg)) if msg.contains("missing addr")));
+    }
+
+    #[test]
+    fn parse_target_rejects_mismatched_peer() {
+        let peer = PeerId::random();
+        let other = PeerId::random();
+        let multiaddr = format!("/ip4/10.0.0.5/tcp/5555/p2p/{other}");
+        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr))
+            .parse()
+            .expect("uri");
+
+        assert!(matches!(parse_target(&uri), Err(BridgeError::DialFailed(msg)) if msg.contains("targets peer")));
     }
 }

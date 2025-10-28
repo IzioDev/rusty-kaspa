@@ -15,11 +15,11 @@ use futures::{
 };
 use libp2p::{
     core::connection::ConnectedPoint,
-    dcutr, identify,
+    identify,
     multiaddr::Protocol,
-    noise, relay,
+    noise,
     swarm::{NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent},
-    tls, yamux, Multiaddr, PeerId, SwarmBuilder,
+    yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
 use std::task::{Context, Poll};
@@ -139,7 +139,7 @@ pub type IncomingStreamReceiver = mpsc::Receiver<Libp2pStreamHandle>;
 /// Commands that can be issued to the libp2p swarm actor.
 pub enum SwarmCommand {
     Dial { peer: PeerId, addrs: Vec<Multiaddr>, response: oneshot::Sender<Result<Libp2pStreamHandle>> },
-    ListenOn { addr: Multiaddr },
+    ListenOn { addr: Multiaddr, response: Option<oneshot::Sender<Result<()>>> },
     Shutdown,
 }
 
@@ -190,10 +190,8 @@ impl SwarmHandle {
 #[derive(NetworkBehaviour)]
 #[behaviour(to_swarm = "BridgeBehaviourEvent")]
 struct BridgeBehaviour {
-    relay: relay::client::Behaviour,
     identify: identify::Behaviour,
     ping: libp2p::ping::Behaviour,
-    dcutr: dcutr::Behaviour,
     stream: lpstream::Behaviour,
 }
 
@@ -217,36 +215,65 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
         let mut peer_book = PeerBook::default();
         let mut incoming_tx = incoming_tx;
         let mut pending_dials = FuturesUnordered::new();
+        let mut pending_listen_acks = Vec::new();
         loop {
             tokio::select! {
                 cmd = command_rx.next() => {
                     match cmd {
                         Some(SwarmCommand::Dial { peer, addrs, response }) => {
+                            debug!(%peer, ?addrs, "Received dial command");
                             let mut control_clone = dial_control.clone();
-                            for addr in &addrs {
-                                swarm.add_peer_address(peer, addr.clone());
-                            }
                             if !addrs.is_empty() {
                                 peer_book.record_addresses(peer, addrs.clone());
+                                // Construct full multiaddrs with /p2p/{peer} suffix for dialing
+                                let full_addrs: Vec<_> = addrs
+                                    .iter()
+                                    .cloned()
+                                    .map(|mut addr| {
+                                        addr.push(Protocol::P2p(peer));
+                                        addr
+                                    })
+                                    .collect();
+                                // Dial using full multiaddrs - this is the most explicit approach
+                                for addr in &full_addrs {
+                                    if let Err(err) = swarm.dial(addr.clone()) {
+                                        warn!(%peer, %err, ?addr, "Failed to dial address");
+                                    } else {
+                                        debug!(%peer, ?addr, "Dial initiated successfully");
+                                        break; // Successfully initiated one dial, that's enough
+                                    }
+                                }
                             }
+                            // open_stream will wait for the connection to establish, then open a stream
                             pending_dials.push(async move {
                                 let result = control_clone.open_stream(peer, stream_protocol()).await.map_err(map_stream_error);
                                 (peer, response, result)
                             }.boxed());
                         }
-                        Some(SwarmCommand::ListenOn { addr }) => {
-                            if let Err(err) = swarm.listen_on(addr) {
-                                error!(%err, "failed to listen");
+                        Some(SwarmCommand::ListenOn { addr, response }) => {
+                            match swarm.listen_on(addr) {
+                                Ok(_) => {
+                                    if let Some(tx) = response {
+                                        pending_listen_acks.push(tx);
+                                    }
+                                }
+                                Err(err) => {
+                                    error!(%err, "failed to listen");
+                                    if let Some(tx) = response {
+                                        let _ = tx.send(Err(BridgeError::DialFailed(format!("listen error: {err}"))));
+                                    }
+                                }
                             }
                         }
                         Some(SwarmCommand::Shutdown) => break,
                         None => break,
                     }
                 }
-                dial_result = pending_dials.next() => {
+                dial_result = pending_dials.next(), if !pending_dials.is_empty() => {
                     if let Some((peer, response, outcome)) = dial_result {
                         match outcome {
                             Ok(stream) => {
+                                debug!(%peer, "Stream opened successfully");
                                 let info = peer_book.info_for(peer);
                                 let handle = Libp2pStreamHandle::new(stream, info);
                                 if response.send(Ok(handle)).is_err() {
@@ -254,6 +281,7 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
                                 }
                             }
                             Err(err) => {
+                                warn!(%peer, %err, "Failed to open stream");
                                 if response.send(Err(err)).is_err() {
                                     debug!(%peer, "dial response channel dropped (error)");
                                 }
@@ -274,7 +302,15 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
                     }
                 }
                 swarm_event = swarm.select_next_some() => {
-                    handle_swarm_event(swarm_event, &mut peer_book);
+                    match swarm_event {
+                        SwarmEvent::NewListenAddr { ref address, .. } => {
+                            info!(%address, "Swarm listening");
+                            for ack in pending_listen_acks.drain(..) {
+                                let _ = ack.send(Ok(()));
+                            }
+                        }
+                        event => handle_swarm_event(event, &mut peer_book),
+                    }
                 }
             }
         }
@@ -286,22 +322,16 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
 fn build_swarm(local_key: libp2p::identity::Keypair) -> Result<Swarm<BridgeBehaviour>> {
     let builder = SwarmBuilder::with_existing_identity(local_key)
         .with_tokio()
-        .with_tcp(Default::default(), (tls::Config::new, noise::Config::new), yamux::Config::default)
+        // Use only Noise for simplicity in tests - TLS negotiation can hang
+        .with_tcp(Default::default(), noise::Config::new, yamux::Config::default)
         .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?;
 
     let builder = builder
-        .with_relay_client((tls::Config::new, noise::Config::new), yamux::Config::default)
-        .map_err(|e| BridgeError::DialFailed(format!("relay client init failed: {e}")))?;
-
-    let builder = builder
-        .with_behaviour(|key, relay| {
+        .with_behaviour(|key| {
             let public = key.public();
-            let peer_id = public.to_peer_id();
             BridgeBehaviour {
-                relay,
                 identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
                 ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
-                dcutr: dcutr::Behaviour::new(peer_id),
                 stream: lpstream::Behaviour::default(),
             }
         })
@@ -348,9 +378,6 @@ impl PeerBook {
 
 fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
-        SwarmEvent::NewListenAddr { address, .. } => {
-            info!(%address, "Swarm listening");
-        }
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
             debug!(%peer_id, ?endpoint, "Swarm connection established");
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
@@ -396,23 +423,16 @@ fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
 }
 
+#[derive(Debug)]
 enum BridgeBehaviourEvent {
     Stream,
-    Relay,
     Identify,
     Ping,
-    Dcutr,
 }
 
 impl From<()> for BridgeBehaviourEvent {
     fn from(_: ()) -> Self {
         Self::Stream
-    }
-}
-impl From<relay::client::Event> for BridgeBehaviourEvent {
-    fn from(value: relay::client::Event) -> Self {
-        let _ = value;
-        Self::Relay
     }
 }
 impl From<identify::Event> for BridgeBehaviourEvent {
@@ -425,11 +445,5 @@ impl From<libp2p::ping::Event> for BridgeBehaviourEvent {
     fn from(value: libp2p::ping::Event) -> Self {
         let _ = value;
         Self::Ping
-    }
-}
-impl From<dcutr::Event> for BridgeBehaviourEvent {
-    fn from(value: dcutr::Event) -> Self {
-        let _ = value;
-        Self::Dcutr
     }
 }

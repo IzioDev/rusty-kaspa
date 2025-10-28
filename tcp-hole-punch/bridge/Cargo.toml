@@ -29,5 +29,14 @@ tokio-util = { version = "0.7", features = ["compat"] }
 http = "1"
 tower = { version = "0.4", features = ["util"] }
 urlencoding = "2"
+prost = "0.13"
+hyper = { version = "1", default-features = false, features = ["client", "http2"] }
+hyper-util = { version = "0.1.17", features = ["tokio"] }
 
 [workspace]
+
+[build-dependencies]
+tonic-build = "0.12"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
