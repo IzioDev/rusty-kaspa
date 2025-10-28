@@ -15,7 +15,7 @@ p4/192.168.215.0/udp/51553/quic-v1
 p4/192.168.107.0/udp/51553/quic-v1
 2025-10-28T00:00:42.552113Z  INFO dcutr_example: Told relay its public address
 2025-10-28T00:00:42.554791Z  INFO dcutr_example: Relay told us our observed addr
-ess address=/ip4/HOTSPOTIP/tcp/5199
+ess address=/ip4/HOMEIP/tcp/5199
 2025-10-28T00:00:43.245109Z  INFO dcutr_example: Relay accepted our reservation
 request
 2025-10-28T00:00:43.245250Z  INFO dcutr_example: Listening on address address=/i

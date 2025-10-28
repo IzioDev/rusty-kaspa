@@ -3,7 +3,7 @@
 - **Relay**: `RELAYIP:4001`, peer id `12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X`, running `relay-server-example` on Hetzner VPS.
 - **Listener (phone hotspot)**  
   - Command: `RUST_LOG=info cargo run --release --manifest-path examples/dcutr/Cargo.toml -- --mode listen --secret-key-seed 2 --relay-address /ip4/RELAYIP/tcp/4001/p2p/12D3KooWPj...`  
-  - Observed address reported by relay: `HOTSPOTIP:*` (carrier-grade NAT).  
+  - Observed address reported by relay: `HOMEIP:*` (carrier-grade NAT).  
   - Reservation confirmed; trace logs saved to `logs/listener_run_hotspot.log`.
 - **Dialer (web01 on home LAN)**  
   - Command loop: `RUST_LOG=info cargo run --release --manifest-path examples/dcutr/Cargo.toml -- --mode dial --secret-key-seed 3 ... --remote-peer-id 12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3`.  

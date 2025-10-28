@@ -10,7 +10,7 @@ This document records the environments we exercised while validating libp2p’s 
 - **Relay**: `RELAYIP:4001` (peer `12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X`).
 - **Listener (hotspot)**  
   - Command: `RUST_LOG=info cargo run --release --manifest-path examples/dcutr/Cargo.toml -- --mode listen --secret-key-seed 2 --relay-address /ip4/RELAYIP/tcp/4001/p2p/12D3KooWPjceQrSwdWXPyLLeABRXmuqt69Rg3sBYbU1Nft9HyQ6X`  
-  - Relay observed address: carrier WAN `/ip4/HOTSPOTIP/tcp/<dynamic>`  
+  - Relay observed address: carrier WAN `/ip4/HOMEIP/tcp/<dynamic>`  
   - Logs: `logs/listener_run_hotspot.log`
 - **Dialer (web01 @ home)**  
   - Command loop: `RUST_LOG=info cargo run --release --manifest-path examples/dcutr/Cargo.toml -- --mode dial --secret-key-seed 3 ... --remote-peer-id 12D3KooWH3uVF6wv47WnArKHk5p6cvgCJEb74UTmxztmQDc298L3`

@@ -4,7 +4,7 @@
 - ✅ **Phase 1 – Baseline hole punching**  
   - Successful direct punch: see `TEST_SCENARIOS.md` (VPS dialer scenario) and raw logs in `logs/dialer_vps_scenario.log`.  
   - Negative case (expected relay fallback): documented in `logs/hotspot-scenario-summary.md`.
-- ⏳ **Phase 2 – Build the libp2p ⇄ tonic bridge** (next up).
+- 🔄 **Phase 2 – Build the libp2p ⇄ tonic bridge** (in progress via `bridge/` crate).
 - ⏳ **Phase 3 – Extend the Kaspa adaptor/router**.
 - ⏳ **Phase 4 – Two-private-peer PoC**.
 
@@ -15,10 +15,10 @@
 - Timing, multiaddrs, and Swarm events recorded to guide Phase 2 expectations (`logs/phase1-summary.md`).
 
 ## Phase 2 – Build the libp2p ⇄ tonic Bridge
-- Implement a libp2p Swarm “actor” task (Tokio loop + command channel) configured with TCP/Noise/Yamux, QUIC, AutoNAT, Relay v2, and DCUtR behaviours.
-- Prototype both `libp2p-stream` and a lightweight custom behaviour (similar to `libp2p-grpc-rs`) to obtain `NegotiatedSubstream`s; keep the option that hands us a `Send + 'static` stream with the least ceremony.
-- Wrap the stream in a `Libp2pStreamWrapper` that implements `AsyncRead/Write` and tonic’s `Connected`, synthesising a fallback `SocketAddr` and exposing full `PeerId`/`Multiaddr` metadata via `ConnectInfo`.
-- Expose async entry points `accept_stream()` (feeding `Server::serve_with_incoming`) and `dial_stream()` (backed by `Endpoint::connect_with_connector`) to integrate with Kaspa.
+- Architecture notes captured in `design/phase2-architecture.md`.
+- Libp2p swarm actor + stream wrapper implemented under `bridge/src/` with `libp2p-stream` control, tonic client connector, and an instrumented command channel wrapper for lifecycle/debug visibility.
+- Helper `incoming_from_handle` added so callers can detach the single pending incoming receiver safely; `tests/integration.rs` covers the helper and shutdown path (5s timeout guard, verified under `cargo test -- --nocapture`).
+- Current TODOs (handover): wire an end-to-end tonic server test using `Libp2pIncoming`, expand connector error coverage (missing/bad multiaddrs, relay fallback), and produce usage docs/README + final plan update before marking Phase 2 complete.
 
 ## Phase 3 – Extend the Kaspa Adaptor/Router
 - Add an adaptor path that consumes an owned `AsyncRead + AsyncWrite + Send + 'static` stream instead of dialing by URI, threading the optional `SocketAddr` through `ConnectionHandler::connect`/`Router::new`.
