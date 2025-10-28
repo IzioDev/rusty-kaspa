@@ -20,6 +20,10 @@ path = "./src/bin/client.rs"
 name = "kaspa_p2p_server"
 path = "./src/bin/server.rs"
 
+ [features]
+default = []
+libp2p-bridge = ["hole-punch-bridge", "libp2p"]
+
 [dependencies]
 kaspa-core.workspace = true
 kaspa-consensus-core.workspace = true
@@ -33,6 +37,9 @@ borsh.workspace = true
 ctrlc.workspace = true
 futures = { workspace = true, features = ["alloc"] }
 h2.workspace = true
+http.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
 itertools.workspace = true
 log.workspace = true
 parking_lot.workspace = true
@@ -44,7 +51,10 @@ thiserror.workspace = true
 tokio = { workspace = true, features = [ "rt-multi-thread", "macros", "signal" ] }
 tokio-stream = { workspace = true, features = ["net"] }
 tonic = { workspace = true, features = ["tls", "gzip"] }
+tower.workspace = true
 uuid.workspace = true
+hole-punch-bridge = { path = "../../tcp-hole-punch/bridge", optional = true }
+libp2p = { version = "0.56", default-features = false, features = ["tcp", "noise", "yamux"], optional = true }
 
 [build-dependencies]
 tonic-build = { workspace = true, features = ["prost"] }

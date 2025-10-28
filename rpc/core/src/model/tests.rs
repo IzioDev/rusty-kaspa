@@ -303,6 +303,10 @@ mod mockery {
                 advertised_protocol_version: mock(),
                 time_connected: mock(),
                 is_ibd_peer: mock(),
+                is_libp2p: true,
+                libp2p_peer_id: Some("12D3KooWExamplePeerId".to_string()),
+                libp2p_multiaddr: Some("/ip4/127.0.0.1/tcp/16111".to_string()),
+                libp2p_relay_used: Some(true),
             }
         }
     }

@@ -2,6 +2,8 @@ use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_utils::networking::{IpAddress, PeerId};
 use std::{fmt::Display, net::SocketAddr, sync::Arc, time::Instant};
 
+use super::connection_info::ConnectionMetadata;
+
 #[derive(Debug, Clone, Default)]
 pub struct PeerProperties {
     pub user_agent: String,
@@ -21,6 +23,7 @@ pub struct Peer {
     connection_started: Instant,
     properties: Arc<PeerProperties>,
     last_ping_duration: u64,
+    connection_metadata: Option<ConnectionMetadata>,
 }
 
 impl Peer {
@@ -31,8 +34,9 @@ impl Peer {
         connection_started: Instant,
         properties: Arc<PeerProperties>,
         last_ping_duration: u64,
+        connection_metadata: Option<ConnectionMetadata>,
     ) -> Self {
-        Self { identity, net_address, is_outbound, connection_started, properties, last_ping_duration }
+        Self { identity, net_address, is_outbound, connection_started, properties, last_ping_duration, connection_metadata }
     }
 
     /// Internal identity of this peer
@@ -64,6 +68,10 @@ impl Peer {
 
     pub fn last_ping_duration(&self) -> u64 {
         self.last_ping_duration
+    }
+
+    pub fn connection_metadata(&self) -> Option<&ConnectionMetadata> {
+        self.connection_metadata.as_ref()
     }
 }
 

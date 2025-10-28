@@ -1,4 +1,5 @@
 use crate::common::ProtocolError;
+use crate::core::connection_info::ConnectionMetadata;
 use crate::core::hub::Hub;
 use crate::ConnectionError;
 use crate::{core::connection_handler::ConnectionHandler, Router};
@@ -7,6 +8,7 @@ use kaspa_utils_tower::counters::TowerConnectionCounters;
 use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::mpsc::channel as mpsc_channel;
 use tokio::sync::oneshot::Sender as OneshotSender;
 
@@ -82,6 +84,14 @@ impl Adaptor {
         retry_interval: Duration,
     ) -> Result<PeerKey, ConnectionError> {
         self.connection_handler.connect_with_retry(peer_address, retry_attempts, retry_interval).await.map(|r| r.key())
+    }
+
+    /// Connect to a new peer using a pre-established async stream.
+    pub async fn connect_peer_with_stream<S>(&self, stream: S, metadata: ConnectionMetadata) -> Result<PeerKey, ConnectionError>
+    where
+        S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
+    {
+        self.connection_handler.connect_with_stream(stream, metadata).await.map(|r| r.key())
     }
 
     /// Terminates all peers and cleans up any additional async resources

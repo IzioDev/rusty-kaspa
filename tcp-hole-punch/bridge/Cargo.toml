@@ -3,6 +3,9 @@ name = "hole-punch-bridge"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+
 [dependencies]
 libp2p = { version = "0.56", default-features = false, features = [
     "tcp",
@@ -32,8 +35,6 @@ urlencoding = "2"
 prost = "0.13"
 hyper = { version = "1", default-features = false, features = ["client", "http2"] }
 hyper-util = { version = "0.1.17", features = ["tokio"] }
-
-[workspace]
 
 [build-dependencies]
 tonic-build = "0.12"

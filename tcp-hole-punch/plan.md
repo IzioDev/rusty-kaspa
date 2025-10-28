@@ -22,10 +22,10 @@
 - [x] Prepare Phase 3 handoff notes (adaptor integration, metrics, relay/DCUtR re-enable plan).
 
 ## Phase 3 – Extend the Kaspa Adaptor/Router
-- [ ] Add an adaptor entrypoint that accepts an owned `AsyncRead + AsyncWrite + Send + 'static` stream (in addition to the existing URI dial path) and plumb it through `ConnectionHandler::connect`/`Router::new`.
-- [ ] Thread `Libp2pConnectInfo` (peer id, multiaddr, relay flag) into the router so logging/metrics can surface libp2p context.
-- [ ] Decide when to re-enable relay/DCUtR/QUIC behaviours and expose the necessary knobs (connection limits, retry cadence).
-- [ ] Update adaptor/unit tests to cover the new stream-based handshake path.
+- [x] Add an adaptor entrypoint that accepts an owned `AsyncRead + AsyncWrite + Send + 'static` stream (in addition to the existing URI dial path) and plumb it through `ConnectionHandler::connect`/`Router::new`.
+- [x] Thread `Libp2pConnectInfo` (peer id, multiaddr, relay flag) into the router so logging/metrics can surface libp2p context.
+- [x] Decide when to re-enable relay/DCUtR/QUIC behaviours and expose the necessary knobs (connection limits, retry cadence).
+- [x] Update adaptor/unit tests to cover the new stream-based handshake path (see `kaspa_p2p_lib::core::connection_handler::tests::connect_with_stream_establishes_router`).
 
 ## Phase 4 – Deliver the Two-Private-Peer PoC
 - Modify `protocol/p2p/src/bin/{server.rs,client.rs}` to source their transport from the libp2p bridge while keeping the Kaspa handshake and flow registration intact.
@@ -33,7 +33,8 @@
 - Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.
 
 ## Phase 3 – Status (handover)
-- [ ] Adopt `Libp2pStream` in the Kaspa adaptor/router (pending)
-- [ ] Thread bridge metadata into logging/metrics (pending)
-- [ ] Re-enable relay/DCUtR behaviours once adaptor path exists (pending)
-- [ ] Extend adaptor tests to cover libp2p streams (pending)
+- [x] Adopt `Libp2pStream` in the Kaspa adaptor/router
+- [x] Thread bridge metadata into logging/metrics
+- [x] Re-enable relay/DCUtR behaviours once adaptor path exists
+- [x] Extend adaptor tests to cover libp2p streams (run `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`)
+- Latest verification (2025-10-28): `cargo check -p kaspa-p2p-lib`, `cargo check -p kaspa-p2p-lib --no-default-features --features libp2p-bridge`, `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`, and `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml` all pass; libp2p-enabled demo usage is captured in `design/phase2-architecture.md`.

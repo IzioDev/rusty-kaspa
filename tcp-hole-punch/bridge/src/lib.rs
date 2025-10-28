@@ -2,6 +2,8 @@ pub mod stream;
 pub mod swarm;
 pub mod tonic_integration;
 
+pub use swarm::{spawn_swarm, spawn_swarm_with_config, HolePunchConfig, RelayConfig, SwarmConfig, TransportConfig};
+
 /// Top-level error type for the bridge.
 #[derive(thiserror::Error, Debug)]
 pub enum BridgeError {

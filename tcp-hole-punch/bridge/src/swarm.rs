@@ -15,10 +15,10 @@ use futures::{
 };
 use libp2p::{
     core::connection::ConnectedPoint,
-    identify,
+    dcutr, identify,
     multiaddr::Protocol,
-    noise,
-    swarm::{NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent},
+    noise, relay,
+    swarm::{behaviour::toggle::Toggle, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent},
     yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
@@ -32,6 +32,57 @@ use crate::{
 };
 
 const BRIDGE_PROTOCOL_ID: &str = "/kaspa/p2p/bridge/1.0";
+
+/// Transport-level configuration for the libp2p swarm.
+#[derive(Clone, Debug)]
+pub struct TransportConfig {
+    /// Enable the QUIC transport in addition to TCP.
+    pub enable_quic: bool,
+}
+
+impl Default for TransportConfig {
+    fn default() -> Self {
+        Self { enable_quic: false }
+    }
+}
+
+/// Configuration for relay client behaviour.
+#[derive(Clone, Debug)]
+pub struct RelayConfig {
+    /// Toggle the relay client behaviour.
+    pub enabled: bool,
+    /// Maximum total reservations to keep active.
+    pub max_reservations: u16,
+    /// Maximum relayed circuits we keep for a single relay peer.
+    pub max_circuits_per_peer: u16,
+}
+
+impl Default for RelayConfig {
+    fn default() -> Self {
+        Self { enabled: true, max_reservations: 8, max_circuits_per_peer: 4 }
+    }
+}
+
+/// Configuration for hole-punching behaviour.
+#[derive(Clone, Debug)]
+pub struct HolePunchConfig {
+    /// Toggle libp2p DCUtR hole punching support.
+    pub enable_dcutr: bool,
+}
+
+impl Default for HolePunchConfig {
+    fn default() -> Self {
+        Self { enable_dcutr: true }
+    }
+}
+
+/// Aggregate swarm configuration.
+#[derive(Clone, Debug, Default)]
+pub struct SwarmConfig {
+    pub transport: TransportConfig,
+    pub relay: RelayConfig,
+    pub hole_punch: HolePunchConfig,
+}
 
 /// Public command sender wrapper used by tonic integration.
 pub struct SwarmCommandSender {
@@ -192,18 +243,26 @@ impl SwarmHandle {
 struct BridgeBehaviour {
     identify: identify::Behaviour,
     ping: libp2p::ping::Behaviour,
+    relay: Toggle<relay::client::Behaviour>,
+    dcutr: Toggle<dcutr::Behaviour>,
     stream: lpstream::Behaviour,
 }
 
-/// Spawn the libp2p swarm actor and return a handle for issuing commands.
+/// Spawn the libp2p swarm actor using the default configuration.
 pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> {
+    spawn_swarm_with_config(local_key, SwarmConfig::default())
+}
+
+/// Spawn the libp2p swarm actor with a custom configuration and return a handle for issuing commands.
+pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: SwarmConfig) -> Result<SwarmHandle> {
     let peer_id_label = local_key.public().to_peer_id();
     let (raw_sender, mut command_rx) = mpsc::channel::<SwarmCommand>(32);
     let (incoming_tx, incoming_rx) = mpsc::channel::<Libp2pStreamHandle>(32);
 
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 
-    let mut swarm = build_swarm(local_key.clone())?;
+    let mut swarm = build_swarm(local_key.clone(), &config)?;
+    let config = Arc::new(config);
     let mut control = swarm.behaviour_mut().stream.new_control();
     let mut incoming_streams = control.accept(stream_protocol()).map_err(|e| match e {
         AlreadyRegistered => BridgeError::DialFailed("protocol already registered".into()),
@@ -211,7 +270,9 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
     let dial_control = control.clone();
     drop(control);
 
+    let config_for_join = Arc::clone(&config);
     let join_handle = tokio::spawn(async move {
+        let config = config_for_join;
         let mut peer_book = PeerBook::default();
         let mut incoming_tx = incoming_tx;
         let mut pending_dials = FuturesUnordered::new();
@@ -222,6 +283,31 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
                     match cmd {
                         Some(SwarmCommand::Dial { peer, addrs, response }) => {
                             debug!(%peer, ?addrs, "Received dial command");
+                            if config.relay.enabled {
+                                let new_relays = addrs.iter().filter(|addr| addr_uses_relay(addr)).count();
+                                if new_relays > 0 {
+                                    let total = peer_book.relay_address_count();
+                                    let per_peer = peer_book.relay_address_count_for(peer);
+                                    let max_total = config.relay.max_reservations as usize;
+                                    let max_per_peer = config.relay.max_circuits_per_peer as usize;
+                                    if total + new_relays > max_total {
+                                        let _ = response.send(Err(BridgeError::DialFailed(
+                                            format!(
+                                                "relay reservation limit reached (total {total} >= {max_total})"
+                                            ),
+                                        )));
+                                        continue;
+                                    }
+                                    if per_peer + new_relays > max_per_peer {
+                                        let _ = response.send(Err(BridgeError::DialFailed(
+                                            format!(
+                                                "relay reservation limit reached for peer {peer} (current {per_peer} >= {max_per_peer})"
+                                            ),
+                                        )));
+                                        continue;
+                                    }
+                                }
+                            }
                             let mut control_clone = dial_control.clone();
                             if !addrs.is_empty() {
                                 peer_book.record_addresses(peer, addrs.clone());
@@ -319,25 +405,76 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
     Ok(SwarmHandle { command_tx, incoming_rx: Some(incoming_rx), join_handle, peer_id: local_key.public().to_peer_id() })
 }
 
-fn build_swarm(local_key: libp2p::identity::Keypair) -> Result<Swarm<BridgeBehaviour>> {
-    let builder = SwarmBuilder::with_existing_identity(local_key)
+fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Result<Swarm<BridgeBehaviour>> {
+    let base_builder = SwarmBuilder::with_existing_identity(local_key.clone())
         .with_tokio()
         // Use only Noise for simplicity in tests - TLS negotiation can hang
         .with_tcp(Default::default(), noise::Config::new, yamux::Config::default)
         .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?;
 
-    let builder = builder
-        .with_behaviour(|key| {
-            let public = key.public();
-            BridgeBehaviour {
-                identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
-                ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
-                stream: lpstream::Behaviour::default(),
-            }
-        })
-        .map_err(|e| BridgeError::DialFailed(format!("behaviour init failed: {e}")))?;
+    if config.transport.enable_quic {
+        let builder = base_builder.with_quic();
+        if config.relay.enabled {
+            let behaviour_config = config.clone();
+            let builder = builder
+                .with_relay_client(noise::Config::new, yamux::Config::default)
+                .map_err(|e| BridgeError::DialFailed(format!("relay client init failed: {e}")))?
+                .with_behaviour(move |key, relay_behaviour| {
+                    Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, Some(relay_behaviour), &behaviour_config))
+                })
+                .map_err(|e| BridgeError::DialFailed(format!("behaviour init failed: {e}")))?;
+            Ok(builder.build())
+        } else {
+            let behaviour_config = config.clone();
+            let builder = builder
+                .with_behaviour(move |key| {
+                    Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, None, &behaviour_config))
+                })
+                .map_err(|e| BridgeError::DialFailed(format!("behaviour init failed: {e}")))?;
+            Ok(builder.build())
+        }
+    } else if config.relay.enabled {
+        let behaviour_config = config.clone();
+        let builder = base_builder
+            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .map_err(|e| BridgeError::DialFailed(format!("relay client init failed: {e}")))?
+            .with_behaviour(move |key, relay_behaviour| {
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, Some(relay_behaviour), &behaviour_config))
+            })
+            .map_err(|e| BridgeError::DialFailed(format!("behaviour init failed: {e}")))?;
+        Ok(builder.build())
+    } else {
+        let behaviour_config = config.clone();
+        let builder = base_builder
+            .with_behaviour(move |key| {
+                Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, None, &behaviour_config))
+            })
+            .map_err(|e| BridgeError::DialFailed(format!("behaviour init failed: {e}")))?;
+        Ok(builder.build())
+    }
+}
 
-    Ok(builder.build())
+fn build_behaviour(
+    key: &libp2p::identity::Keypair,
+    relay_behaviour: Option<relay::client::Behaviour>,
+    config: &SwarmConfig,
+) -> BridgeBehaviour {
+    let public = key.public();
+
+    let relay = Toggle::from(relay_behaviour);
+    let dcutr = if config.hole_punch.enable_dcutr {
+        Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())))
+    } else {
+        Toggle::from(None)
+    };
+
+    BridgeBehaviour {
+        identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
+        ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
+        relay,
+        dcutr,
+        stream: lpstream::Behaviour::default(),
+    }
 }
 
 #[derive(Default)]
@@ -354,6 +491,14 @@ impl PeerBook {
         for addr in addrs {
             self.record_address(peer, addr);
         }
+    }
+
+    fn relay_address_count(&self) -> usize {
+        self.addresses.values().flat_map(|set| set.iter()).filter(|addr| addr_uses_relay(addr)).count()
+    }
+
+    fn relay_address_count_for(&self, peer: PeerId) -> usize {
+        self.addresses.get(&peer).map(|set| set.iter().filter(|addr| addr_uses_relay(addr)).count()).unwrap_or(0)
     }
 
     fn remove_address(&mut self, peer: PeerId, addr: &Multiaddr) {
@@ -396,6 +541,13 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::IncomingConnectionError { error, .. } => {
             debug!(%error, "Incoming connection error");
         }
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Relay(event)) => {
+            debug!(?event, "Relay behaviour event");
+        }
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
+            debug!(?event, "DCUtR behaviour event");
+        }
+        SwarmEvent::Behaviour(_) => {}
         _ => {}
     }
 }
@@ -428,6 +580,8 @@ enum BridgeBehaviourEvent {
     Stream,
     Identify,
     Ping,
+    Relay(relay::client::Event),
+    Dcutr(dcutr::Event),
 }
 
 impl From<()> for BridgeBehaviourEvent {
@@ -435,15 +589,29 @@ impl From<()> for BridgeBehaviourEvent {
         Self::Stream
     }
 }
+
 impl From<identify::Event> for BridgeBehaviourEvent {
     fn from(value: identify::Event) -> Self {
         let _ = value;
         Self::Identify
     }
 }
+
 impl From<libp2p::ping::Event> for BridgeBehaviourEvent {
     fn from(value: libp2p::ping::Event) -> Self {
         let _ = value;
         Self::Ping
+    }
+}
+
+impl From<relay::client::Event> for BridgeBehaviourEvent {
+    fn from(value: relay::client::Event) -> Self {
+        Self::Relay(value)
+    }
+}
+
+impl From<dcutr::Event> for BridgeBehaviourEvent {
+    fn from(value: dcutr::Event) -> Self {
+        Self::Dcutr(value)
     }
 }

@@ -192,6 +192,9 @@ hmac = { version = "0.12.1", default-features = false }
 home = "0.5.5"
 http-body = "1.0.1"
 http-body-util = "0.1.2"
+http = "1.1.0"
+hyper = "1.4.1"
+hyper-util = { version = "0.1.17", features = ["tokio"] }
 igd-next = { version = "0.14.2", features = ["aio_tokio"] }
 indexmap = "2.1.0"
 intertrait = "0.2.2"

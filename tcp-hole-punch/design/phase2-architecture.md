@@ -79,18 +79,51 @@
 4. **Inspect metadata**
    Every accepted stream implements `Connected` and exposes `Libp2pConnectInfo` (peer id, first observed multiaddr, relay flag, synthesised socket address). This can be threaded into Kaspa’s logging/metrics without additional plumbing.
 
+5. **Bridge directly into the Kaspa adaptor**
+   ```rust
+   use hole_punch_bridge::stream::Libp2pStreamHandle;
+
+   fn metadata(info: &hole_punch_bridge::stream::Libp2pConnectInfo) -> kaspa_p2p_lib::ConnectionMetadata {
+       let libp2p_info = kaspa_p2p_lib::Libp2pConnectInfo::with_address(
+           info.peer_id.to_string(),
+           info.remote_multiaddr.as_ref().map(|addr| addr.to_string()),
+           info.relay_used,
+       );
+       kaspa_p2p_lib::ConnectionMetadata::new(info.synthesized_socket, Some(libp2p_info))
+   }
+
+   async fn connect_stream(adaptor: &kaspa_p2p_lib::Adaptor, handle: Libp2pStreamHandle) -> kaspa_p2p_lib::ConnectionResult {
+       let meta = metadata(handle.info());
+       adaptor.connect_peer_with_stream(handle.into_stream(), meta).await
+   }
+   ```
+   `Libp2pStreamHandle` carries the metadata required for logging/metrics; the adaptor can be wired using the same pattern that the unit test `kaspa_p2p_lib::core::connection_handler::tests::connect_with_stream_establishes_router` employs for an in-memory duplex stream.
+
+6. **Tune transport policy via `SwarmConfig`**
+   ```rust
+   use hole_punch_bridge::{spawn_swarm_with_config, SwarmConfig, RelayConfig, TransportConfig};
+
+   let mut config = SwarmConfig::default();
+   config.transport.enable_quic = true;
+   config.relay = RelayConfig { enabled: true, max_reservations: 4, max_circuits_per_peer: 2 };
+   let swarm = spawn_swarm_with_config(local_key, config)?;
+   ```
+   The configuration toggles QUIC alongside TCP and enforces conservative relay limits. DCUtR hole punching is enabled by default but can be disabled through `config.hole_punch.enable_dcutr`.
+
+   The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviour under the `libp2p-bridge` feature. Set `LIBP2P_LISTEN_MULTIADDR=/ip4/0.0.0.0/tcp/16000` on the server to accept inbound streams, and supply `LIBP2P_REMOTE_MULTIADDR`/`LIBP2P_REMOTE_PEER_ID` on the client to dial via libp2p.
+
 ## Test Coverage
 - `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically.
 - `tonic_server_accepts_libp2p_stream` feeds the same stream through a tonic Echo service using `serve_with_incoming` + `Libp2pConnector`.
-- Additional tests cover URI failure modes (`missing addr`, malformed multiaddr, missing `/p2p/`, mismatched peer).
+- Additional tests cover URI failure modes (`missing addr`, malformed multiaddr, missing `/p2p/`, mismatched peer`).
 
-All integration tests run in ~20 ms and are part of `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`.
+Core tests run in ~20 ms via `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`.
 
 ## Open Questions
 - Extend metrics once Phase 3 threads `Libp2pConnectInfo` into Kaspa’s adaptor (e.g., relay/DCUtR counters).
-- Evaluate QUIC support when Kaspa’s networking layer is ready for parallel TCP/QUIC dial attempts.
+- Monitor relay/DCUtR behaviour under real-world load and adjust defaults if reservations or retries need tightening.
 
 ## Next Steps
 1. Extend Kaspa’s adaptor/router to consume `Libp2pStream` directly (Phase 3).
 2. Record relay/DCUtR metrics once the adaptor exposes them downstream.
-3. Re-enable relay/DCUtR/QUIC behaviours after the router can select transports at runtime.
+3. Wire the bridge into the Kaspa client/server binaries to smoke-test a punched Kaspa session (Phase 4).

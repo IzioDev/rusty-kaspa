@@ -6,7 +6,10 @@ use futures::{
     SinkExt,
 };
 use http::Uri;
-use libp2p::{multiaddr::{Multiaddr, Protocol}, PeerId};
+use libp2p::{
+    multiaddr::{Multiaddr, Protocol},
+    PeerId,
+};
 use tower::Service;
 
 use crate::{
@@ -146,9 +149,7 @@ fn sanitize_multiaddr(mut addr: Multiaddr, peer_id: PeerId) -> Result<Multiaddr>
             addr.pop();
             Ok(addr)
         }
-        Some(Protocol::P2p(id)) => Err(BridgeError::DialFailed(format!(
-            "multiaddr '{addr}' targets peer {id} instead of {peer_id}"
-        ))),
+        Some(Protocol::P2p(id)) => Err(BridgeError::DialFailed(format!("multiaddr '{addr}' targets peer {id} instead of {peer_id}"))),
         _ => Err(BridgeError::DialFailed(format!("multiaddr '{addr}' missing terminal /p2p/ component"))),
     }
 }
@@ -161,9 +162,7 @@ mod tests {
     fn parse_target_sanitizes_terminal_peer_component() {
         let peer = PeerId::random();
         let multiaddr = format!("/ip4/127.0.0.1/tcp/12345/p2p/{peer}");
-        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr))
-            .parse()
-            .expect("uri");
+        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr)).parse().expect("uri");
 
         let target = parse_target(&uri).expect("target");
         assert_eq!(target.peer_id, peer);
@@ -183,9 +182,7 @@ mod tests {
         let peer = PeerId::random();
         let other = PeerId::random();
         let multiaddr = format!("/ip4/10.0.0.5/tcp/5555/p2p/{other}");
-        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr))
-            .parse()
-            .expect("uri");
+        let uri: Uri = format!("libp2p://{peer}?addr={}", urlencoding::encode(&multiaddr)).parse().expect("uri");
 
         assert!(matches!(parse_target(&uri), Err(BridgeError::DialFailed(msg)) if msg.contains("targets peer")));
     }

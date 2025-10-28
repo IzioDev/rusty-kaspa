@@ -20,4 +20,10 @@ pub struct RpcPeerInfo {
     pub advertised_protocol_version: u32,
     pub time_connected: u64, // NOTE: i64 in gRPC protowire
     pub is_ibd_peer: bool,
+
+    // Libp2p metadata (None when the connection was established using plain TCP)
+    pub is_libp2p: bool,
+    pub libp2p_peer_id: Option<String>,
+    pub libp2p_multiaddr: Option<String>,
+    pub libp2p_relay_used: Option<bool>,
 }

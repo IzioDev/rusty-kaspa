@@ -104,11 +104,7 @@ impl HyperRead for Libp2pStream {
 }
 
 impl HyperWrite for Libp2pStream {
-    fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
+    fn poll_write(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<std::io::Result<usize>> {
         HyperWrite::poll_write(std::pin::Pin::new(&mut self.get_mut().inner), cx, buf)
     }
 
@@ -116,10 +112,7 @@ impl HyperWrite for Libp2pStream {
         HyperWrite::poll_flush(std::pin::Pin::new(&mut self.get_mut().inner), cx)
     }
 
-    fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         HyperWrite::poll_shutdown(std::pin::Pin::new(&mut self.get_mut().inner), cx)
     }
 

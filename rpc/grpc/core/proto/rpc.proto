@@ -278,6 +278,12 @@ message GetConnectedPeerInfoMessage{
 
   // Whether this peer is the IBD peer (if IBD is running)
   bool isIbdPeer = 11;
+
+  // Libp2p connection metadata (present when the connection was established via the hole-punch bridge)
+  bool isLibp2p = 12;
+  string libp2pPeerId = 13;
+  string libp2pMultiaddr = 14;
+  bool libp2pRelayUsed = 15;
 }
 
 // AddPeerRequestMessage adds a peer to kaspad's outgoing connection list.

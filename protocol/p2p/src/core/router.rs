@@ -19,6 +19,7 @@ use tokio::sync::mpsc::{channel as mpsc_channel, Receiver as MpscReceiver, Sende
 use tokio::sync::oneshot::{channel as oneshot_channel, Sender as OneshotSender};
 use tonic::Streaming;
 
+use super::connection_info::ConnectionMetadata;
 use super::peer::{PeerKey, PeerProperties};
 
 pub struct IncomingRoute {
@@ -120,6 +121,9 @@ pub struct Router {
     /// The socket address of this peer
     net_address: SocketAddr,
 
+    /// Optional metadata describing how this connection was established.
+    connection_metadata: Option<ConnectionMetadata>,
+
     /// Indicates whether this connection is an outbound connection
     is_outbound: bool,
 
@@ -143,7 +147,15 @@ pub struct Router {
 
 impl Display for Router {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.net_address)
+        if let Some(metadata) = &self.connection_metadata {
+            if let Some(summary) = metadata.summary() {
+                write!(f, "{} ({summary})", self.net_address)
+            } else {
+                write!(f, "{}", self.net_address)
+            }
+        } else {
+            write!(f, "{}", self.net_address)
+        }
     }
 }
 
@@ -162,6 +174,7 @@ impl From<&Router> for Peer {
             router.connection_started,
             router.properties(),
             router.last_ping_duration(),
+            router.connection_metadata.clone(),
         )
     }
 }
@@ -175,6 +188,7 @@ fn message_summary(msg: &KaspadMessage) -> impl Debug {
 impl Router {
     pub(crate) async fn new(
         net_address: SocketAddr,
+        connection_metadata: Option<ConnectionMetadata>,
         is_outbound: bool,
         hub_sender: MpscSender<HubEvent>,
         mut incoming_stream: Streaming<KaspadMessage>,
@@ -186,6 +200,7 @@ impl Router {
         let router = Arc::new(Router {
             identity: Default::default(),
             net_address,
+            connection_metadata,
             is_outbound,
             connection_started: Instant::now(),
             routing_map_by_type: RwLock::new(HashMap::new()),
@@ -258,6 +273,10 @@ impl Router {
     /// The socket address of this peer
     pub fn net_address(&self) -> SocketAddr {
         self.net_address
+    }
+
+    pub fn connection_metadata(&self) -> Option<&ConnectionMetadata> {
+        self.connection_metadata.as_ref()
     }
 
     pub fn key(&self) -> PeerKey {

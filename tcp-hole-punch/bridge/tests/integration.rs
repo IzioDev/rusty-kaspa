@@ -1,13 +1,13 @@
-use std::{
-    net::TcpListener,
-    time::Duration,
-};
+use std::{net::TcpListener, time::Duration};
 
 use futures::{channel::oneshot, FutureExt, SinkExt, StreamExt};
 use http::Uri;
 use libp2p::{identity, Multiaddr, PeerId};
 use tokio::time::timeout;
-use tonic::{transport::{Endpoint, Server}, Request, Response, Status};
+use tonic::{
+    transport::{Endpoint, Server},
+    Request, Response, Status,
+};
 use tower::Service;
 use urlencoding::encode;
 
@@ -146,10 +146,7 @@ async fn tonic_server_accepts_libp2p_stream() {
         .expect("connect via libp2p");
 
     let mut client = EchoClient::new(channel);
-    let response = client
-        .ping(Request::new(PingRequest { message: "hello".into() }))
-        .await
-        .expect("ping response");
+    let response = client.ping(Request::new(PingRequest { message: "hello".into() })).await.expect("ping response");
     assert_eq!(response.into_inner().message, "hello");
 
     drop(client);
@@ -212,6 +209,40 @@ async fn connector_rejects_mismatched_peer() {
 
     let err = connector.call(uri).await.expect_err("expected error");
     assert!(matches!(err, BridgeError::DialFailed(msg) if msg.contains("targets peer")));
+
+    timeout(Duration::from_secs(5), handle.shutdown()).await.expect("shutdown timeout").expect("shutdown");
+}
+
+#[tokio::test]
+async fn relay_limits_are_enforced() {
+    init_tracing();
+
+    let mut config = hole_punch_bridge::SwarmConfig::default();
+    config.relay.max_reservations = 1;
+    config.relay.max_circuits_per_peer = 1;
+
+    let handle = hole_punch_bridge::spawn_swarm_with_config(identity::Keypair::generate_ed25519(), config).expect("spawn with config");
+    let mut command_tx = handle.command_tx();
+
+    let peer = PeerId::random();
+    let relay_addr: Multiaddr = "/ip4/192.0.2.1/tcp/4001/p2p-circuit".parse().expect("multiaddr");
+
+    let (first_tx, first_rx) = oneshot::channel();
+    command_tx.send(SwarmCommand::Dial { peer, addrs: vec![relay_addr.clone()], response: first_tx }).await.expect("send first dial");
+
+    let (second_tx, second_rx) = oneshot::channel();
+    command_tx.send(SwarmCommand::Dial { peer, addrs: vec![relay_addr], response: second_tx }).await.expect("send second dial");
+
+    match second_rx.await.expect("second response") {
+        Ok(_) => panic!("expected limit error"),
+        Err(BridgeError::DialFailed(msg)) => {
+            assert!(msg.contains("relay reservation limit"), "unexpected error message: {msg}")
+        }
+        Err(other) => panic!("unexpected error {other:?}"),
+    }
+
+    // Ensure the first dial completes (it will likely fail once the swarm realises there is no relay).
+    let _ = first_rx.await;
 
     timeout(Duration::from_secs(5), handle.shutdown()).await.expect("shutdown timeout").expect("shutdown");
 }

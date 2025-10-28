@@ -15,6 +15,15 @@ impl ProtocolConverter {
 
     fn get_peer_info(&self, peer: &Peer, ibd_peer_key: &Option<PeerKey>) -> RpcPeerInfo {
         let properties = peer.properties();
+        let (is_libp2p, libp2p_peer_id, libp2p_multiaddr, libp2p_relay_used) = if let Some(metadata) = peer.connection_metadata() {
+            if let Some(info) = metadata.libp2p.as_ref() {
+                (true, Some(info.peer_id.clone()), info.remote_multiaddr.clone(), Some(info.relay_used))
+            } else {
+                (false, None, None, None)
+            }
+        } else {
+            (false, None, None, None)
+        };
         RpcPeerInfo {
             id: peer.identity(),
             address: peer.net_address().into(),
@@ -25,6 +34,10 @@ impl ProtocolConverter {
             user_agent: properties.user_agent.clone(),
             advertised_protocol_version: properties.advertised_protocol_version,
             time_connected: peer.time_connected(),
+            is_libp2p,
+            libp2p_peer_id,
+            libp2p_multiaddr,
+            libp2p_relay_used,
         }
     }
 
