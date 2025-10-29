@@ -81,6 +81,11 @@ Success criteria:
 - **Inbound backpressure** – The swarm now awaits the incoming queue; the new stress test `inbound_queue_handles_many_concurrent_streams` runs 40 simultaneous substreams without drops while tonic consumes them.
 - **Hardened rehearsal** – `logs/phase5-hardened-run.md` together with `logs/phase5-{relay,server,client}-session.log` documents the end-to-end replay using the updated bridge.
 
+## Phase 6 Validation Snapshot
+
+- Re-ran the mixed-NAT scenario against the production relay: the server reserved `/p2p-circuit` on `<RELAY_IP>` (`phase6-server-session.log:188`), the client established the libp2p circuit and Kaspa handshake (`phase6-client-session.log:251`), and the relay confirmed `CircuitReqAccepted` for the hardened peers (`phase6-relay-session.log:295`).
+- `logs/phase6-remote-validation.md` captures the runbook (tmux sessions, env vars, and key log callouts) so future rollouts can replay the validation verbatim.
+
 ## Follow-up Opportunities (Post-PoC)
 
 These are not required for the proof-of-concept but will matter for production hardening:
@@ -100,5 +105,7 @@ These are not required for the proof-of-concept but will matter for production h
 | `tcp-hole-punch/logs/phase4-{relay,server,client}-session.log` | Captured logs (sanitised) from the successful mixed-NAT run. |
 | `tcp-hole-punch/logs/phase5-hardened-run.md` | Phase 5 hardened replay summary with links to the new relay/server/client logs. |
 | `tcp-hole-punch/bridge/tests/integration.rs` | Integration suite covering libp2p dial, tonic server acceptance, relay quota, counter instrumentation, and the >32 stream stress test. |
+| `tcp-hole-punch/logs/phase6-remote-validation.md` | Phase 6 remote rehearsal notes with pointers to the latest server/client/relay logs. |
+| `tcp-hole-punch/logs/phase6-{server,client,relay}-session.log` | Logs from the Phase 6 validation run (sanitised). |
 | `tcp-hole-punch/design/phase2-architecture.md` | Updated architecture and operational notes. |
 | `tcp-hole-punch/plan.md` | Phase tracking, now with post-Phase 4 follow-up tasks. |

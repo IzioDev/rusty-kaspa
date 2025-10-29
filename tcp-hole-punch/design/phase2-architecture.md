@@ -118,6 +118,7 @@ The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviou
 - Give the reservation a moment to settle before starting the remote client. In the Phase 4 VPS run the server was up for ~1 s before the Vultr dial succeeded; starting the client too early still triggers `Relay has no reservation for destination`.
 - Reference logs for the mixed-NAT rehearsal live under `logs/phase4-{relay,server,client}-session.log` and show the complete reservation/DCUtR/handshake timeline.
 - The Phase 5 hardened replay (`logs/phase5-hardened-run.md`) captures the deterministic synthetic socket addresses, relay metadata, and byte counters after the latest fixes.
+- The Phase 6 remote validation (`logs/phase6-remote-validation.md`) reconfirms the hardened path against the real relay; use `logs/phase6-{server,client,relay}-session.log` when troubleshooting future rollouts.
 
 ## Test Coverage
 - Core bridge smoke tests: `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically, while `tonic_server_accepts_libp2p_stream` feeds the stream through tonic using `serve_with_incoming`.

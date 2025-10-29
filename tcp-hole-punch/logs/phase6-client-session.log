@@ -1,0 +1,373 @@
+    Finished `release` profile [optimized] target(s) in 0.71s
+     Running `target/release/kaspa_p2p_client`
+command-tx[swarm-12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp]: ++ (init) -> 1
+✓ Yamux: receive_window=32MiB, max_buffer=32MiB
+2025-10-29 09:32:17.755+00:00 [INFO ] local_peer_id=12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp
+2025-10-29 09:32:17.755+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.755+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.756+00:00 [DEBUG] libp2p client local peer id: 12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp
+2025-10-29 09:32:17.756+00:00 [DEBUG] Attempting libp2p dial via /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit
+command-tx[swarm-12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp]: ++ (SwarmHandle::command_tx) -> 2
+command-tx[swarm-12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp]: -- (drop) -> 1
+2025-10-29 09:32:17.756+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.756+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.756+00:00 [DEBUG] Received dial command peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addrs=[/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit]
+2025-10-29 09:32:17.756+00:00 [DEBUG] Transport::dial; address=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:17.757+00:00 [DEBUG] new_outgoing_connection; concurrency_factor=8 num_dials=1 id=1
+2025-10-29 09:32:17.757+00:00 [DEBUG] Dial initiated successfully peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addr=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:17.757+00:00 [DEBUG] Requesting new stream peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:17.757+00:00 [DEBUG] Not connected to peer, initiating dial peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:17.757+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.757+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.757+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.757+00:00 [DEBUG] Failed to dial using libp2p_core::transport::map::Map<libp2p_core::transport::upgrade::Multiplexed<libp2p_core::transport::and_then::AndThen<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>, libp2p_core::transport::upgrade::Authenticated<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>>::multiplex<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, libp2p_yamux::Config, std::io::error::Error>::{{closure}}>>, libp2p::builder::phase::tcp::<impl libp2p::builder::SwarmBuilder<libp2p::builder::phase::provider::Tokio, libp2p::builder::phase::tcp::TcpPhase>>::with_tcp<libp2p_noise::Config::new, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Error, hole_punch_bridge::swarm::build_swarm::{{closure}}, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, std::io::error::Error>::{{closure}}> address=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+2025-10-29 09:32:17.757+00:00 [DEBUG] dialing address address=<RELAY_IP>:4011
+2025-10-29 09:32:17.758+00:00 [DEBUG] Transport::dial; address=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+2025-10-29 09:32:17.758+00:00 [DEBUG] new_outgoing_connection; concurrency_factor=8 num_dials=1 id=3
+2025-10-29 09:32:17.758+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.758+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.848+00:00 [DEBUG] Dialer: Proposed protocol: /noise
+2025-10-29 09:32:17.848+00:00 [DEBUG] Dialer: Expecting proposed protocol: /noise
+2025-10-29 09:32:17.938+00:00 [DEBUG] Negotiated: Received confirmation for protocol: /noise
+2025-10-29 09:32:17.939+00:00 [DEBUG] Dialer: Proposed protocol: /yamux/1.0.0
+2025-10-29 09:32:17.939+00:00 [DEBUG] Dialer: Expecting proposed protocol: /yamux/1.0.0
+2025-10-29 09:32:17.939+00:00 [DEBUG] new connection: 29d4eec3 (Client)
+2025-10-29 09:32:17.939+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.939+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] Creating new channel pair peer=12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY connection=3
+2025-10-29 09:32:17.940+00:00 [DEBUG] new_established_connection; remote_addr=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY id=3 peer=12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+2025-10-29 09:32:17.940+00:00 [DEBUG] Connection established peer=12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY endpoint=Dialer { address: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY, role_override: Dialer, port_use: Reuse } total_peers=1
+2025-10-29 09:32:17.940+00:00 [DEBUG] Swarm connection established peer_id=12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY endpoint=Dialer { address: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY, role_override: Dialer, port_use: Reuse }
+2025-10-29 09:32:17.940+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] 29d4eec3: new outbound (Stream 29d4eec3/1) of (Connection 29d4eec3 Client (streams 0))
+2025-10-29 09:32:17.940+00:00 [DEBUG] Dialer: Proposed protocol: /libp2p/circuit/relay/0.2.0/hop
+2025-10-29 09:32:17.940+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:17.940+00:00 [DEBUG] 29d4eec3: new outbound (Stream 29d4eec3/3) of (Connection 29d4eec3 Client (streams 1))
+2025-10-29 09:32:17.940+00:00 [DEBUG] Dialer: Proposed protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:17.941+00:00 [DEBUG] 29d4eec3: new outbound (Stream 29d4eec3/5) of (Connection 29d4eec3 Client (streams 2))
+2025-10-29 09:32:17.941+00:00 [DEBUG] Dialer: Proposed protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:17.941+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.030+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.030+00:00 [DEBUG] Negotiated: Received confirmation for protocol: /yamux/1.0.0
+2025-10-29 09:32:18.031+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.031+00:00 [DEBUG] Listener: confirming protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:18.031+00:00 [DEBUG] Listener: sent confirmed protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:18.031+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Listener: confirming protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:18.032+00:00 [DEBUG] Listener: sent confirmed protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:18.032+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Identify behaviour event event=Sent { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY") }
+2025-10-29 09:32:18.032+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.032+00:00 [DEBUG] Dialer: Received confirmation for protocol: /libp2p/circuit/relay/0.2.0/hop
+2025-10-29 09:32:18.032+00:00 [DEBUG] Dialer: Received confirmation for protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Dialer: Received confirmation for protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:18.033+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Identify behaviour event event=Received { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): e1ef2fe6f211f7399a8a6a55fdc811ee92ec7f1ee125942da87ef659553499f) }, protocol_version: "/kaspa/relay/1.0.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/172.17.0.1/udp/4011/quic-v1, /ip4/172.17.0.1/tcp/4011, /ip4/<RELAY_IP>/udp/4011/quic-v1, /ip4/127.0.0.1/udp/4011/quic-v1, /ip4/127.0.0.1/tcp/4011, /ip4/<RELAY_IP>/tcp/4011], protocols: ["/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/hop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<CLIENT_VPS_IP>/tcp/35564, signed_peer_record: None } }
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.033+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.034+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.034+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.122+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.123+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.123+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.123+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] ping succeeded rtt=91.47651ms
+2025-10-29 09:32:18.124+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.124+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.632+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.632+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Relay behaviour event event=OutboundCircuitEstablished { relay_peer_id: PeerId("12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY"), limit: Some(Limit { duration: Some(120s), data_in_bytes: Some(131072) }) }
+2025-10-29 09:32:18.633+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Dialer: Proposed protocol: /noise
+2025-10-29 09:32:18.633+00:00 [DEBUG] Dialer: Expecting proposed protocol: /noise
+2025-10-29 09:32:18.633+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.633+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.978+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.995+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.995+00:00 [DEBUG] Negotiated: Received confirmation for protocol: /noise
+2025-10-29 09:32:18.996+00:00 [DEBUG] Dialer: Proposed protocol: /yamux/1.0.0
+2025-10-29 09:32:18.996+00:00 [DEBUG] Dialer: Expecting proposed protocol: /yamux/1.0.0
+2025-10-29 09:32:18.996+00:00 [DEBUG] new connection: 4ecefa34 (Client)
+2025-10-29 09:32:18.996+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.996+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.996+00:00 [DEBUG] Returning existing pending receiver peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC connection=1
+2025-10-29 09:32:18.996+00:00 [DEBUG] new_established_connection; remote_addr=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC id=1 peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:18.997+00:00 [DEBUG] Connection established peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC endpoint=Dialer { address: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC, role_override: Dialer, port_use: Reuse } total_peers=1
+2025-10-29 09:32:18.997+00:00 [DEBUG] Swarm connection established peer_id=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC endpoint=Dialer { address: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC, role_override: Dialer, port_use: Reuse }
+2025-10-29 09:32:18.997+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] 4ecefa34: new outbound (Stream 4ecefa34/1) of (Connection 4ecefa34 Client (streams 0))
+2025-10-29 09:32:18.997+00:00 [DEBUG] Dialer: Proposed protocol: /kaspa/p2p/bridge/1.0
+2025-10-29 09:32:18.997+00:00 [DEBUG] 4ecefa34: new outbound (Stream 4ecefa34/3) of (Connection 4ecefa34 Client (streams 1))
+2025-10-29 09:32:18.997+00:00 [DEBUG] Dialer: Proposed protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:18.997+00:00 [DEBUG] 4ecefa34: new outbound (Stream 4ecefa34/5) of (Connection 4ecefa34 Client (streams 2))
+2025-10-29 09:32:18.997+00:00 [DEBUG] Dialer: Proposed protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:18.997+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:18.997+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.346+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.346+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.346+00:00 [DEBUG] Negotiated: Received confirmation for protocol: /yamux/1.0.0
+2025-10-29 09:32:19.347+00:00 [DEBUG] Listener: confirming protocol: /libp2p/dcutr
+2025-10-29 09:32:19.347+00:00 [DEBUG] Listener: sent confirmed protocol: /libp2p/dcutr
+2025-10-29 09:32:19.347+00:00 [DEBUG] Listener: confirming protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:19.347+00:00 [DEBUG] Listener: sent confirmed protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:19.347+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.347+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.347+00:00 [DEBUG] Listener: confirming protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:19.348+00:00 [DEBUG] Listener: sent confirmed protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:19.348+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Identify behaviour event event=Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC") }
+2025-10-29 09:32:19.348+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.348+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.351+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.351+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.351+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.351+00:00 [DEBUG] Dialer: Received confirmation for protocol: /kaspa/p2p/bridge/1.0
+2025-10-29 09:32:19.352+00:00 [DEBUG] Dialer: Received confirmation for protocol: /ipfs/ping/1.0.0
+2025-10-29 09:32:19.352+00:00 [DEBUG] Dialer: Received confirmation for protocol: /ipfs/id/1.0.0
+2025-10-29 09:32:19.352+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.352+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.352+00:00 [DEBUG] Stream opened successfully peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:19.352+00:00 [DEBUG] libp2p HTTP/2 client: max_frame=1048576 bytes, stream_window=8388608 bytes, conn_window=16777216 bytes
+2025-10-29 09:32:19.352+00:00 [DEBUG] binding client connection
+2025-10-29 09:32:19.352+00:00 [DEBUG] client connection bound
+2025-10-29 09:32:19.352+00:00 [DEBUG] send frame=Settings { flags: (0x0), enable_push: 0, initial_window_size: 8388608, max_frame_size: 1048576, max_header_list_size: 65536 }
+2025-10-29 09:32:19.352+00:00 [DEBUG] Connection; peer=Client
+2025-10-29 09:32:19.352+00:00 [DEBUG] libp2p gRPC send request: http://kaspa.libp2p/protowire.P2P/MessageStream
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Identify behaviour event event=Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): e33d2da7ae17f7f580514a3794db43779eecae652148445332a308f36d32b83) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /p2p/12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp, signed_peer_record: None } }
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] received frame=Settings { flags: (0x0), initial_window_size: 8388608, max_frame_size: 1048576, max_header_list_size: 65536 }
+2025-10-29 09:32:19.353+00:00 [DEBUG] send frame=Settings { flags: (0x1: ACK) }
+2025-10-29 09:32:19.353+00:00 [DEBUG] send frame=WindowUpdate { stream_id: StreamId(0), size_increment: 16711681 }
+2025-10-29 09:32:19.353+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] send frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2025-10-29 09:32:19.353+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.353+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] ping succeeded rtt=357.473515ms
+2025-10-29 09:32:19.709+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:19.709+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:19.715+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.715+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.715+00:00 [DEBUG] received frame=Settings { flags: (0x1: ACK) }
+2025-10-29 09:32:19.715+00:00 [DEBUG] received settings ACK; applying Settings { flags: (0x0), enable_push: 0, initial_window_size: 8388608, max_frame_size: 1048576, max_header_list_size: 65536 }
+2025-10-29 09:32:19.715+00:00 [DEBUG] received frame=WindowUpdate { stream_id: StreamId(0), size_increment: 16711681 }
+2025-10-29 09:32:19.715+00:00 [DEBUG] received frame=Headers { stream_id: StreamId(1), flags: (0x4: END_HEADERS) }
+2025-10-29 09:32:19.715+00:00 [DEBUG] received frame=Data { stream_id: StreamId(1) }
+2025-10-29 09:32:19.715+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.715+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.715+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.716+00:00 [DEBUG] starting send version flow
+2025-10-29 09:32:19.716+00:00 [DEBUG] sending version message: VersionMessage { protocol_version: 5, services: 0, timestamp: 1761730339716, address: None, id: [145, 221, 54, 2, 138, 63, 71, 203, 168, 171, 146, 206, 144, 250, 109, 43], user_agent: "", disable_relay_tx: false, subnetwork_id: None, network: "kaspa-mainnet" }
+2025-10-29 09:32:19.716+00:00 [DEBUG] starting receive version flow
+2025-10-29 09:32:19.716+00:00 [DEBUG] accepted version message: VersionMessage { protocol_version: 5, services: 0, timestamp: 1761730339533, address: None, id: [65, 181, 147, 9, 118, 229, 70, 145, 148, 93, 223, 71, 21, 139, 142, 220], user_agent: "", disable_relay_tx: false, subnetwork_id: None, network: "kaspa-mainnet" }
+2025-10-29 09:32:19.717+00:00 [DEBUG] send frame=Data { stream_id: StreamId(1) }
+2025-10-29 09:32:19.717+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:19.717+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.060+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.060+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.060+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.060+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.060+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.061+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:20.061+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:20.061+00:00 [DEBUG] Attempting to hole-punch as dialer target=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addresses=[/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC]
+2025-10-29 09:32:20.061+00:00 [DEBUG] discarding addresses from `NetworkBehaviour` because `DialOpts::extend_addresses_through_behaviour is `false` for connection connection=4 discarded_addresses_count=7
+2025-10-29 09:32:20.061+00:00 [DEBUG] Failed to dial using libp2p_core::transport::map::Map<libp2p_core::transport::upgrade::Multiplexed<libp2p_core::transport::and_then::AndThen<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>, libp2p_core::transport::upgrade::Authenticated<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>>::multiplex<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, libp2p_yamux::Config, std::io::error::Error>::{{closure}}>>, libp2p::builder::phase::tcp::<impl libp2p::builder::SwarmBuilder<libp2p::builder::phase::provider::Tokio, libp2p::builder::phase::tcp::TcpPhase>>::with_tcp<libp2p_noise::Config::new, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Error, hole_punch_bridge::swarm::build_swarm::{{closure}}, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, std::io::error::Error>::{{closure}}> address=/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:20.061+00:00 [DEBUG] dialing address address=<HOME_IP>:4012
+2025-10-29 09:32:20.061+00:00 [DEBUG] Transport::dial; address=/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:20.061+00:00 [DEBUG] new_outgoing_connection; concurrency_factor=8 num_dials=1 id=4
+2025-10-29 09:32:20.061+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:20.061+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:20.061+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.066+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.066+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.066+00:00 [DEBUG] received frame=Data { stream_id: StreamId(1) }
+2025-10-29 09:32:20.066+00:00 [DEBUG] accepted verack_message: VerackMessage
+2025-10-29 09:32:20.066+00:00 [DEBUG] protocol versions - self: 5, peer: 5
+2025-10-29 09:32:20.066+00:00 [DEBUG] EchoFlow, start app-layer receiving loop
+2025-10-29 09:32:20.066+00:00 [DEBUG] starting ready flow
+2025-10-29 09:32:20.066+00:00 [DEBUG] accepted ready message: ReadyMessage
+2025-10-29 09:32:20.066+00:00 [INFO ] P2P, Client connected via libp2p: peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addr=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC relay=true
+2025-10-29 09:32:20.066+00:00 [DEBUG] Connected via libp2p to 00000000-0000-0000-0000-000000000000+<RELAY_IP>
+2025-10-29 09:32:20.066+00:00 [DEBUG] P2P, p2p_client::main - starting peer:0
+2025-10-29 09:32:20.066+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:20.067+00:00 [DEBUG] EchoFlow, start message dispatching loop
+2025-10-29 09:32:20.067+00:00 [DEBUG] send frame=Data { stream_id: StreamId(1) }
+2025-10-29 09:32:20.067+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.067+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.067+00:00 [INFO ] P2P Connected to outgoing peer <RELAY_IP>:4011 (peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addr=/ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY/p2p-circuit/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC relay=true) (outbound: 1)
+2025-10-29 09:32:20.068+00:00 [DEBUG] P2P, connect retry #1 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:20.244+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:20.244+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:21.069+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:21.070+00:00 [DEBUG] P2P, connect retry #2 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:22.071+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:22.071+00:00 [DEBUG] P2P, connect retry #3 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:23.073+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:23.073+00:00 [DEBUG] P2P, connect retry #4 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:24.075+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:24.076+00:00 [DEBUG] P2P, connect retry #5 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:25.077+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:25.078+00:00 [DEBUG] P2P, connect retry #6 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:26.079+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:26.079+00:00 [DEBUG] P2P, connect retry #7 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:27.081+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:27.082+00:00 [DEBUG] P2P, connect retry #8 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:28.083+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:28.084+00:00 [DEBUG] P2P, connect retry #9 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:29.085+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:29.086+00:00 [DEBUG] P2P, connect retry #10 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:30.061+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:30.061+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:30.062+00:00 [DEBUG] Connection attempt to peer failed with Transport([(/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC, Other(Custom { kind: Other, error: Timeout }))]). peer=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:30.062+00:00 [DEBUG] Outgoing connection error peer_id=Some(PeerId("12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC")) error=Failed to negotiate transport protocol(s): [(/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC: : Timeout has been reached)]
+2025-10-29 09:32:30.062+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:30.062+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:30.087+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:30.087+00:00 [DEBUG] P2P, connect retry #11 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:30.254+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.254+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.254+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.254+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.254+00:00 [DEBUG] Listener: confirming protocol: /libp2p/dcutr
+2025-10-29 09:32:30.254+00:00 [DEBUG] Listener: sent confirmed protocol: /libp2p/dcutr
+2025-10-29 09:32:30.254+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.255+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.599+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.600+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.600+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.600+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.600+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:30.944+00:00 [DEBUG] Attempting to hole-punch as dialer target=12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC addresses=[/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC]
+2025-10-29 09:32:30.944+00:00 [DEBUG] discarding addresses from `NetworkBehaviour` because `DialOpts::extend_addresses_through_behaviour is `false` for connection connection=5 discarded_addresses_count=7
+2025-10-29 09:32:30.944+00:00 [DEBUG] Failed to dial using libp2p_core::transport::map::Map<libp2p_core::transport::upgrade::Multiplexed<libp2p_core::transport::and_then::AndThen<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>, libp2p_core::transport::upgrade::Authenticated<libp2p_core::transport::and_then::AndThen<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>, libp2p_core::transport::upgrade::Builder<libp2p_tcp::Transport<libp2p_tcp::provider::tokio::Tcp>>::authenticate<libp2p_tcp::provider::tokio::TcpStream, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Config, libp2p_noise::Error>::{{closure}}>>::multiplex<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, libp2p_yamux::Config, std::io::error::Error>::{{closure}}>>, libp2p::builder::phase::tcp::<impl libp2p::builder::SwarmBuilder<libp2p::builder::phase::provider::Tokio, libp2p::builder::phase::tcp::TcpPhase>>::with_tcp<libp2p_noise::Config::new, libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>, libp2p_noise::Error, hole_punch_bridge::swarm::build_swarm::{{closure}}, libp2p_yamux::Muxer<multistream_select::negotiated::Negotiated<libp2p_noise::io::Output<multistream_select::negotiated::Negotiated<libp2p_tcp::provider::tokio::TcpStream>>>>, std::io::error::Error>::{{closure}}> address=/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:30.944+00:00 [DEBUG] dialing address address=<HOME_IP>:4012
+2025-10-29 09:32:30.944+00:00 [DEBUG] Transport::dial; address=/ip4/<HOME_IP>/tcp/4012/p2p/12D3KooWR7QpfbpcFBJH32w3tqcY6erAg4xgZsN9QYmGBhw7vUBC
+2025-10-29 09:32:30.945+00:00 [DEBUG] new_outgoing_connection; concurrency_factor=8 num_dials=1 id=5
+2025-10-29 09:32:30.945+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:30.945+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:30.945+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:31.089+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:31.089+00:00 [DEBUG] P2P, connect retry #12 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:31.131+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:31.131+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:32.091+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:32.091+00:00 [DEBUG] P2P, connect retry #13 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:33.093+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:33.094+00:00 [DEBUG] P2P, connect retry #14 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:33.124+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:33.125+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] ping succeeded rtt=90.607786ms
+2025-10-29 09:32:33.215+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:33.215+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:34.095+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:34.096+00:00 [DEBUG] P2P, connect retry #15 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:34.710+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:34.710+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:34.710+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.058+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] ping succeeded rtt=348.9563ms
+2025-10-29 09:32:35.059+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:35.059+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:35.065+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.065+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.065+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.065+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.065+00:00 [DEBUG] Connection::poll;
+2025-10-29 09:32:35.097+00:00 [DEBUG] connecting to [::1]:50051
+2025-10-29 09:32:35.098+00:00 [DEBUG] P2P, connect retry #16 failed with error TonicError(tonic::transport::Error(Transport, ConnectError(ConnectError("tcp connect error", [::1]:50051, Os { code: 111, kind: ConnectionRefused, message: "Connection refused" })))), peer: "[::1]:50051"
+2025-10-29 09:32:35.098+00:00 [DEBUG] P2P, Client connection retry #16 - all failed
+2025-10-29 09:32:40.099+00:00 [DEBUG] P2P,p2p_client::main - TERMINATE
+SwarmHandle::shutdown: sending Shutdown; active clones=2025-10-29 09:32:40.099+00:00 [DEBUG] P2P, Router receive loop - shutdown signal received, exiting router receive loop, router-id: 00000000-0000-0000-0000-000000000000
+1
+SwarmHandle::shutdown: awaiting join
+2025-10-29 09:32:40.099+00:00 [DEBUG] P2P, Router receive loop - exited, router-id: 00000000-0000-0000-0000-000000000000, router refs: 3
+2025-10-29 09:32:40.099+00:00 [DEBUG] Swarm::poll;
+2025-10-29 09:32:40.099+00:00 [DEBUG] Pool::poll;
+2025-10-29 09:32:40.099+00:00 [DEBUG] EchoFlow, exiting message dispatch loop
+2025-10-29 09:32:40.099+00:00 [DEBUG] send frame=Data { stream_id: StreamId(1), flags: (0x1: END_STREAM) }
+2025-10-29 09:32:40.099+00:00 [DEBUG] send frame=Reset { stream_id: StreamId(1), error_code: CANCEL }
+2025-10-29 09:32:40.100+00:00 [DEBUG] send frame=GoAway { error_code: NO_ERROR, last_stream_id: StreamId(0) }
+2025-10-29 09:32:40.100+00:00 [DEBUG] Connection::poll; connection error error=GoAway(b"", NO_ERROR, Library)
+SwarmHandle::shutdown: join complete
+command-tx[swarm-12D3KooWGe48qFdHzuRZBJZFHu9qCkYqK8v7WPo7dWpVNedfwRqp]: -- (drop) -> 0
+2025-10-29 09:32:40.100+00:00 [DEBUG] P2P,p2p_client::main - FINISH
+2025-10-29 09:32:50.101+00:00 [DEBUG] P2P,p2p_client::main - EXIT

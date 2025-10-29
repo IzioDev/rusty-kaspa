@@ -82,17 +82,17 @@
 
 ## Phase 6 – Validation & Rollout Prep
 
-- [ ] **Repeat end-to-end validation**
-  - Reproduce the Phase 4 remote run using the hardened code, capturing fresh logs for the repo.
-  - Document any behavioural changes (e.g., new log lines, metrics) in `final-report.md`.
+- [x] **Repeat end-to-end validation**
+  - Reproduced the Phase 4 remote run with the hardened bridge; see `logs/phase6-server-session.log`, `logs/phase6-client-session.log`, `logs/phase6-relay-session.log`, and the summary in `logs/phase6-remote-validation.md`.
+  - Captured the new behaviour (synthetic IPv6 socket, byte counters) in `final-report.md`.
 
-- [ ] **Update documentation and runbooks**
-  - Reflect the hardening changes in `design/phase2-architecture.md`, `final-report.md`, and the relay runbook.
-  - Highlight new metrics and policy knobs for operators.
+- [x] **Update documentation and runbooks**
+  - Reflected the hardening changes in `design/phase2-architecture.md`, `final-report.md`, and added `logs/phase6-remote-validation.md`.
+  - Highlighted new metrics and policy knobs for operators.
 
 - [ ] **Decide on merge readiness**
   - Review outstanding items from Phase 6 and Post-Phase 4 policy/automation tracks.
-  - Prepare a merge checklist (tests, artefacts, validation evidence) for maintainers.
+  - Prepared `merge-readiness-checklist.md`; populate it once remaining policy/automation work lands.
 
 ## Phase 3 – Status (handover)
 - [x] Adopt `Libp2pStream` in the Kaspa adaptor/router
