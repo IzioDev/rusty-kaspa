@@ -58,6 +58,47 @@
    - Align PeerId↔PeerKey mapping to ensure libp2p identity persists across restarts.
    - Extend the peer-store schema to remember observed multiaddrs and relay provenance.
 
+## Phase 5 – Libp2p Hardening (In Progress)
+
+- [ ] **Stabilise synthetic socket addresses**
+  - Refine `ConnectionHandler::synthetic_socket_addr` so repeated connections from the same libp2p peer reuse a consistent value (drop per-connection counter; hash only stable metadata).
+  - Add regression coverage that exercises duplicate inbound attempts and ensures `ProtocolError::PeerAlreadyExists` still fires.
+  - Re-run the mixed-NAT PoC to confirm duplicate suppression works with the new addressing logic.
+
+- [ ] **Correct relay quota bookkeeping**
+  - Track relay reservations only after a stream is opened (or roll back bookkeeping when `open_stream` fails) in `swarm.rs`.
+  - Add unit/integration coverage proving successive failed dials do not exhaust the quota.
+  - Smoke-test against a relay with injected failures to verify retries continue to work.
+
+- [ ] **Improve libp2p metadata fidelity**
+  - Extend `PeerBook` to store the most recent successful endpoint (direct vs relay) and make `info_for` deterministic.
+  - Capture observed addresses for inbound connections (e.g., via identify/DCUtR callbacks) and thread them into `Libp2pConnectInfo`.
+  - Expose updated metadata through the Kaspa adaptor and confirm logs/metrics reflect relay usage accurately.
+
+- [ ] **Restore traffic accounting for libp2p channels**
+  - Wrap `Libp2pSendRequest` with the existing `MapRequest/MapResponseBodyLayer` counters so byte metrics cover libp2p traffic.
+  - Add a targeted test (or metric assertion) ensuring counters advance during a libp2p handshake.
+  - Update operational docs noting that metrics parity with TCP has been restored.
+
+- [ ] **Handle inbound stream backpressure**
+  - Replace the lossy `try_send` path with bounded await/backpressure (or increase the buffer with monitoring) in the incoming stream queue.
+  - Add a stress test that establishes >32 concurrent inbound streams and asserts none are dropped.
+  - Verify tonic still consumes streams correctly after the backpressure change.
+
+## Phase 6 – Validation & Rollout Prep
+
+- [ ] **Repeat end-to-end validation**
+  - Reproduce the Phase 4 remote run using the hardened code, capturing fresh logs for the repo.
+  - Document any behavioural changes (e.g., new log lines, metrics) in `final-report.md`.
+
+- [ ] **Update documentation and runbooks**
+  - Reflect the hardening changes in `design/phase2-architecture.md`, `final-report.md`, and the relay runbook.
+  - Highlight new metrics and policy knobs for operators.
+
+- [ ] **Decide on merge readiness**
+  - Review outstanding items from Phase 6 and Post-Phase 4 policy/automation tracks.
+  - Prepare a merge checklist (tests, artefacts, validation evidence) for maintainers.
+
 ## Phase 3 – Status (handover)
 - [x] Adopt `Libp2pStream` in the Kaspa adaptor/router
 - [x] Thread bridge metadata into logging/metrics
