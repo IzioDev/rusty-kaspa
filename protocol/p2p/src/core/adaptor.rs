@@ -3,6 +3,7 @@ use crate::core::connection_info::ConnectionMetadata;
 use crate::core::hub::Hub;
 use crate::ConnectionError;
 use crate::{core::connection_handler::ConnectionHandler, Router};
+use futures::Stream;
 use kaspa_utils::networking::NetAddress;
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 use std::ops::Deref;
@@ -92,6 +93,15 @@ impl Adaptor {
         S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
     {
         self.connection_handler.connect_with_stream(stream, metadata).await.map(|r| r.key())
+    }
+
+    /// Serve incoming connections provided by an external transport (e.g. libp2p).
+    pub fn serve_incoming_streams<S, I>(&self, incoming: I)
+    where
+        S: AsyncRead + AsyncWrite + tonic::transport::server::Connected + Send + Unpin + 'static,
+        I: Stream<Item = Result<S, std::io::Error>> + Send + 'static,
+    {
+        self.connection_handler.serve_with_incoming(incoming);
     }
 
     /// Terminates all peers and cleans up any additional async resources

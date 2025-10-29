@@ -59,6 +59,8 @@ members = [
     "metrics/core",
     "metrics/perf_monitor",
     "utils/alloc",
+    "tcp-hole-punch/bridge",
+    "tcp-hole-punch/relay",
 ]
 
 [workspace.package]

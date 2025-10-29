@@ -1,0 +1,17 @@
+[package]
+name = "hole-punch-relay"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+clap = { workspace = true, features = ["derive"] }
+futures = { workspace = true }
+libp2p = { version = "0.56", default-features = false, features = ["identify", "noise", "ping", "relay", "tcp", "macros", "yamux", "quic", "tokio"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "signal"] }
+
+[lints]
+workspace = true

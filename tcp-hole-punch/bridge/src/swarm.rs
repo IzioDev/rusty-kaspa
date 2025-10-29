@@ -406,18 +406,35 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
 }
 
 fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Result<Swarm<BridgeBehaviour>> {
+    // Configure yamux with large buffers to support HTTP/2 over libp2p
+    let receive_window_size = 32 * 1024 * 1024;
+    let max_buffer_size = 32 * 1024 * 1024;
+
+    let yamux_config = {
+        let mut cfg = yamux::Config::default();
+        #[allow(deprecated)]
+        {
+            cfg.set_receive_window_size(receive_window_size);
+            cfg.set_max_buffer_size(max_buffer_size);
+        }
+        cfg
+    };
+
+    eprintln!("✓ Yamux: receive_window={}MiB, max_buffer={}MiB", receive_window_size / (1024 * 1024), max_buffer_size / (1024 * 1024));
+
     let base_builder = SwarmBuilder::with_existing_identity(local_key.clone())
         .with_tokio()
         // Use only Noise for simplicity in tests - TLS negotiation can hang
-        .with_tcp(Default::default(), noise::Config::new, yamux::Config::default)
+        .with_tcp(Default::default(), noise::Config::new, || yamux_config.clone())
         .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?;
 
     if config.transport.enable_quic {
         let builder = base_builder.with_quic();
         if config.relay.enabled {
             let behaviour_config = config.clone();
+            let yamux_cfg = yamux_config.clone();
             let builder = builder
-                .with_relay_client(noise::Config::new, yamux::Config::default)
+                .with_relay_client(noise::Config::new, move || yamux_cfg.clone())
                 .map_err(|e| BridgeError::DialFailed(format!("relay client init failed: {e}")))?
                 .with_behaviour(move |key, relay_behaviour| {
                     Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, Some(relay_behaviour), &behaviour_config))
@@ -436,7 +453,7 @@ fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Re
     } else if config.relay.enabled {
         let behaviour_config = config.clone();
         let builder = base_builder
-            .with_relay_client(noise::Config::new, yamux::Config::default)
+            .with_relay_client(noise::Config::new, || yamux_config.clone())
             .map_err(|e| BridgeError::DialFailed(format!("relay client init failed: {e}")))?
             .with_behaviour(move |key, relay_behaviour| {
                 Ok::<_, Box<dyn std::error::Error + Send + Sync>>(build_behaviour(key, Some(relay_behaviour), &behaviour_config))

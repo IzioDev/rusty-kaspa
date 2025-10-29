@@ -28,9 +28,12 @@
 - [x] Update adaptor/unit tests to cover the new stream-based handshake path (see `kaspa_p2p_lib::core::connection_handler::tests::connect_with_stream_establishes_router`).
 
 ## Phase 4 – Deliver the Two-Private-Peer PoC
-- Modify `protocol/p2p/src/bin/{server.rs,client.rs}` to source their transport from the libp2p bridge while keeping the Kaspa handshake and flow registration intact.
-- Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).
-- Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.
+- [x] Modify `protocol/p2p/src/bin/{server.rs,client.rs}` to source their transport from the libp2p bridge while keeping the Kaspa handshake and flow registration intact.
+- [x] libp2p env wiring: server accepts `LIBP2P_LISTEN_MULTIADDRS` (e.g., `/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit`) plus optional `LIBP2P_RELAY_MULTIADDR(S)` to issue manual reservations; client accepts `LIBP2P_REMOTE_MULTIADDR(S)` and `LIBP2P_REMOTE_PEER_ID`, attempting each address in order.
+- [x] Harden the libp2p handshake channel (HTTP/2 window + frame sizing, keep-alives) so tonic runs reliably over bridged streams (`protocol/p2p/src/core/connection_handler.rs`).
+- [~] Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).  
+  _Local rehearsal complete:_ see `logs/local-libp2p-bridge.md` plus the raw session dumps (`logs/local-relay-session.log`, `logs/local-server-session.log`, and `logs/local-client-session.log`) for the tmux-driven relay/server/client run on macOS with all traffic forced through libp2p. ✅ Remote (VPS + mixed-NAT) run still outstanding.
+- [ ] Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.
 
 ## Phase 3 – Status (handover)
 - [x] Adopt `Libp2pStream` in the Kaspa adaptor/router

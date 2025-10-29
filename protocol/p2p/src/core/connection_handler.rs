@@ -5,7 +5,7 @@ use crate::pb::{
     p2p_client::P2pClient as ProtoP2pClient, p2p_server::P2p as ProtoP2p, p2p_server::P2pServer as ProtoP2pServer, KaspadMessage,
 };
 use crate::{ConnectionInitializer, Router};
-use futures::FutureExt;
+use futures::{future::poll_fn, FutureExt, Stream};
 use http::Uri;
 use hyper_util::rt::TokioIo;
 use kaspa_core::{debug, info};
@@ -27,8 +27,13 @@ use tokio::sync::mpsc::{channel as mpsc_channel, Sender as MpscSender};
 use tokio::sync::oneshot::{channel as oneshot_channel, Sender as OneshotSender};
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_stream::StreamExt;
+use tonic::body::BoxBody;
 use tonic::transport::{Error as TonicError, Server as TonicServer};
 use tonic::{Request, Response, Status as TonicStatus, Streaming};
+use tower::Service;
+
+#[cfg(feature = "libp2p-bridge")]
+use hole_punch_bridge::stream::Libp2pConnectInfo as BridgeLibp2pInfo;
 
 #[derive(Error, Debug)]
 pub enum ConnectionError {
@@ -50,6 +55,10 @@ pub enum ConnectionError {
 
 /// Maximum P2P decoded gRPC message size to send and receive
 const P2P_MAX_MESSAGE_SIZE: usize = 1024 * 1024 * 1024; // 1GB
+const LIBP2P_HTTP2_STREAM_WINDOW: u32 = 8 * 1024 * 1024; // 8 MiB
+const LIBP2P_HTTP2_CONNECTION_WINDOW: u32 = 16 * 1024 * 1024; // 16 MiB
+const LIBP2P_HTTP2_MAX_FRAME_SIZE: u32 = 1024 * 1024; // 1 MiB
+const LIBP2P_HTTP2_MAX_HEADER_LIST_SIZE: u32 = 64 * 1024; // 64 KiB
 
 static SYNTHETIC_ADDR_COUNTER: AtomicU64 = AtomicU64::new(1);
 
@@ -77,18 +86,10 @@ impl ConnectionHandler {
         S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
     {
         let connector = StreamConnector::new(stream);
-        let endpoint = tonic::transport::Endpoint::from_static("http://kaspa.libp2p")
-            .timeout(Duration::from_millis(Self::communication_timeout()))
-            .connect_timeout(Duration::from_millis(Self::connect_timeout()));
+        let channel =
+            build_libp2p_channel(connector, Duration::from_millis(Self::connect_timeout())).await.map_err(ConnectionError::IoError)?;
 
-        let channel = endpoint.connect_with_connector(connector).await?;
-
-        let channel = ServiceBuilder::new()
-            .layer(MapResponseBodyLayer::new(move |body| CountBytesBody::new(body, self.counters.bytes_rx.clone())))
-            .layer(MapRequestBodyLayer::new(move |body| CountBytesBody::new(body, self.counters.bytes_tx.clone()).boxed_unsync()))
-            .service(channel);
-
-        let mut client = ProtoP2pClient::new(channel)
+        let mut client = ProtoP2pClient::with_origin(channel, Uri::from_static("http://kaspa.libp2p"))
             .send_compressed(tonic::codec::CompressionEncoding::Gzip)
             .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
             .max_decoding_message_size(P2P_MAX_MESSAGE_SIZE);
@@ -125,19 +126,14 @@ impl ConnectionHandler {
         let connection_handler = self.clone();
         info!("P2P Server starting on: {}", serve_address);
 
-        let bytes_tx = self.counters.bytes_tx.clone();
-        let bytes_rx = self.counters.bytes_rx.clone();
-
         tokio::spawn(async move {
-            let proto_server = ProtoP2pServer::new(connection_handler)
-                .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+            let proto_server = ProtoP2pServer::new(connection_handler).max_decoding_message_size(P2P_MAX_MESSAGE_SIZE);
+            let proto_server = proto_server
                 .send_compressed(tonic::codec::CompressionEncoding::Gzip)
-                .max_decoding_message_size(P2P_MAX_MESSAGE_SIZE);
+                .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
 
             // TODO: check whether we should set tcp_keepalive
-            let serve_result = TonicServer::builder()
-                .layer(MapRequestBodyLayer::new(move |body| CountBytesBody::new(body, bytes_rx.clone()).boxed_unsync()))
-                .layer(MapResponseBodyLayer::new(move |body| CountBytesBody::new(body, bytes_tx.clone())))
+            let serve_result = configure_libp2p_server(TonicServer::builder())
                 .add_service(proto_server)
                 .serve_with_shutdown(serve_address.into(), termination_receiver.map(drop))
                 .await;
@@ -148,6 +144,27 @@ impl ConnectionHandler {
             }
         });
         Ok(termination_sender)
+    }
+
+    pub(crate) fn serve_with_incoming<S, I>(&self, incoming: I)
+    where
+        S: AsyncRead + AsyncWrite + tonic::transport::server::Connected + Send + Unpin + 'static,
+        I: Stream<Item = Result<S, std::io::Error>> + Send + 'static,
+    {
+        let connection_handler = self.clone();
+        tokio::spawn(async move {
+            let proto_server = ProtoP2pServer::new(connection_handler.clone()).max_decoding_message_size(P2P_MAX_MESSAGE_SIZE);
+            let proto_server = proto_server
+                .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
+
+            let result = configure_libp2p_server(TonicServer::builder()).add_service(proto_server).serve_with_incoming(incoming).await;
+
+            match result {
+                Ok(_) => debug!("P2P, libp2p incoming server stopped"),
+                Err(err) => debug!("P2P, libp2p incoming server stopped with error: {err:?}"),
+            }
+        });
     }
 
     /// Connect to a new peer
@@ -278,16 +295,41 @@ impl ProtoP2p for ConnectionHandler {
         &self,
         request: Request<Streaming<KaspadMessage>>,
     ) -> Result<Response<Self::MessageStreamStream>, TonicStatus> {
-        let Some(remote_address) = request.remote_addr() else {
+        let mut socket_addr = request.remote_addr();
+        let mut libp2p_metadata: Option<crate::core::connection_info::Libp2pConnectInfo> = None;
+
+        #[cfg(feature = "libp2p-bridge")]
+        if let Some(connect_info) = request.extensions().get::<BridgeLibp2pInfo>() {
+            if socket_addr.is_none() {
+                socket_addr = connect_info.synthesized_socket;
+            }
+
+            libp2p_metadata = Some(crate::core::connection_info::Libp2pConnectInfo::with_address(
+                connect_info.peer_id.to_string(),
+                connect_info.remote_multiaddr.as_ref().map(|addr| addr.to_string()),
+                connect_info.relay_used,
+            ));
+        }
+
+        let Some(remote_address) = socket_addr else {
             return Err(TonicStatus::new(tonic::Code::InvalidArgument, "Incoming connection opening request has no remote address"));
         };
+
+        let metadata = ConnectionMetadata::new(Some(remote_address), libp2p_metadata);
+
+        if let Some(summary) = metadata.summary() {
+            debug!("P2P, accepting incoming libp2p stream: {}", summary);
+        } else {
+            debug!("P2P, accepting incoming stream from {}", remote_address);
+        }
 
         // Build the in/out pipes
         let (outgoing_route, outgoing_receiver) = mpsc_channel(Self::outgoing_network_channel_size());
         let incoming_stream = request.into_inner();
 
         // Build the router object
-        let router = Router::new(remote_address, None, false, self.hub_sender.clone(), incoming_stream, outgoing_route).await;
+        let router =
+            Router::new(remote_address, Some(metadata), false, self.hub_sender.clone(), incoming_stream, outgoing_route).await;
 
         // Notify the central Hub about the new peer
         self.hub_sender.send(HubEvent::NewPeer(router)).await.expect("hub receiver should never drop before senders");
@@ -323,6 +365,96 @@ where
         let stream = self.stream.take().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "libp2p connector reused"));
         Box::pin(async move { stream })
     }
+}
+
+fn configure_libp2p_server(builder: TonicServer) -> TonicServer {
+    // Match yamux buffers (32 MiB) while keeping connection responsive
+    builder
+        .max_frame_size(Some(LIBP2P_HTTP2_MAX_FRAME_SIZE))
+        .initial_stream_window_size(Some(LIBP2P_HTTP2_STREAM_WINDOW)) // 8 MiB stream window
+        .initial_connection_window_size(Some(LIBP2P_HTTP2_CONNECTION_WINDOW)) // 16 MiB connection window
+        .http2_keepalive_interval(Some(Duration::from_secs(30)))
+        .http2_keepalive_timeout(Some(Duration::from_secs(10)))
+        .http2_max_header_list_size(Some(LIBP2P_HTTP2_MAX_HEADER_LIST_SIZE))
+        .http2_adaptive_window(Some(false))
+}
+
+type Libp2pGrpcService = Libp2pSendRequest;
+
+struct Libp2pSendRequest {
+    inner: hyper::client::conn::http2::SendRequest<BoxBody>,
+}
+
+impl From<hyper::client::conn::http2::SendRequest<BoxBody>> for Libp2pSendRequest {
+    fn from(inner: hyper::client::conn::http2::SendRequest<BoxBody>) -> Self {
+        Self { inner }
+    }
+}
+
+impl tower::Service<http::Request<BoxBody>> for Libp2pSendRequest {
+    type Response = http::Response<BoxBody>;
+    type Error = hyper::Error;
+    type Future = Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: http::Request<BoxBody>) -> Self::Future {
+        debug!("libp2p gRPC send request: {}", req.uri());
+        let fut = self.inner.send_request(req);
+        Box::pin(async move {
+            match fut.await {
+                Ok(res) => Ok(res.map(tonic::body::boxed)),
+                Err(err) => {
+                    debug!("libp2p gRPC request failed: {err:?}");
+                    Err(err)
+                }
+            }
+        })
+    }
+}
+
+async fn build_libp2p_channel<S>(
+    mut connector: StreamConnector<S>,
+    connect_timeout: Duration,
+) -> Result<Libp2pGrpcService, std::io::Error>
+where
+    S: AsyncRead + AsyncWrite + Send + Unpin + 'static,
+{
+    poll_fn(|cx| connector.poll_ready(cx)).await?;
+    let stream = connector.call(Uri::from_static("http://kaspa.libp2p")).await?;
+
+    let mut builder = hyper::client::conn::http2::Builder::new(hyper_util::rt::TokioExecutor::new());
+    // Match yamux buffers (32 MiB) while keeping connection responsive
+    builder
+        .initial_stream_window_size(LIBP2P_HTTP2_STREAM_WINDOW) // 8 MiB stream window
+        .initial_connection_window_size(LIBP2P_HTTP2_CONNECTION_WINDOW) // 16 MiB connection window
+        .keep_alive_interval(Some(Duration::from_secs(30)))
+        .keep_alive_timeout(Duration::from_secs(10))
+        .keep_alive_while_idle(true)
+        .adaptive_window(false)
+        .max_frame_size(LIBP2P_HTTP2_MAX_FRAME_SIZE)
+        .max_header_list_size(LIBP2P_HTTP2_MAX_HEADER_LIST_SIZE);
+    builder.timer(hyper_util::rt::TokioTimer::new());
+
+    debug!(
+        "libp2p HTTP/2 client: max_frame={} bytes, stream_window={} bytes, conn_window={} bytes",
+        LIBP2P_HTTP2_MAX_FRAME_SIZE, LIBP2P_HTTP2_STREAM_WINDOW, LIBP2P_HTTP2_CONNECTION_WINDOW
+    );
+
+    let handshake = tokio::time::timeout(connect_timeout, builder.handshake(stream))
+        .await
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::TimedOut, "libp2p grpc handshake timed out"))?;
+    let (send_request, connection) = handshake.map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err))?;
+
+    tokio::spawn(async move {
+        if let Err(err) = connection.await {
+            debug!("libp2p h2 connection error: {:?}", err);
+        }
+    });
+
+    Ok(Libp2pSendRequest::from(send_request))
 }
 
 #[cfg(test)]
@@ -372,7 +504,7 @@ mod tests {
         let incoming_stream = tokio_stream::StreamExt::map(ReceiverStream::new(incoming_rx), |io| Ok::<_, std::io::Error>(io));
 
         let server_task = tokio::spawn(async move {
-            TonicServer::builder()
+            configure_libp2p_server(TonicServer::builder())
                 .add_service(
                     ProtoP2pServer::new(server_handler)
                         .accept_compressed(tonic::codec::CompressionEncoding::Gzip)

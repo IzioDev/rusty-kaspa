@@ -2249,6 +2249,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hole-punch-relay"
+version = "1.0.1"
+dependencies = [
+ "anyhow",
+ "clap 4.5.19",
+ "futures",
+ "libp2p",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "home"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"

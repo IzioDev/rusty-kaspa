@@ -110,7 +110,7 @@
    ```
    The configuration toggles QUIC alongside TCP and enforces conservative relay limits. DCUtR hole punching is enabled by default but can be disabled through `config.hole_punch.enable_dcutr`.
 
-   The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviour under the `libp2p-bridge` feature. Set `LIBP2P_LISTEN_MULTIADDR=/ip4/0.0.0.0/tcp/16000` on the server to accept inbound streams, and supply `LIBP2P_REMOTE_MULTIADDR`/`LIBP2P_REMOTE_PEER_ID` on the client to dial via libp2p.
+   The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviour under the `libp2p-bridge` feature. Set `LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit` on the server to register local sockets and pre-reserve relay circuits (comma/semicolon are accepted separators). Optional `LIBP2P_RELAY_MULTIADDR(S)` entries keep backwards compatibility with the one-shot dial helper. The client accepts `LIBP2P_REMOTE_MULTIADDRS` (same separators, supports relay + direct addresses) together with `LIBP2P_REMOTE_PEER_ID` to drive the dialer; it tries each provided multiaddr until one succeeds.
 
 ## Test Coverage
 - `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically.
