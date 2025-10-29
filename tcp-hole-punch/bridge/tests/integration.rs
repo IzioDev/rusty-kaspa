@@ -181,6 +181,76 @@ async fn tonic_server_accepts_libp2p_stream() {
     timeout(Duration::from_secs(5), server_handle.shutdown()).await.expect("server shutdown timeout").expect("server shutdown");
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 6)]
+async fn inbound_queue_handles_many_concurrent_streams() {
+    init_tracing();
+    const STREAM_COUNT: usize = 40;
+
+    let mut server_handle = spawn_swarm(identity::Keypair::generate_ed25519()).expect("spawn server");
+    let listen_multiaddr = reserve_tcp_multiaddr();
+    let (listen_tx, listen_rx) = oneshot::channel();
+    server_handle
+        .command_tx()
+        .send(SwarmCommand::ListenOn { addr: listen_multiaddr.clone(), response: Some(listen_tx) })
+        .await
+        .expect("send listen");
+    listen_rx.await.expect("listen ack dropped").expect("listen result");
+    let mut incoming = incoming_from_handle(&mut server_handle).expect("incoming receiver available");
+
+    let client_handle = spawn_swarm(identity::Keypair::generate_ed25519()).expect("spawn client");
+    let mut response_rx = Vec::with_capacity(STREAM_COUNT);
+    for _ in 0..STREAM_COUNT {
+        let (response_tx, response_one_rx) = oneshot::channel();
+        client_handle
+            .command_tx()
+            .send(SwarmCommand::Dial { peer: server_handle.local_peer_id(), addrs: vec![listen_multiaddr.clone()], response: response_tx })
+            .await
+            .expect("send dial command");
+        response_rx.push(response_one_rx);
+    }
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let mut inbound_streams = Vec::with_capacity(STREAM_COUNT);
+    for _ in 0..STREAM_COUNT {
+        let next = timeout(Duration::from_secs(10), incoming.next()).await.expect("incoming timeout");
+        let stream = next.expect("incoming stream channel closed").expect("incoming stream error");
+        inbound_streams.push(stream);
+    }
+    assert_eq!(inbound_streams.len(), STREAM_COUNT, "expected {STREAM_COUNT} inbound streams");
+
+    let mut outbound_streams = Vec::with_capacity(STREAM_COUNT);
+    for rx in response_rx {
+        let handle = timeout(Duration::from_secs(10), rx)
+            .await
+            .expect("dial response timeout")
+            .expect("dial response dropped")
+            .expect("dial attempt failed");
+        outbound_streams.push(handle.into_stream());
+    }
+    assert_eq!(outbound_streams.len(), STREAM_COUNT, "expected {STREAM_COUNT} outbound streams");
+
+    use std::collections::VecDeque;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    let mut inbound_queue: VecDeque<_> = inbound_streams.into_iter().collect();
+    let mut outbound_queue: VecDeque<_> = outbound_streams.into_iter().collect();
+
+    for idx in 0..STREAM_COUNT {
+        let mut inbound = inbound_queue.pop_front().expect("missing inbound stream");
+        let mut outbound = outbound_queue.pop_front().expect("missing outbound stream");
+        let payload = format!("stream-{idx}").into_bytes();
+        outbound.write_all(&payload).await.expect("write outbound payload");
+        outbound.flush().await.expect("flush outbound payload");
+        let mut buf = vec![0u8; payload.len()];
+        inbound.read_exact(&mut buf).await.expect("read inbound payload");
+        assert_eq!(buf, payload, "payload mismatch for stream {idx}");
+    }
+
+    timeout(Duration::from_secs(5), client_handle.shutdown()).await.expect("client shutdown timeout").expect("client shutdown");
+    timeout(Duration::from_secs(5), server_handle.shutdown()).await.expect("server shutdown timeout").expect("server shutdown");
+}
+
 #[tokio::test]
 async fn connector_rejects_missing_addr() {
     let handle = spawn_swarm(identity::Keypair::generate_ed25519()).expect("spawn");

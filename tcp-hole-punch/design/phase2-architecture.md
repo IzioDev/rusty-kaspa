@@ -117,19 +117,20 @@ The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviou
 - The tonic request that surfaces an inbound libp2p stream often lacks a socket address. The connection handler now synthesizes one (based on the libp2p metadata) and records it in the log as `addr=/p2p/<peer>`, so downstream consumers still receive a stable identifier.
 - Give the reservation a moment to settle before starting the remote client. In the Phase 4 VPS run the server was up for ~1 s before the Vultr dial succeeded; starting the client too early still triggers `Relay has no reservation for destination`.
 - Reference logs for the mixed-NAT rehearsal live under `logs/phase4-{relay,server,client}-session.log` and show the complete reservation/DCUtR/handshake timeline.
+- The Phase 5 hardened replay (`logs/phase5-hardened-run.md`) captures the deterministic synthetic socket addresses, relay metadata, and byte counters after the latest fixes.
 
 ## Test Coverage
-- `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically.
-- `tonic_server_accepts_libp2p_stream` feeds the same stream through a tonic Echo service using `serve_with_incoming` + `Libp2pConnector`.
-- Additional tests cover URI failure modes (`missing addr`, malformed multiaddr, missing `/p2p/`, mismatched peer`).
+- Core bridge smoke tests: `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically, while `tonic_server_accepts_libp2p_stream` feeds the stream through tonic using `serve_with_incoming`.
+- Hardening regressions: `synthetic_socket_addr_is_stable`, `duplicate_libp2p_connection_is_rejected`, `relay_limits_are_enforced`, `relay_limit_recovers_after_failed_dial`, `libp2p_counters_capture_traffic`, and the new stress test `inbound_queue_handles_many_concurrent_streams` exercise the Phase 5 fixes.
+- URI failure modes remain covered (`missing addr`, malformed multiaddr, missing `/p2p/`, mismatched peer`).
 
 Core tests run in ~20 ms via `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`.
 
 ## Open Questions
-- Extend metrics once Phase 3 threads `Libp2pConnectInfo` into Kaspa’s adaptor (e.g., relay/DCUtR counters).
+- Integrate the libp2p byte counters into the wider Kaspa telemetry pipeline (dashboards/alerts).
 - Monitor relay/DCUtR behaviour under real-world load and adjust defaults if reservations or retries need tightening.
 
 ## Next Steps
-1. Extend Kaspa’s adaptor/router to consume `Libp2pStream` directly (Phase 3).
-2. Record relay/DCUtR metrics once the adaptor exposes them downstream.
-3. Wire the bridge into the Kaspa client/server binaries to smoke-test a punched Kaspa session (Phase 4).
+1. Promote the hardened bridge into sustained nightly test harnesses (Phase 6).
+2. Capture production-grade metrics/dashboards for relay/DCUtR performance.
+3. Finalise operator runbooks before broader rollout.

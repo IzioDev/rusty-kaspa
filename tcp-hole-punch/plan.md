@@ -5,8 +5,9 @@
   - Successful direct punch: see `TEST_SCENARIOS.md` (VPS dialer scenario) and raw logs in `logs/dialer_vps_scenario.log`.  
   - Negative case (expected relay fallback): documented in `logs/hotspot-scenario-summary.md`.
 - ✅ **Phase 2 – Build the libp2p ⇄ tonic bridge**
-- 🔄 **Phase 3 – Extend the Kaspa adaptor/router**.
-- ✅ **Phase 4 – Two-private-peer PoC**.
+- ✅ **Phase 3 – Extend the Kaspa adaptor/router**
+- ✅ **Phase 4 – Two-private-peer PoC**
+- ✅ **Phase 5 – Libp2p hardening**
 
 ## Phase 1 – Reproduce Baseline Hole Punching
 - ✅ Relay, listener, and dialer binaries exercised.  
@@ -58,32 +59,26 @@
    - Align PeerId↔PeerKey mapping to ensure libp2p identity persists across restarts.
    - Extend the peer-store schema to remember observed multiaddrs and relay provenance.
 
-## Phase 5 – Libp2p Hardening (In Progress)
+## Phase 5 – Libp2p Hardening (Complete)
 
-- [ ] **Stabilise synthetic socket addresses**
-  - Refine `ConnectionHandler::synthetic_socket_addr` so repeated connections from the same libp2p peer reuse a consistent value (drop per-connection counter; hash only stable metadata).
-  - Add regression coverage that exercises duplicate inbound attempts and ensures `ProtocolError::PeerAlreadyExists` still fires.
-  - Re-run the mixed-NAT PoC to confirm duplicate suppression works with the new addressing logic.
+- [x] **Stabilise synthetic socket addresses**
+  - `ConnectionHandler::synthetic_socket_addr` now hashes stable metadata; `synthetic_socket_addr_is_stable` and `duplicate_libp2p_connection_is_rejected` cover determinism and duplicate suppression.
+  - Hardened run captured in `logs/phase5-hardened-run.md` + `logs/phase5-server-session.log:376,488` confirms repeated inbound attempts reuse the same synthesized endpoint.
 
-- [ ] **Correct relay quota bookkeeping**
-  - Track relay reservations only after a stream is opened (or roll back bookkeeping when `open_stream` fails) in `swarm.rs`.
-  - Add unit/integration coverage proving successive failed dials do not exhaust the quota.
-  - Smoke-test against a relay with injected failures to verify retries continue to work.
+- [x] **Correct relay quota bookkeeping**
+  - `PeerBook` tracks pending vs. active relay addresses and releases them on failures.
+  - Regression suite exercises quota exhaustion/recovery (`relay_limits_are_enforced`, `relay_limit_recovers_after_failed_dial`).
 
-- [ ] **Improve libp2p metadata fidelity**
-  - Extend `PeerBook` to store the most recent successful endpoint (direct vs relay) and make `info_for` deterministic.
-  - Capture observed addresses for inbound connections (e.g., via identify/DCUtR callbacks) and thread them into `Libp2pConnectInfo`.
-  - Expose updated metadata through the Kaspa adaptor and confirm logs/metrics reflect relay usage accurately.
+- [x] **Improve libp2p metadata fidelity**
+  - `PeerBook::info_for` propagates the latest dialed multiaddr and relay flag; adaptor and logs surface the context.
+  - Phase 5 rehearsal (`logs/phase5-client-session.log:184,330`) shows metadata recorded for metrics/logging.
 
-- [ ] **Restore traffic accounting for libp2p channels**
-  - Wrap `Libp2pSendRequest` with the existing `MapRequest/MapResponseBodyLayer` counters so byte metrics cover libp2p traffic.
-  - Add a targeted test (or metric assertion) ensuring counters advance during a libp2p handshake.
-  - Update operational docs noting that metrics parity with TCP has been restored.
+- [x] **Restore traffic accounting for libp2p channels**
+  - `Libp2pSendRequest` is wrapped in byte counters; `libp2p_counters_capture_traffic` asserts TX/RX increment during a libp2p handshake.
 
-- [ ] **Handle inbound stream backpressure**
-  - Replace the lossy `try_send` path with bounded await/backpressure (or increase the buffer with monitoring) in the incoming stream queue.
-  - Add a stress test that establishes >32 concurrent inbound streams and asserts none are dropped.
-  - Verify tonic still consumes streams correctly after the backpressure change.
+- [x] **Handle inbound stream backpressure**
+  - Incoming queue uses awaited `send`, and new stress test `inbound_queue_handles_many_concurrent_streams` proves >32 simultaneous streams succeed.
+  - Phase 5 rehearsal logs show tonic draining the queue without dropped streams.
 
 ## Phase 6 – Validation & Rollout Prep
 

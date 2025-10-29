@@ -73,6 +73,14 @@ Success criteria:
   - Relay reservation must complete before dial; logs make this visible.
   - Synthesised metadata is necessary for routers but should be clearly logged to avoid confusion.
 
+## Phase 5 Hardening Highlights
+
+- **Deterministic addressing & duplicate protection** – `ConnectionHandler::synthetic_socket_addr` now hashes stable metadata; the paired regressions (`synthetic_socket_addr_is_stable`, `duplicate_libp2p_connection_is_rejected`) ensure repeated libp2p arrivals reuse the same endpoint while still raising `PeerAlreadyExists` on duplicates.
+- **Relay quota bookkeeping** – `PeerBook` tracks pending vs. confirmed relay addresses so failed dials release reservations; covered by `relay_limits_are_enforced` and `relay_limit_recovers_after_failed_dial`.
+- **Metadata & metrics parity** – `PeerBook::info_for` feeds libp2p multiaddrs/relay flags into the adaptor, and `libp2p_counters_capture_traffic` validates byte counters for bridged traffic.
+- **Inbound backpressure** – The swarm now awaits the incoming queue; the new stress test `inbound_queue_handles_many_concurrent_streams` runs 40 simultaneous substreams without drops while tonic consumes them.
+- **Hardened rehearsal** – `logs/phase5-hardened-run.md` together with `logs/phase5-{relay,server,client}-session.log` documents the end-to-end replay using the updated bridge.
+
 ## Follow-up Opportunities (Post-PoC)
 
 These are not required for the proof-of-concept but will matter for production hardening:
@@ -90,5 +98,7 @@ These are not required for the proof-of-concept but will matter for production h
 | `protocol/p2p/src/bin/{server,client}.rs` | libp2p env wiring, reservation handling, stream hand-off. |
 | `tcp-hole-punch/logs/phase4-remote-success.md` | Runbook + timeline for the remote PoC. |
 | `tcp-hole-punch/logs/phase4-{relay,server,client}-session.log` | Captured logs (sanitised) from the successful mixed-NAT run. |
+| `tcp-hole-punch/logs/phase5-hardened-run.md` | Phase 5 hardened replay summary with links to the new relay/server/client logs. |
+| `tcp-hole-punch/bridge/tests/integration.rs` | Integration suite covering libp2p dial, tonic server acceptance, relay quota, counter instrumentation, and the >32 stream stress test. |
 | `tcp-hole-punch/design/phase2-architecture.md` | Updated architecture and operational notes. |
 | `tcp-hole-punch/plan.md` | Phase tracking, now with post-Phase 4 follow-up tasks. |
