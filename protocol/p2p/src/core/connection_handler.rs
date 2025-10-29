@@ -311,11 +311,16 @@ impl ProtoP2p for ConnectionHandler {
             ));
         }
 
-        let Some(remote_address) = socket_addr else {
-            return Err(TonicStatus::new(tonic::Code::InvalidArgument, "Incoming connection opening request has no remote address"));
-        };
+        let mut metadata = ConnectionMetadata::new(socket_addr, libp2p_metadata);
+        let remote_address = metadata.socket_addr.unwrap_or_else(|| {
+            let synthetic = Self::synthetic_socket_addr(&metadata);
+            metadata.socket_addr = Some(synthetic);
+            synthetic
+        });
 
-        let metadata = ConnectionMetadata::new(Some(remote_address), libp2p_metadata);
+        if socket_addr.is_none() {
+            debug!("P2P, synthesized remote address for libp2p inbound: {}", remote_address);
+        }
 
         if let Some(summary) = metadata.summary() {
             debug!("P2P, accepting incoming libp2p stream: {}", summary);

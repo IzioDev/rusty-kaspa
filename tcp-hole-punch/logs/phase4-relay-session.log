@@ -1,0 +1,847 @@
+[2m2025-10-28T11:35:57.757554Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/61885 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/61885, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }, num_established: 1, concurrent_dial_errors: None, established_in: 305.636841ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 526e86c17cc38bd07bf8289a2f2020be9bea6a3325ccca987366eb2be3e53c) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.97.0/tcp/4101, /ip4/192.168.139.3/tcp/4101, /ip4/192.168.215.0/tcp/4101, /ip4/192.168.107.0/tcp/4101, /ip4/127.0.0.1/tcp/4101, /ip4/10.0.0.150/tcp/4101], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011/p2p/12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/192.168.97.0/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/192.168.139.3/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/192.168.215.0/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/192.168.107.0/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/127.0.0.1/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), address: /ip4/10.0.0.150/tcp/4101 }
+BehaviourEvent: Event { peer: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), connection: ConnectionId(2), result: Ok(257.258953ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWFN9MG5VmF2e74KLj3Z1JXa9vyLLWCxzGmCZBctc7xXNj"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(3), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39908 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWGJqoTT8pYbM1yUiRRufCqbtic7ZqoYg5nMikZf5ujPwk"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39908 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.168807ms }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWGJqoTT8pYbM1yUiRRufCqbtic7ZqoYg5nMikZf5ujPwk"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39908 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(4), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/56834 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/56834 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.477138ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): f427bd536f907a7e59332b78dff676c213b3327b1e48b8ba6b53e073884b86) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h"), dst_peer_id: PeerId("12D3KooWCNeqahuEVokiyzYwsz2xyLF2CGQPsTBFcsMuY3aSgBwf"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h"), connection: ConnectionId(4), result: Ok(89.9765ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWSFSnwfKHrgEWpMzd3y4YWnxFQMoYuNTvXpwQDXSKGa6h"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/56834 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(5), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }, num_established: 1, concurrent_dial_errors: None, established_in: 263.277239ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): ab8c71d1e3a437f0e461d7860b2a9e67641f6efe99d64bc13c957e4c4c7c) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4101, /ip4/192.168.139.3/tcp/4101, /ip4/192.168.215.0/tcp/4101, /ip4/127.0.0.1/tcp/4101, /ip4/192.168.107.0/tcp/4101, /ip4/192.168.97.0/tcp/4101], protocols: ["/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/10.0.0.150/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/192.168.139.3/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/192.168.215.0/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/127.0.0.1/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/192.168.107.0/tcp/4101 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), address: /ip4/192.168.97.0/tcp/4101 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), connection: ConnectionId(5), result: Ok(263.466983ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), connection: ConnectionId(5), result: Ok(266.515741ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(6), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43572 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43572 }, num_established: 1, concurrent_dial_errors: None, established_in: 96.255526ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 96d61c2b23c3b451a0cf8fe1e1395ad91325bf19e7ebd191874e8f5ccba47) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), connection: ConnectionId(6), result: Ok(90.373895ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), dst_peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43572 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWKyAgbTWaBegVhzw5wpgsTuaS3Ys1xHZ78CuFSXNAdZ34"), dst_peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), connection: ConnectionId(5), result: Ok(265.122175ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4101 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWMN26U1NBfgNuMp7QFibbp9A1C5zVgaDFHpK28n4ncaXd") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(7), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.136/tcp/49511 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(7), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.136/tcp/49511, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(InvalidMessage)))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(8), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.144/tcp/37045 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(8), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.144/tcp/37045, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(InvalidMessage)))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(9), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/54795 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(9), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/54795, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(10), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.148/tcp/32787 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(10), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.148/tcp/32787, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(11), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.135/tcp/39029 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(11), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.135/tcp/39029, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(12), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.135/tcp/57275 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(12), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.135/tcp/57275, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(InvalidMessage)))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(13), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.143/tcp/33163 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(13), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.143/tcp/33163, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(14), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.132/tcp/36721 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(14), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.132/tcp/36721, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(15), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.142/tcp/51601 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(15), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.142/tcp/51601, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(16), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.144/tcp/51783 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(16), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.144/tcp/51783, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(InvalidMessage)))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(17), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.149/tcp/46887 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(17), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.149/tcp/46887, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(18), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.132/tcp/48979 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(18), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.132/tcp/48979, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Custom { kind: InvalidData, error: "not enough input bytes" }))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(19), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.130/tcp/60097 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(19), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.130/tcp/60097, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(20), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/41101 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(20), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/41101, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Custom { kind: InvalidData, error: "not enough input bytes" }))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(21), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.126/tcp/49435 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(21), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.126/tcp/49435, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(InvalidMessage)))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(22), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.133/tcp/58355 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(22), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.133/tcp/58355, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(23), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.146/tcp/41091 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(23), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.146/tcp/41091, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(Failed))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(24), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.137/tcp/41459 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(24), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.137/tcp/41459, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Custom { kind: InvalidData, error: "not enough input bytes" }))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(25), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.138/tcp/40463 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(25), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.138/tcp/40463, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(26), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.142/tcp/36053 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(26), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.142/tcp/36053, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Select(ProtocolError(IoError(Kind(UnexpectedEof)))))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(27), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/36715 }
+Swarm event: IncomingConnectionError { connection_id: ConnectionId(27), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/36715, error: Transport(Other(Custom { kind: Other, error: Other(Left(Left(Right(Apply(Io(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" })))))) })), peer_id: None }
+Swarm event: IncomingConnection { connection_id: ConnectionId(28), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/36715 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E"), connection_id: ConnectionId(28), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/36715 }, num_established: 1, concurrent_dial_errors: None, established_in: 324.576733ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(28), peer_id: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(28), peer_id: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 8f94e92979d48d17e3c1de1c2faeab9ce7da23d2966727eb036e5f7ed092a3) }, protocol_version: "", agent_version: "scanner@v1.25.1-0.20251024131842-9708e398c0a8", listen_addrs: [/ip4/104.152.52.136/tcp/0], protocols: ["/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E"), address: /ip4/104.152.52.136/tcp/0 }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E"), connection: ConnectionId(28), result: Ok(106.964096ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWKUrAeCXh7tPHuyqm8J8GXBvHWsdVEhE5q2365ha7ny4E"), connection_id: ConnectionId(28), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/104.152.52.125/tcp/36715 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Decode(Io(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" })))) })) }
+[2m2025-10-28T21:40:00.509791Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+[2m2025-10-28T21:40:34.896136Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 267.286973ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 7ab8a0ec515796c6c36dd8baf93bf060388741e5faeb25055b63169a2581cee) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.97.0/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), address: /ip4/192.168.97.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), connection: ConnectionId(1), result: Ok(258.114293ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWJ5RCEFpYLeqiwEgbAMzxseUiXvJZoh5wbkHDAvPgZgxD") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 281.59219ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): b7c0754b7b45a349a776e6dfae49a751326f195a42733f6622b59b1288f7fc9) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.97.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), connection: ConnectionId(2), result: Ok(251.839254ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), connection: ConnectionId(2), result: Ok(255.638041ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(3), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/58964 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/58964 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.750823ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): a9c450ae339e88612d12662963cf83e3692079655bc534d3911abe242faf7) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), connection: ConnectionId(3), result: Ok(90.235124ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), dst_peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/58964 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWMF4h5eV4Zph9ewCPqrefsdG6SDzAN5Fu2eeFAcFgAHuQ"), dst_peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), connection: ConnectionId(2), result: Ok(259.429949ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWNBezHYa8z9WJpPQkj4mEPPanvf4MBVZyv4A4C7sjQh44") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(4), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 261.608889ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): f0fdfaf0a28cd938aaee68df619d54bbf1cdb2b1ca0691e3623f973f6302abc) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), connection: ConnectionId(4), result: Ok(259.304532ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), connection: ConnectionId(4), result: Ok(10.931267118s) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), connection: ConnectionId(4), result: Ok(274.075902ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWS36dwQdoEtHKEVsdekMg8CLXWjkUtRWyvANBXJFjUA8B") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(5), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 262.30919ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 85203c563cca407aa77b91783b1555efe8aeb978c091e499940e7863dd0) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), connection: ConnectionId(5), result: Ok(258.43665ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), connection: ConnectionId(5), result: Ok(260.999771ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), connection: ConnectionId(5), result: Ok(261.74053ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(6), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39850 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39850 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.700972ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): e719d77c19a29f8bd21c6bf8e91c5e5630556c7987af87ccb67f6a4a2547) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ"), dst_peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ"), connection: ConnectionId(6), result: Ok(90.056904ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWRNUWAXGxDe6Tqkdkoc8ew9MirPPk3xYZm11YfyC4iCFQ"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39850 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(7), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33286 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8"), connection_id: ConnectionId(7), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33286 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.873882ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(7), peer_id: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(7), peer_id: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): d0646ab1f5a1847b56b6a0b34ae23223715193b3f7b112cec9959b2337e648a1) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8"), dst_peer_id: PeerId("12D3KooWJn2uGenNozA4jiPQzWWGkQPGQbhBpHD5U1HAcQpFt8sy"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8"), connection: ConnectionId(7), result: Ok(90.155197ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPqqn8z5fpk4R7huxVbNPEjgTnRRtuSjTosPynPTNQHn8"), connection_id: ConnectionId(7), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33286 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(8), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), connection_id: ConnectionId(8), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 264.489608ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(8), peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(8), peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): efb44f3a3d1951eed682a2e4b964302ebdbbd8651e53787725b57e823ceaeb7) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.97.0/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), address: /ip4/192.168.97.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), connection: ConnectionId(8), result: Ok(255.358827ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), connection: ConnectionId(8), result: Ok(261.695694ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(9), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43880 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), connection_id: ConnectionId(9), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43880 }, num_established: 1, concurrent_dial_errors: None, established_in: 94.142837ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(9), peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(9), peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 6aa5125ee29c5e14bcab8660eac1fff0ae08c6fc1cafa82c294ac4c98eca) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), connection: ConnectionId(9), result: Ok(90.416942ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), dst_peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), connection_id: ConnectionId(9), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43880 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWGzfNi1EKNa1geJqshntiwcDfvWiMacLbjdmP39nFrN1o"), dst_peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), connection: ConnectionId(8), result: Ok(266.117269ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY"), connection_id: ConnectionId(8), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWRx55KDDZJsWJPawtopdPdrueUaw6gsu664YwqS1BdGPY") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(10), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), connection_id: ConnectionId(10), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 276.633049ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(10), peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(10), peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 8b5164bb55c6d439954f98a3f3ddb8ffd58a7be929e2ef5a56349388566919d) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), address: /ip4/10.0.0.150/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), connection: ConnectionId(10), result: Ok(257.925053ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), connection: ConnectionId(10), result: Ok(260.812658ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), connection: ConnectionId(10), result: Ok(4.733183017s) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS"), connection_id: ConnectionId(10), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWKCCpisaPHaEi4QREGayJ25ErBnVvFnb6pd8kq8rhJMFS") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(11), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), connection_id: ConnectionId(11), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 267.979951ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(11), peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A") }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), renewed: false }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(11), peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 22a34986a95cfba7c190b09e14c415126bc82764ed1716ce9c21f46e18b5d) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: Event { peer: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), connection: ConnectionId(11), result: Ok(261.193716ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), connection: ConnectionId(11), result: Ok(268.354254ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(12), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51958 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), connection_id: ConnectionId(12), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51958 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.374752ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(12), peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(12), peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 63c76d6ae29e24d92c7a5b7c3a6abbad749d9834f6a12c788b6b4549852d) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), connection: ConnectionId(12), result: Ok(90.697686ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), dst_peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), connection_id: ConnectionId(12), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51958 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWGXruUNASdXv29UDZek6JEAtmCxz57UXAut3cbT8pSWBW"), dst_peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), connection: ConnectionId(11), result: Ok(270.164521ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A"), connection_id: ConnectionId(11), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWC9aCoxb8q83gGctBbn6zEfwVtJFLM55xSvvZfFa5Pd3A") }
+[2m2025-10-28T23:27:27.037455Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+[2m2025-10-28T23:27:41.305407Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+[2m2025-10-28T23:28:00.393867Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 264.486535ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): ce441b9df98d6f83831e2c8a86fcc4ed2678f8299e833d7da285151ee67f6e) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), connection: ConnectionId(1), result: Ok(261.823139ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWPhYPYYLSVHpJMgBzBiq75WwCyqkppVU8cBhCy2hjrvBo") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 268.167544ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 15ee70246e8ec37d2b4511fb27ca928d4f7fbb9aa2390481f4f9274e53ea16b) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.97.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), connection: ConnectionId(2), result: Ok(267.60688ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(3), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/34368 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/34368 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.348463ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 7087376e234797ab1ba6b198ff1eb89fb4c54ebbb8386a62d2aed2abbd786) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), connection: ConnectionId(3), result: Ok(90.385251ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), dst_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/34368 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWHPdEjah8isyZWmu78WDMoBbG2Gwsh1D2ZuRn8U7Q4GVj"), dst_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), connection: ConnectionId(2), result: Ok(295.13562ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), connection: ConnectionId(2), result: Ok(263.353875ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(4), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36890 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36890 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.677668ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): bb9cf38eb7bc6fa09d63acc247e978fd85919ad6bc2f011a067aece9e3fc5ba) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), connection: ConnectionId(4), result: Ok(90.109471ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), dst_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36890 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWNSjDXuurnZQkV71R2QJsGYy6hZbPLe3Xrvf1T81Qn6kH"), dst_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), error: Some(Kind(ConnectionAborted)) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWBHyc7orrQCDGgz4U5jdy18WzmKBWm5UTX5faezzA5K2S") }
+[2m2025-10-28T23:49:37.949954Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 265.667252ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 8ad24d79b4b93a37cd586c9be9532edb49813ea4d5afff41fcc26cff7e8778) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/127.0.0.1/tcp/4012], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), address: /ip4/127.0.0.1/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), connection: ConnectionId(1), result: Ok(254.472152ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), renewed: true }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57312 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57312 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.121318ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): b4a899f63bc5bec3f997b1cdaba9d8d1f2dab2fd9cedd8c6d41670e8195db9) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), connection: ConnectionId(2), result: Ok(89.82579ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), dst_peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57312 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWMwAse4oKFo24YGyVRrb9Y67J1EMqRSNu476XRN9o5TnY"), dst_peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), connection: ConnectionId(1), result: Ok(259.298813ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), connection: ConnectionId(1), result: Ok(266.361201ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWKAGRXzC1pzMcANYwJw5d9nHMd9Lf8uXZmUBCfNgpohcj") }
+[2m2025-10-29T00:00:10.954481Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 268.311627ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 318a959f80f75453f274376a5cf672989106df08eb664c13c8f4f8e7bec4e5e) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), connection: ConnectionId(1), result: Ok(261.903211ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), renewed: true }
+BehaviourEvent: Event { peer: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), connection: ConnectionId(1), result: Ok(274.444881ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36288 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36288 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.584114ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): d4f741b661c778ede9311c524c15337c6eea7eb3937bfd3901030126fa060) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), connection: ConnectionId(2), result: Ok(90.296236ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), dst_peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36288 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWQ9hGx4YAGcLB5YrodqTQLnyHNbv1yUAqAHZ7B3vEXou1"), dst_peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), connection: ConnectionId(1), result: Ok(255.548894ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWD9kiBQ4vDRkWSPnswaTgDqPPu8RxJ8DZzJf7jgzpLwVf") }
+[2m2025-10-29T00:09:39.888727Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 273.275055ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 6a59ae94331e5315a539b959294231659b3c14d961f9d68eadc9a0b7228c74) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), address: /ip4/127.0.0.1/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), connection: ConnectionId(1), result: Ok(254.183571ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), connection: ConnectionId(1), result: Ok(332.130203ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36340 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36340 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.661178ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 19d7aabf18e416235ac8afe5bc7efbfa7f7554e2a4d15c32a0a55b465d3cfb) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), connection: ConnectionId(2), result: Ok(90.368882ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), dst_peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/36340 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooW9vfrN3JtkgUZnFBg2C8YkZHsX2kFidave9wbiWvtS3Wi"), dst_peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), connection: ConnectionId(1), result: Ok(259.159747ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWGyWhYryt1WCfHiYcPurFTwQ6RcKNzaJxqrovm3RxUUC3") }
+[2m2025-10-29T00:31:11.584377Z[0m [32m INFO[0m [2mlibp2p_swarm[0m[2m:[0m [3mlocal_peer_id[0m[2m=[0m12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+Listening on /ip4/0.0.0.0/tcp/4011 (id=ListenerId(1))
+Listening on /ip4/0.0.0.0/udp/4011/quic-v1 (id=ListenerId(2))
+Relay peer id: 12D3KooWR2KSRQWyanR1dPvnZkXt296xgf3FFn8135szya3zYYwY
+New listen address: /ip4/127.0.0.1/tcp/4011
+New listen address: /ip4/<RELAY_IP>/tcp/4011
+New listen address: /ip4/172.17.0.1/tcp/4011
+New listen address: /ip4/127.0.0.1/udp/4011/quic-v1
+New listen address: /ip4/<RELAY_IP>/udp/4011/quic-v1
+New listen address: /ip4/172.17.0.1/udp/4011/quic-v1
+Swarm event: IncomingConnection { connection_id: ConnectionId(1), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 271.50424ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(1), peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 66841aaeeb6ba45283b0658f17efb9f885f3ec44574a5c37b3d7428452ad9e5) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/127.0.0.1/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), address: /ip4/127.0.0.1/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), connection: ConnectionId(1), result: Ok(262.73571ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), connection_id: ConnectionId(1), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(2), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45870 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45870 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.073163ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(2), peer_id: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 7088e6f09fb3cb95be0408fc6ffdcf7951420e78be2a6e49bb356ef0a7c) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX"), dst_peer_id: PeerId("12D3KooWGiYb347jsaTTGhSpV5oHYPmDBWbWM2grVVaomUoMJhg8"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX"), connection: ConnectionId(2), result: Ok(90.413722ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWHPeucMiy1owgu2B8FdLsCgUeFpy4E4V8mCwVnDiWdpnX"), connection_id: ConnectionId(2), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45870 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(3), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 262.290548ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(3), peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 3f976d31ee38c0584383325b6144292eb27d8ee8f04c4e1f1966985ef8cb6ddf) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.139.3/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/127.0.0.1/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), address: /ip4/127.0.0.1/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), connection: ConnectionId(3), result: Ok(256.913122ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), connection: ConnectionId(3), result: Ok(267.058372ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), connection: ConnectionId(3), result: Ok(267.280461ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai"), connection_id: ConnectionId(3), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWE6bmyJ4uAYxiAZXEoQgSYHfafdfJ1syWHHoToVWmsCai") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(4), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 270.367179ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(4), peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): cef3db3d81a51cd1a7263745bf853eeec58cf3447feef562cc7e3da88468e2) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), connection: ConnectionId(4), result: Ok(260.046735ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), renewed: true }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), connection: ConnectionId(4), result: Ok(260.444725ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), connection: ConnectionId(4), result: Ok(258.620155ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), connection_id: ConnectionId(4), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(5), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45690 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45690 }, num_established: 1, concurrent_dial_errors: None, established_in: 102.346144ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(5), peer_id: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): d3cb69cd76f04ecb6a2d1e6fad9bd77896ce0f09b2196f34535590cb316586) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK"), dst_peer_id: PeerId("12D3KooWPkDpenCHyTTXa6VWBrUSWsULwpbWs3gJCe3YWkyzVR6q"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK"), connection: ConnectionId(5), result: Ok(90.145502ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWQ586LNwVTm7vbqyLu4kRh3KSf3WkvRHh44YTUQQVgYHK"), connection_id: ConnectionId(5), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/45690 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(6), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 263.535685ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(6), peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): f6ff61573535e898b345e8416a26ff5e4cdec544de575653e4eb43c9dee) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.139.3/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), connection: ConnectionId(6), result: Ok(358.455433ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(7), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57580 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), connection_id: ConnectionId(7), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57580 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.239595ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(7), peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(7), peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 1c4537cbfd59efe030267d3d1041c25f81cf117612b7d75bfede0df1ed11ba) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), connection: ConnectionId(7), result: Ok(89.92701ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), dst_peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), connection_id: ConnectionId(7), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/57580 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWBiioR1v7UQowiwbhE9N9ekTQ8Sv8fUKSAeP4tLoQzT4D"), dst_peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), connection: ConnectionId(6), result: Ok(1.747952609s) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), connection: ConnectionId(6), result: Ok(263.38707ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7"), connection_id: ConnectionId(6), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWSSYKdahhzoXKQ5vHFQTq3S38FMu2Zf1pK5Yr7u9Fk6f7") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(8), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), connection_id: ConnectionId(8), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 255.660037ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(8), peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(8), peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): eb80f871ee58ecbcf5e9768d9d686d4b5d95269865a6a723881cdf849695f) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), connection: ConnectionId(8), result: Ok(334.690828ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(9), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43450 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), connection_id: ConnectionId(9), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43450 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.318469ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(9), peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(9), peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): c989efe92af84cc997928bcc52b50b095f0a49da28362622a8e653ebae37aaf) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), connection: ConnectionId(9), result: Ok(90.254567ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), dst_peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), connection_id: ConnectionId(9), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/43450 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Decode(Io(Os { code: 104, kind: ConnectionReset, message: "Connection reset by peer" })))) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWPP67EqDHa86zEtRkJBQvNhZ2oQLmZ4Ctibsgf5EdEpp6"), dst_peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), connection: ConnectionId(8), result: Ok(260.035262ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), connection: ConnectionId(8), result: Ok(412.364409ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi"), connection_id: ConnectionId(8), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWRfg3Gc3buRQzbd5dfK6oATsVoG4opn5anUy49ys82nAi") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(10), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), connection_id: ConnectionId(10), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 271.416803ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(10), peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(10), peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): c3f4d5c87dcf9ed58e8296b1302239a882d3cda976497236888357ec46c2985) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), connection: ConnectionId(10), result: Ok(262.997897ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(11), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51284 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), connection_id: ConnectionId(11), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51284 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.006529ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(11), peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(11), peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): e51c681a7b72894bff5195ad3fce8ff71a6784e1932beafb8ac63930b5d46d) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), connection: ConnectionId(11), result: Ok(90.453121ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), dst_peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), connection_id: ConnectionId(11), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/51284 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWREievHMBRbmv7UmStSBuqTCtY4wyG59eRqvGGcE4UABW"), dst_peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), connection: ConnectionId(10), result: Ok(320.866532ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), connection: ConnectionId(10), result: Ok(259.280836ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2"), connection_id: ConnectionId(10), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWP1JCk3st6afuF5yKWxXJUZsDRzSwQkwfzHczybaFbiR2") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(12), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), connection_id: ConnectionId(12), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 262.341775ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(12), peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(12), peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): b2e7ad97a9b139683e5e620e873ad492c6d3d1a2d6ec8463f9347e839f4c5e) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), connection: ConnectionId(12), result: Ok(313.796514ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(13), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/48542 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), connection_id: ConnectionId(13), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/48542 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.245467ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(13), peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(13), peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): cdf11a627ffd68ba983432c509cb4443f1b22ae91b5b510ccbec29a75f0e682) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), connection: ConnectionId(13), result: Ok(90.183608ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), dst_peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), connection_id: ConnectionId(13), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/48542 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWPgGymgyFf4yypi3h6GUVhAYespK2EupCY3CwbTDSr4bj"), dst_peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), connection: ConnectionId(12), result: Ok(260.003282ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), connection: ConnectionId(12), result: Ok(261.120324ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq"), connection_id: ConnectionId(12), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWMrjdrkEL7qXLbTbBBx7v26csLnP3sF5eXd6o9u1LF6rq") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(14), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), connection_id: ConnectionId(14), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 261.099759ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(14), peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(14), peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 575a69bafd77a4c367cf627e2947e7545142734fd33e29cacf9ac083e65a) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.107.0/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), address: /ip4/192.168.107.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), connection: ConnectionId(14), result: Ok(263.301434ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), renewed: true }
+Swarm event: IncomingConnection { connection_id: ConnectionId(15), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39212 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), connection_id: ConnectionId(15), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39212 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.440477ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(15), peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(15), peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 25cd4da8e595a3e2a2d017f312d7ebf3f7f1628fecbc8bf9c1fbababe16eed8) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), connection: ConnectionId(15), result: Ok(90.616427ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), dst_peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), connection_id: ConnectionId(15), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/39212 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWCMvpoQx82L1cLFKhX9iojtGCFaNPAtHbLf5c9wbiAmks"), dst_peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), connection: ConnectionId(14), result: Ok(261.041092ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), connection: ConnectionId(14), result: Ok(260.22879ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV"), connection_id: ConnectionId(14), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWFhMbdW1Zjgipwwd1TSAsmMpH6gpSbyPrJBefBGQ3UgiV") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(16), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), connection_id: ConnectionId(16), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 264.602812ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(16), peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(16), peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): cedc6cc63e9ff345aedc4e79a2a93d5a3b1c26a4d3517501394e92b4a6c7fe5) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/192.168.139.3/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.97.0/tcp/4012], protocols: ["/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), address: /ip4/192.168.97.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), connection: ConnectionId(16), result: Ok(272.552419ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), renewed: true }
+Swarm event: IncomingConnection { connection_id: ConnectionId(17), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/60782 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), connection_id: ConnectionId(17), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/60782 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.942298ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(17), peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(17), peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 3976e4835ac9e870819485a62a97be9fd728460c3efe2e7f51bd9dbd4b1cb) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), connection: ConnectionId(17), result: Ok(90.489426ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), dst_peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), connection_id: ConnectionId(17), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/60782 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWDggZFRFWb6ycP315MjuifeMuRWwmtDh9XCGomuKhieeE"), dst_peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), connection: ConnectionId(16), result: Ok(256.880791ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), connection: ConnectionId(16), result: Ok(262.135972ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS"), connection_id: ConnectionId(16), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWPjs6ioBKbSufz2ceiBnrv4e4rPaavkoLCviNuZ2vgnRS") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(18), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), connection_id: ConnectionId(18), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 303.669862ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(18), peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(18), peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 4d586443aa236c2378941c04fd3cb4554c557c68b7473ea78ffcbbeb1b75edf) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), connection: ConnectionId(18), result: Ok(263.437045ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(19), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/40278 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), connection_id: ConnectionId(19), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/40278 }, num_established: 1, concurrent_dial_errors: None, established_in: 93.016899ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(19), peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(19), peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 1bc4df9f7117a322299acd75212821e4ec718d42cde7f091622115a87cdc57) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), connection: ConnectionId(19), result: Ok(90.659347ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), dst_peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), connection_id: ConnectionId(19), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/40278 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWBgmHvYRxLC1h6yyMhEK9ij1Eh1SR3WnV9Ei5FCkF4ajx"), dst_peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), connection: ConnectionId(18), result: Ok(262.268167ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), connection: ConnectionId(18), result: Ok(262.625032ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC"), connection_id: ConnectionId(18), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWF2Hjchnd6qAS3pvG1aXbQimHqGPYi6DGSsRFtXpS6ywC") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(20), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), connection_id: ConnectionId(20), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 264.390379ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(20), peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(20), peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 6c6a2f4b9971de68cf1b95d2b645116badb6ef9916a012d2726e644764d6a6) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), connection: ConnectionId(20), result: Ok(251.853819ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), renewed: true }
+Swarm event: IncomingConnection { connection_id: ConnectionId(21), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33264 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), connection_id: ConnectionId(21), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33264 }, num_established: 1, concurrent_dial_errors: None, established_in: 94.614541ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(21), peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(21), peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): a3321cb8be6a7682f34ebf13e5fc348353b54d916871527abe7d837b038c4a5) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), connection: ConnectionId(21), result: Ok(90.321899ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), dst_peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), connection_id: ConnectionId(21), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33264 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWLoQweavJ9Q9MHjFgBXhZYayjoj9g37JFENja7pcMURYg"), dst_peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), connection: ConnectionId(20), result: Ok(264.052475ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), connection: ConnectionId(20), result: Ok(260.140466ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM"), connection_id: ConnectionId(20), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWH7a7My28eUPQAgvfurWjv53kv58maG7KFdKnYqxUMVEM") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(22), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), connection_id: ConnectionId(22), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 262.80376ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(22), peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(22), peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 76698c3c795041bc3b75de222f33f0921dd6fc4a3fb9a93d2966a5c4ea532a) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.139.3/tcp/4012], protocols: ["/ipfs/ping/1.0.0", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), address: /ip4/192.168.139.3/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), connection: ConnectionId(22), result: Ok(292.03445ms) }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), renewed: true }
+BehaviourEvent: Event { peer: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), connection: ConnectionId(22), result: Ok(290.204207ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), connection: ConnectionId(22), result: Ok(263.763835ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), connection_id: ConnectionId(22), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(23), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33824 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV"), connection_id: ConnectionId(23), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33824 }, num_established: 1, concurrent_dial_errors: None, established_in: 94.036251ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(23), peer_id: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(23), peer_id: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): becfccc2ad719447a59fe756da2f83cbce8f8b630fb6af6376fa68a444d88a) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: CircuitReqDenied { src_peer_id: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV"), dst_peer_id: PeerId("12D3KooWHnbd9uWWgE6vcaTFFRR9cNmZyX5Zfneb9kzpybvw2gVF"), status: NoReservation }
+BehaviourEvent: Event { peer: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV"), connection: ConnectionId(23), result: Ok(91.406519ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWNfDQmau3CQBehgmUtudN6jAraVH4mXfAvopzHbtqvoLV"), connection_id: ConnectionId(23), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/33824 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(24), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), connection_id: ConnectionId(24), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 258.566569ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(24), peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(24), peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 24cca84f3bbf6bd5b2d82789cea8b92e20bf19789d2af81ffde39a8312d42b) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012, /ip4/127.0.0.1/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/192.168.107.0/tcp/4012], protocols: ["/ipfs/id/1.0.0", "/ipfs/id/push/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/ping/1.0.0", "/kaspa/p2p/bridge/1.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/192.168.215.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), address: /ip4/192.168.107.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), connection: ConnectionId(24), result: Ok(272.384211ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), connection: ConnectionId(24), result: Ok(293.049704ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(25), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/41104 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), connection_id: ConnectionId(25), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/41104 }, num_established: 1, concurrent_dial_errors: None, established_in: 92.253002ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(25), peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(25), peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 988095979352aa8b16a32024fad31feda2818ff376d2065eba253a16bfb604b) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), connection: ConnectionId(25), result: Ok(90.517428ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), dst_peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez") }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), connection_id: ConnectionId(25), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/41104 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWL5frofWXyq1xG5GJCgjECo3KvManwp4iz9iG57HteYx2"), dst_peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), error: Some(Kind(ConnectionAborted)) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), connection: ConnectionId(24), result: Ok(259.246289ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez"), connection_id: ConnectionId(24), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWCJ1r2H67UcAsCch7a1bVMG7kg92vZQhhFxKjeXKWQjez") }
+Swarm event: IncomingConnection { connection_id: ConnectionId(26), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), connection_id: ConnectionId(26), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 1, concurrent_dial_errors: None, established_in: 268.176389ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(26), peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(26), peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): c6ba5c821ac2ef9647c4b7b76df1379863a874b2637ed3ee66360a197f5e4f7) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [/ip4/127.0.0.1/tcp/4012, /ip4/192.168.107.0/tcp/4012, /ip4/192.168.139.3/tcp/4012, /ip4/10.0.0.150/tcp/4012, /ip4/192.168.97.0/tcp/4012, /ip4/192.168.215.0/tcp/4012], protocols: ["/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/ipfs/ping/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/127.0.0.1/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/192.168.107.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/192.168.139.3/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/10.0.0.150/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/192.168.97.0/tcp/4012 }
+Swarm event: NewExternalAddrOfPeer { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), address: /ip4/192.168.215.0/tcp/4012 }
+BehaviourEvent: ReservationReqAccepted { src_peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), renewed: false }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), connection: ConnectionId(26), result: Ok(251.347043ms) }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), connection: ConnectionId(26), result: Ok(273.512711ms) }
+Swarm event: IncomingConnection { connection_id: ConnectionId(27), local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/46170 }
+Swarm event: ConnectionEstablished { peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), connection_id: ConnectionId(27), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/46170 }, num_established: 1, concurrent_dial_errors: None, established_in: 94.119778ms }
+BehaviourEvent: Sent { connection_id: ConnectionId(27), peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2") }
+Observed addr: /ip4/<RELAY_IP>/tcp/4011
+BehaviourEvent: Received { connection_id: ConnectionId(27), peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), info: Info { public_key: PublicKey { publickey: Ed25519(PublicKey(compressed): 32b448a15ecfb5e12dbbf941c58c9024b75fd747692a7db1c7d5eca65e32c3b) }, protocol_version: "/kaspa/0.1.0", agent_version: "rust-libp2p/0.47.0", listen_addrs: [], protocols: ["/ipfs/ping/1.0.0", "/libp2p/circuit/relay/0.2.0/stop", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/1.0.0"], observed_addr: /ip4/<RELAY_IP>/tcp/4011, signed_peer_record: None } }
+BehaviourEvent: Event { peer: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), connection: ConnectionId(27), result: Ok(90.18854ms) }
+BehaviourEvent: CircuitReqAccepted { src_peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), dst_peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW") }
+BehaviourEvent: Event { peer: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), connection: ConnectionId(26), result: Ok(263.376051ms) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), connection_id: ConnectionId(27), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<CLIENT_VPS_IP>/tcp/46170 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: CircuitClosed { src_peer_id: PeerId("12D3KooWDEHzowF9uYm5K3yXL34kKA4yRdxVHNf75jxPxdKCNqN2"), dst_peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), error: Some(Kind(ConnectionAborted)) }
+Swarm event: ConnectionClosed { peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW"), connection_id: ConnectionId(26), endpoint: Listener { local_addr: /ip4/<RELAY_IP>/tcp/4011, send_back_addr: /ip4/<HOME_IP>/tcp/4012 }, num_established: 0, cause: Some(IO(Custom { kind: Other, error: Error(Right(Closed)) })) }
+BehaviourEvent: ReservationClosed { src_peer_id: PeerId("12D3KooWPC7iF5f59UFdRFEUfNprqjshtWcevpHm3N9VxD8ArxYW") }

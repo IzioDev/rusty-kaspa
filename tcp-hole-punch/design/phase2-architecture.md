@@ -110,7 +110,13 @@
    ```
    The configuration toggles QUIC alongside TCP and enforces conservative relay limits. DCUtR hole punching is enabled by default but can be disabled through `config.hole_punch.enable_dcutr`.
 
-   The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviour under the `libp2p-bridge` feature. Set `LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit` on the server to register local sockets and pre-reserve relay circuits (comma/semicolon are accepted separators). Optional `LIBP2P_RELAY_MULTIADDR(S)` entries keep backwards compatibility with the one-shot dial helper. The client accepts `LIBP2P_REMOTE_MULTIADDRS` (same separators, supports relay + direct addresses) together with `LIBP2P_REMOTE_PEER_ID` to drive the dialer; it tries each provided multiaddr until one succeeds.
+The demo binaries (`protocol/p2p/src/bin/{server,client}.rs`) wire this behaviour under the `libp2p-bridge` feature. Set `LIBP2P_LISTEN_MULTIADDRS=/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit` on the server to register local sockets and pre-reserve relay circuits (comma/semicolon are accepted separators). Optional `LIBP2P_RELAY_MULTIADDR(S)` entries keep backwards compatibility with the one-shot dial helper. The client accepts `LIBP2P_REMOTE_MULTIADDRS` (same separators, supports relay + direct addresses) together with `LIBP2P_REMOTE_PEER_ID` to drive the dialer; it tries each provided multiaddr until one succeeds.
+
+## Operational Notes
+- Keep both the local listen socket and the relay circuit in `LIBP2P_LISTEN_MULTIADDRS`. The server issues a follow-up reservation via `LIBP2P_RELAY_MULTIADDRS`; expect to see `Relay reservation requested` followed by a full `/p2p-circuit/p2p/<server>` listener before dialling from the client.
+- The tonic request that surfaces an inbound libp2p stream often lacks a socket address. The connection handler now synthesizes one (based on the libp2p metadata) and records it in the log as `addr=/p2p/<peer>`, so downstream consumers still receive a stable identifier.
+- Give the reservation a moment to settle before starting the remote client. In the Phase 4 VPS run the server was up for ~1 s before the Vultr dial succeeded; starting the client too early still triggers `Relay has no reservation for destination`.
+- Reference logs for the mixed-NAT rehearsal live under `logs/phase4-{relay,server,client}-session.log` and show the complete reservation/DCUtR/handshake timeline.
 
 ## Test Coverage
 - `libp2p_dial_yields_stream` verifies two in-process swarms can open a substream, exchange bytes and shut down deterministically.

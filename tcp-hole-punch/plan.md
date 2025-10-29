@@ -6,7 +6,7 @@
   - Negative case (expected relay fallback): documented in `logs/hotspot-scenario-summary.md`.
 - ✅ **Phase 2 – Build the libp2p ⇄ tonic bridge**
 - 🔄 **Phase 3 – Extend the Kaspa adaptor/router**.
-- ⏳ **Phase 4 – Two-private-peer PoC**.
+- ✅ **Phase 4 – Two-private-peer PoC**.
 
 ## Phase 1 – Reproduce Baseline Hole Punching
 - ✅ Relay, listener, and dialer binaries exercised.  
@@ -31,9 +31,32 @@
 - [x] Modify `protocol/p2p/src/bin/{server.rs,client.rs}` to source their transport from the libp2p bridge while keeping the Kaspa handshake and flow registration intact.
 - [x] libp2p env wiring: server accepts `LIBP2P_LISTEN_MULTIADDRS` (e.g., `/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit`) plus optional `LIBP2P_RELAY_MULTIADDR(S)` to issue manual reservations; client accepts `LIBP2P_REMOTE_MULTIADDR(S)` and `LIBP2P_REMOTE_PEER_ID`, attempting each address in order.
 - [x] Harden the libp2p handshake channel (HTTP/2 window + frame sizing, keep-alives) so tonic runs reliably over bridged streams (`protocol/p2p/src/core/connection_handler.rs`).
-- [~] Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).  
-  _Local rehearsal complete:_ see `logs/local-libp2p-bridge.md` plus the raw session dumps (`logs/local-relay-session.log`, `logs/local-server-session.log`, and `logs/local-client-session.log`) for the tmux-driven relay/server/client run on macOS with all traffic forced through libp2p. ✅ Remote (VPS + mixed-NAT) run still outstanding.
-- [ ] Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.
+- [x] Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).  
+  _Local rehearsal:_ `logs/local-libp2p-bridge.md` plus `logs/local-relay-session.log`, `logs/local-server-session.log`, and `logs/local-client-session.log`.  
+  _Remote success (2025-10-29):_ see `logs/phase4-relay-session.log`, `logs/phase4-server-session.log`, and `logs/phase4-client-session.log` for the Hetzner relay ↔ local server ↔ Vultr client run; note the reservation/handshake timeline and the synthesized inbound addresses now surfaced in the server log.
+- [x] Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.  
+  _See_ `design/phase2-architecture.md` (Operational Notes) _and_ `logs/phase4-remote-success.md` for the mixed-NAT runbook.
+
+## Post-Phase 4 – Follow-up Work
+
+1. **Transport Policy & Fallback Strategy**
+   - Draft requirements: per-peer relay quota, retry cadence, TCP/QUIC toggles, and UI/CLI exposure.
+   - Implement adaptor-level policy (routing decisions, relay vs. direct fallback, connection limits) plus config serialization.
+   - Add documentation for operators (new knobs, recommended defaults, troubleshooting playbook).
+
+2. **Metrics & Observability**
+   - Instrument handshake path (reservation timing, punch success/failure, relay usage) and expose counters/gauges via existing metrics pipeline.
+   - Surface peer metadata (multiaddrs, relay flag, punch latency) to the hub and logging.
+   - Produce dashboards/alerts for punch success rate and relay load.
+
+3. **Automation & Testing**
+   - Build an integration harness that spins up relay/server/client automatically (local containers or CI environment) and asserts Version/Verack/Ready over libp2p.
+   - Add regression tests for metadata synthesis and policy enforcement.
+   - Wire the harness into CI (nightly or targeted jobs) with artifacts (sanitized logs) for debugging.
+
+4. **Peer Identity & Persistence**
+   - Align PeerId↔PeerKey mapping to ensure libp2p identity persists across restarts.
+   - Extend the peer-store schema to remember observed multiaddrs and relay provenance.
 
 ## Phase 3 – Status (handover)
 - [x] Adopt `Libp2pStream` in the Kaspa adaptor/router
