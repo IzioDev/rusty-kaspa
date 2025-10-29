@@ -33,7 +33,7 @@
 - [x] Harden the libp2p handshake channel (HTTP/2 window + frame sizing, keep-alives) so tonic runs reliably over bridged streams (`protocol/p2p/src/core/connection_handler.rs`).
 - [x] Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).  
   _Local rehearsal:_ `logs/local-libp2p-bridge.md` plus `logs/local-relay-session.log`, `logs/local-server-session.log`, and `logs/local-client-session.log`.  
-  _Remote success (2025-10-29):_ see `logs/phase4-relay-session.log`, `logs/phase4-server-session.log`, and `logs/phase4-client-session.log` for the Hetzner relay ↔ local server ↔ Vultr client run; note the reservation/handshake timeline and the synthesized inbound addresses now surfaced in the server log.
+  _Remote success (2025-10-29):_ see `logs/phase4-relay-session.log`, `logs/phase4-server-session.log`, `logs/phase4-client-session.log`, and the summary in `final-report.md` for the coordinating relay ↔ local server ↔ remote client run; note the reservation/handshake timeline and the synthesized inbound addresses now surfaced in the server log.
 - [x] Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.  
   _See_ `design/phase2-architecture.md` (Operational Notes) _and_ `logs/phase4-remote-success.md` for the mixed-NAT runbook.
 
