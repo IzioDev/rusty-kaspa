@@ -72,7 +72,6 @@ Success criteria:
 - **Operational Learnings**:
   - Relay reservation must complete before dial; logs make this visible.
   - Synthesised metadata is necessary for routers but should be clearly logged to avoid confusion.
-  - Building native binaries on remote hosts avoids architecture mismatches (hence the rustup install on the VPS).
 
 ## Follow-up Opportunities (Post-PoC)
 
