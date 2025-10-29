@@ -90,12 +90,36 @@ async fn libp2p_dial_yields_stream() {
         .expect("incoming timeout")
         .expect("incoming stream")
         .expect("stream ok");
+    let inbound_addr = inbound_stream
+        .info
+        .remote_multiaddr
+        .as_ref()
+        .expect("inbound multiaddr")
+        .to_string();
+    assert!(
+        inbound_addr.ends_with(&format!("/p2p/{}", client_handle.local_peer_id())),
+        "expected inbound addr to end with client peer id, got {inbound_addr}"
+    );
+    assert!(inbound_addr.starts_with("/ip4/127.0.0.1"));
+    assert!(!inbound_stream.info.relay_used);
     let mut outbound_stream = timeout(Duration::from_secs(15), response_rx)
         .await
         .expect("dial response timeout")
         .expect("dial response")
         .expect("dial ok")
         .into_stream();
+    let outbound_addr = outbound_stream
+        .info
+        .remote_multiaddr
+        .as_ref()
+        .expect("outbound multiaddr")
+        .to_string();
+    assert!(
+        outbound_addr.ends_with(&format!("/p2p/{}", server_handle.local_peer_id())),
+        "expected outbound addr to end with server peer id, got {outbound_addr}"
+    );
+    assert!(outbound_addr.starts_with("/ip4/127.0.0.1"));
+    assert!(!outbound_stream.info.relay_used);
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -243,6 +267,47 @@ async fn relay_limits_are_enforced() {
 
     // Ensure the first dial completes (it will likely fail once the swarm realises there is no relay).
     let _ = first_rx.await;
+
+    timeout(Duration::from_secs(5), handle.shutdown()).await.expect("shutdown timeout").expect("shutdown");
+}
+
+#[tokio::test]
+async fn relay_limit_recovers_after_failed_dial() {
+    init_tracing();
+
+    let mut config = hole_punch_bridge::SwarmConfig::default();
+    config.relay.max_reservations = 1;
+    config.relay.max_circuits_per_peer = 1;
+
+    let handle = hole_punch_bridge::spawn_swarm_with_config(identity::Keypair::generate_ed25519(), config).expect("spawn with config");
+    let mut command_tx = handle.command_tx();
+
+    let peer = PeerId::random();
+    let relay_addr: Multiaddr = "/ip4/192.0.2.1/tcp/4001/p2p-circuit".parse().expect("multiaddr");
+
+    let (first_tx, first_rx) = oneshot::channel();
+    command_tx
+        .send(SwarmCommand::Dial { peer, addrs: vec![relay_addr.clone()], response: first_tx })
+        .await
+        .expect("send first dial");
+
+    // The relay address is unreachable in the test environment, so expect a dial failure.
+    let first_outcome = first_rx.await.expect("first response");
+    assert!(first_outcome.is_err(), "expected initial dial to fail");
+
+    let (second_tx, second_rx) = oneshot::channel();
+    command_tx
+        .send(SwarmCommand::Dial { peer, addrs: vec![relay_addr], response: second_tx })
+        .await
+        .expect("send second dial");
+
+    match second_rx.await.expect("second response") {
+        Err(BridgeError::DialFailed(msg)) => {
+            assert!(!msg.contains("reservation limit"), "quota should reset after failure: {msg}");
+        }
+        Ok(_) => { /* Successful punch is acceptable if the environment permits it. */ }
+        Err(other) => panic!("unexpected error {other:?}"),
+    }
 
     timeout(Duration::from_secs(5), handle.shutdown()).await.expect("shutdown timeout").expect("shutdown");
 }

@@ -18,7 +18,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::net::{IpAddr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
@@ -60,8 +59,6 @@ const LIBP2P_HTTP2_CONNECTION_WINDOW: u32 = 16 * 1024 * 1024; // 16 MiB
 const LIBP2P_HTTP2_MAX_FRAME_SIZE: u32 = 1024 * 1024; // 1 MiB
 const LIBP2P_HTTP2_MAX_HEADER_LIST_SIZE: u32 = 64 * 1024; // 64 KiB
 
-static SYNTHETIC_ADDR_COUNTER: AtomicU64 = AtomicU64::new(1);
-
 /// Handles Router creation for both server and client-side new connections
 #[derive(Clone)]
 pub struct ConnectionHandler {
@@ -88,6 +85,13 @@ impl ConnectionHandler {
         let connector = StreamConnector::new(stream);
         let channel =
             build_libp2p_channel(connector, Duration::from_millis(Self::connect_timeout())).await.map_err(ConnectionError::IoError)?;
+
+        let bytes_rx = self.counters.bytes_rx.clone();
+        let bytes_tx = self.counters.bytes_tx.clone();
+        let channel = ServiceBuilder::new()
+            .layer(MapResponseBodyLayer::new(move |body| CountBytesBody::new(body, bytes_rx.clone())))
+            .layer(MapRequestBodyLayer::new(move |body| CountBytesBody::new(body, bytes_tx.clone()).boxed_unsync()))
+            .service(channel);
 
         let mut client = ProtoP2pClient::with_origin(channel, Uri::from_static("http://kaspa.libp2p"))
             .send_compressed(tonic::codec::CompressionEncoding::Gzip)
@@ -274,12 +278,11 @@ impl ConnectionHandler {
 
         let mut hasher = DefaultHasher::new();
         metadata.hash(&mut hasher);
-        hasher.write_u64(SYNTHETIC_ADDR_COUNTER.fetch_add(1, Ordering::Relaxed));
         let hash = hasher.finish();
 
         let mut octets = [0u8; 16];
         octets[0] = 0xfd;
-        octets[1..9].copy_from_slice(&hash.to_be_bytes());
+        octets[8..16].copy_from_slice(&hash.to_be_bytes());
 
         let port = (((hash >> 16) as u16) | 0x8000).max(1025);
         SocketAddr::new(IpAddr::V6(Ipv6Addr::from(octets)), port)
@@ -469,9 +472,14 @@ mod tests {
         adaptor::Adaptor,
         connection_info::{ConnectionMetadata, Libp2pConnectInfo},
         hub::Hub,
+        peer::PeerKey,
     };
+    use crate::make_message;
     use kaspa_utils::networking::PeerId;
+    use parking_lot::Mutex;
+    use std::collections::HashSet;
     use std::net::SocketAddr;
+    use std::sync::atomic::Ordering;
     use std::time::Duration;
     use tokio::io::duplex;
     use tokio::sync::mpsc;
@@ -487,6 +495,7 @@ mod tests {
     impl ConnectionInitializer for TestInitializer {
         async fn initialize_connection(&self, router: Arc<Router>) -> Result<(), ProtocolError> {
             router.set_identity(PeerId::new(Uuid::new_v4()));
+            router.start();
             Ok(())
         }
     }
@@ -541,6 +550,181 @@ mod tests {
         assert_eq!(stored.socket_addr, metadata.socket_addr);
         let stored_info = stored.libp2p.as_ref().expect("libp2p info");
         assert_eq!(stored_info, metadata.libp2p.as_ref().unwrap());
+
+        adaptor.close().await;
+        server_hub.terminate_all_peers().await;
+        server_task.abort();
+        let _ = server_task.await;
+    }
+
+    #[derive(Clone)]
+    struct DuplicateRejectingInitializer {
+        seen: Arc<Mutex<HashSet<PeerKey>>>,
+        peer_id: PeerId,
+    }
+
+    impl DuplicateRejectingInitializer {
+        fn new(peer_id: PeerId) -> Self {
+            Self { seen: Arc::new(Mutex::new(HashSet::new())), peer_id }
+        }
+    }
+
+    #[tonic::async_trait]
+    impl ConnectionInitializer for DuplicateRejectingInitializer {
+        async fn initialize_connection(&self, router: Arc<Router>) -> Result<(), ProtocolError> {
+            router.set_identity(self.peer_id);
+            let key = router.key();
+
+            let mut seen = self.seen.lock();
+            if !seen.insert(key) {
+                return Err(ProtocolError::PeerAlreadyExists(key));
+            }
+            Ok(())
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn duplicate_libp2p_connection_is_rejected() {
+        let server_initializer = Arc::new(TestInitializer);
+        let server_counters = Arc::new(TowerConnectionCounters::default());
+        let server_hub = Hub::new();
+        let (server_tx, server_rx) = mpsc::channel(Adaptor::hub_channel_size());
+        server_hub.clone().start_event_loop(server_rx, server_initializer.clone());
+        let server_handler = ConnectionHandler::new(server_tx, server_initializer.clone(), server_counters);
+
+        let (incoming_tx, incoming_rx) = mpsc::channel(2);
+        let remote_addr = SocketAddr::from(([127, 0, 0, 1], 4000));
+
+        let (client_stream_one, server_stream_one) = duplex(8 * 1024);
+        incoming_tx.send(TestServerIo::new(server_stream_one, remote_addr)).await.expect("send first server stream");
+
+        let (client_stream_two, server_stream_two) = duplex(8 * 1024);
+        incoming_tx.send(TestServerIo::new(server_stream_two, remote_addr)).await.expect("send second server stream");
+        drop(incoming_tx);
+
+        let incoming_stream = tokio_stream::StreamExt::map(ReceiverStream::new(incoming_rx), |io| Ok::<_, std::io::Error>(io));
+
+        let server_task = tokio::spawn(async move {
+            configure_libp2p_server(TonicServer::builder())
+                .add_service(
+                    ProtoP2pServer::new(server_handler)
+                        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+                        .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                        .max_decoding_message_size(P2P_MAX_MESSAGE_SIZE),
+                )
+                .serve_with_incoming(incoming_stream)
+                .await
+        });
+
+        let duplicate_peer_id = PeerId::new(Uuid::new_v4());
+        let client_initializer = Arc::new(DuplicateRejectingInitializer::new(duplicate_peer_id));
+        let client_counters = Arc::new(TowerConnectionCounters::default());
+        let client_hub = Hub::new();
+        let adaptor = Adaptor::client_only(client_hub, client_initializer, client_counters);
+
+        let libp2p_info = Libp2pConnectInfo::with_address(
+            Uuid::new_v4().to_string(),
+            Some("/ip4/192.0.2.1/tcp/12345/p2p/12D3KooWExamplePeer".to_string()),
+            false,
+        );
+        let metadata = ConnectionMetadata::new(None, Some(libp2p_info));
+
+        let peer_key = adaptor.connect_peer_with_stream(client_stream_one, metadata.clone()).await.expect("first connection");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let err = adaptor.connect_peer_with_stream(client_stream_two, metadata.clone()).await.expect_err("duplicate should fail");
+        match err {
+            ConnectionError::ProtocolError(ProtocolError::PeerAlreadyExists(key)) => assert_eq!(key, peer_key),
+            other => panic!("expected duplicate rejection, got {other:?}"),
+        }
+
+        adaptor.close().await;
+        server_hub.terminate_all_peers().await;
+        server_task.abort();
+        let _ = server_task.await;
+    }
+
+    #[test]
+    fn synthetic_socket_addr_is_stable() {
+        let info = Libp2pConnectInfo::with_address(
+            "peer-id",
+            Some("/ip4/198.51.100.10/tcp/16111/p2p/12D3KooWExamplePeer".to_string()),
+            false,
+        );
+        let metadata = ConnectionMetadata::new(None, Some(info.clone()));
+
+        let addr1 = ConnectionHandler::synthetic_socket_addr(&metadata);
+        let addr2 = ConnectionHandler::synthetic_socket_addr(&metadata);
+        assert_eq!(addr1, addr2);
+
+        let info_no_addr = Libp2pConnectInfo::new("peer-id");
+        let metadata_no_addr = ConnectionMetadata::new(None, Some(info_no_addr));
+        let addr3 = ConnectionHandler::synthetic_socket_addr(&metadata_no_addr);
+        let addr4 = ConnectionHandler::synthetic_socket_addr(&metadata);
+
+        assert_ne!(addr3, addr4, "different metadata should lead to different synthetic addresses");
+        assert_eq!(addr3, ConnectionHandler::synthetic_socket_addr(&ConnectionMetadata::new(None, Some(Libp2pConnectInfo::new("peer-id")))));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn libp2p_counters_capture_traffic() {
+        let server_initializer = Arc::new(TestInitializer);
+        let server_counters = Arc::new(TowerConnectionCounters::default());
+        let server_hub = Hub::new();
+        let (server_tx, server_rx) = mpsc::channel(Adaptor::hub_channel_size());
+        server_hub.clone().start_event_loop(server_rx, server_initializer.clone());
+        let server_handler = ConnectionHandler::new(server_tx, server_initializer.clone(), server_counters);
+
+        let (client_half, server_half) = duplex(8 * 1024);
+
+        let (incoming_tx, incoming_rx) = mpsc::channel(1);
+        let remote_addr = SocketAddr::from(([127, 0, 0, 1], 4010));
+        incoming_tx.send(TestServerIo::new(server_half, remote_addr)).await.expect("send server stream");
+        drop(incoming_tx);
+        let incoming_stream = tokio_stream::StreamExt::map(ReceiverStream::new(incoming_rx), |io| Ok::<_, std::io::Error>(io));
+
+        let server_task = tokio::spawn(async move {
+            configure_libp2p_server(TonicServer::builder())
+                .add_service(
+                    ProtoP2pServer::new(server_handler)
+                        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+                        .send_compressed(tonic::codec::CompressionEncoding::Gzip)
+                        .max_decoding_message_size(P2P_MAX_MESSAGE_SIZE),
+                )
+                .serve_with_incoming(incoming_stream)
+                .await
+        });
+
+        let client_initializer = Arc::new(TestInitializer);
+        let client_counters = Arc::new(TowerConnectionCounters::default());
+        let client_hub = Hub::new();
+        let adaptor = Adaptor::client_only(client_hub, client_initializer, client_counters.clone());
+
+        let libp2p_info = Libp2pConnectInfo::with_address(
+            Uuid::new_v4().to_string(),
+            Some("/ip4/192.0.2.1/tcp/12345/p2p/12D3KooWPingTarget".to_string()),
+            false,
+        );
+        let metadata = ConnectionMetadata::new(None, Some(libp2p_info));
+
+        let peer_key = adaptor.connect_peer_with_stream(client_half, metadata).await.expect("connect");
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let tx_before = client_counters.bytes_tx.load(Ordering::Relaxed);
+        let rx_before = client_counters.bytes_rx.load(Ordering::Relaxed);
+
+        let message = make_message!(crate::pb::kaspad_message::Payload::Ping, crate::pb::PingMessage { nonce: 42 });
+        let sent = adaptor.send(peer_key, message).await.expect("send ping");
+        assert!(sent, "hub reported message was not dispatched");
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let tx_after = client_counters.bytes_tx.load(Ordering::Relaxed);
+        let rx_after = client_counters.bytes_rx.load(Ordering::Relaxed);
+
+        assert!(tx_after > tx_before, "expected transmitted byte counter to increase");
+        assert!(rx_after >= rx_before, "receive counter should not decrease");
 
         adaptor.close().await;
         server_hub.terminate_all_peers().await;

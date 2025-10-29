@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::{
@@ -283,34 +283,32 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     match cmd {
                         Some(SwarmCommand::Dial { peer, addrs, response }) => {
                             debug!(%peer, ?addrs, "Received dial command");
+                            let mut reserved_relays: Vec<Multiaddr> = Vec::new();
                             if config.relay.enabled {
-                                let new_relays = addrs.iter().filter(|addr| addr_uses_relay(addr)).count();
-                                if new_relays > 0 {
+                                let relay_candidates: Vec<_> = addrs.iter().cloned().filter(|addr| addr_uses_relay(addr)).collect();
+                                let new_relay_slots = relay_candidates.len();
+                                if new_relay_slots > 0 {
                                     let total = peer_book.relay_address_count();
                                     let per_peer = peer_book.relay_address_count_for(peer);
                                     let max_total = config.relay.max_reservations as usize;
                                     let max_per_peer = config.relay.max_circuits_per_peer as usize;
-                                    if total + new_relays > max_total {
-                                        let _ = response.send(Err(BridgeError::DialFailed(
-                                            format!(
-                                                "relay reservation limit reached (total {total} >= {max_total})"
-                                            ),
-                                        )));
+                                    if total + new_relay_slots > max_total {
+                                        let _ = response.send(Err(BridgeError::DialFailed(format!(
+                                            "relay reservation limit reached (total {total} >= {max_total})"
+                                        ))));
                                         continue;
                                     }
-                                    if per_peer + new_relays > max_per_peer {
-                                        let _ = response.send(Err(BridgeError::DialFailed(
-                                            format!(
-                                                "relay reservation limit reached for peer {peer} (current {per_peer} >= {max_per_peer})"
-                                            ),
-                                        )));
+                                    if per_peer + new_relay_slots > max_per_peer {
+                                        let _ = response.send(Err(BridgeError::DialFailed(format!(
+                                            "relay reservation limit reached for peer {peer} (current {per_peer} >= {max_per_peer})"
+                                        ))));
                                         continue;
                                     }
                                 }
+                                reserved_relays = peer_book.reserve_addresses(peer, &relay_candidates);
                             }
                             let mut control_clone = dial_control.clone();
                             if !addrs.is_empty() {
-                                peer_book.record_addresses(peer, addrs.clone());
                                 // Construct full multiaddrs with /p2p/{peer} suffix for dialing
                                 let full_addrs: Vec<_> = addrs
                                     .iter()
@@ -333,7 +331,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             // open_stream will wait for the connection to establish, then open a stream
                             pending_dials.push(async move {
                                 let result = control_clone.open_stream(peer, stream_protocol()).await.map_err(map_stream_error);
-                                (peer, response, result)
+                                (peer, response, result, reserved_relays)
                             }.boxed());
                         }
                         Some(SwarmCommand::ListenOn { addr, response }) => {
@@ -356,10 +354,11 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     }
                 }
                 dial_result = pending_dials.next(), if !pending_dials.is_empty() => {
-                    if let Some((peer, response, outcome)) = dial_result {
+                    if let Some((peer, response, outcome, reserved_relays)) = dial_result {
                         match outcome {
                             Ok(stream) => {
                                 debug!(%peer, "Stream opened successfully");
+                                peer_book.confirm_addresses(peer, &reserved_relays);
                                 let info = peer_book.info_for(peer);
                                 let handle = Libp2pStreamHandle::new(stream, info);
                                 if response.send(Ok(handle)).is_err() {
@@ -368,6 +367,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             }
                             Err(err) => {
                                 warn!(%peer, %err, "Failed to open stream");
+                                peer_book.release_pending(peer, &reserved_relays);
                                 if response.send(Err(err)).is_err() {
                                     debug!(%peer, "dial response channel dropped (error)");
                                 }
@@ -380,8 +380,8 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                         Some((peer_id, stream)) => {
                             let info = peer_book.info_for(peer_id);
                             let handle = Libp2pStreamHandle::new(stream, info);
-                            if incoming_tx.try_send(handle).is_err() {
-                                warn!(%peer_id, "incoming queue full; dropping inbound stream");
+                            if incoming_tx.send(handle).await.is_err() {
+                                warn!(%peer_id, "incoming queue closed; dropping inbound stream");
                             }
                         }
                         None => break,
@@ -496,48 +496,151 @@ fn build_behaviour(
 
 #[derive(Default)]
 struct PeerBook {
-    addresses: HashMap<PeerId, HashSet<Multiaddr>>,
+    active: HashMap<PeerId, VecDeque<Multiaddr>>,
+    pending: HashMap<PeerId, VecDeque<Multiaddr>>,
 }
 
 impl PeerBook {
     fn record_address(&mut self, peer: PeerId, addr: Multiaddr) {
-        self.addresses.entry(peer).or_default().insert(addr);
+        if let Some(normalized) = normalize_multiaddr(addr) {
+            let queue = self.active.entry(peer).or_default();
+            push_unique(queue, normalized);
+        }
     }
 
-    fn record_addresses(&mut self, peer: PeerId, addrs: Vec<Multiaddr>) {
+    fn reserve_addresses(&mut self, peer: PeerId, addrs: &[Multiaddr]) -> Vec<Multiaddr> {
+        let mut reserved = Vec::new();
         for addr in addrs {
-            self.record_address(peer, addr);
+            if let Some(normalized) = normalize_multiaddr(addr.clone()) {
+                if self.is_tracking(peer, &normalized) {
+                    continue;
+                }
+                let queue = self.pending.entry(peer).or_default();
+                push_unique(queue, normalized.clone());
+                reserved.push(normalized);
+            }
+        }
+        reserved
+    }
+
+    fn confirm_addresses(&mut self, peer: PeerId, addrs: &[Multiaddr]) {
+        if addrs.is_empty() {
+            return;
+        }
+
+        let mut to_activate: Vec<Multiaddr> = Vec::new();
+        if let Some(queue) = self.pending.get_mut(&peer) {
+            for addr in addrs {
+                if let Some(pos) = queue.iter().position(|existing| existing == addr) {
+                    if let Some(removed) = queue.remove(pos) {
+                        to_activate.push(removed);
+                    }
+                }
+            }
+            if queue.is_empty() {
+                self.pending.remove(&peer);
+            }
+        }
+
+        if to_activate.is_empty() {
+            to_activate = addrs.to_vec();
+        }
+
+        let active_queue = self.active.entry(peer).or_default();
+        for addr in to_activate {
+            push_unique(active_queue, addr);
+        }
+    }
+
+    fn release_pending(&mut self, peer: PeerId, addrs: &[Multiaddr]) {
+        if let Some(queue) = self.pending.get_mut(&peer) {
+            for addr in addrs {
+                if let Some(pos) = queue.iter().position(|existing| existing == addr) {
+                    queue.remove(pos);
+                }
+            }
+            if queue.is_empty() {
+                self.pending.remove(&peer);
+            }
         }
     }
 
     fn relay_address_count(&self) -> usize {
-        self.addresses.values().flat_map(|set| set.iter()).filter(|addr| addr_uses_relay(addr)).count()
+        self.active.values().flat_map(|queue| queue.iter()).filter(|addr| addr_uses_relay(addr)).count()
+            + self.pending.values().flat_map(|queue| queue.iter()).filter(|addr| addr_uses_relay(addr)).count()
     }
 
     fn relay_address_count_for(&self, peer: PeerId) -> usize {
-        self.addresses.get(&peer).map(|set| set.iter().filter(|addr| addr_uses_relay(addr)).count()).unwrap_or(0)
+        let active = self
+            .active
+            .get(&peer)
+            .map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count())
+            .unwrap_or(0);
+        let pending = self
+            .pending
+            .get(&peer)
+            .map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count())
+            .unwrap_or(0);
+        active + pending
+    }
+
+    fn is_tracking(&self, peer: PeerId, addr: &Multiaddr) -> bool {
+        self.active.get(&peer).map_or(false, |queue| queue.contains(addr))
+            || self.pending.get(&peer).map_or(false, |queue| queue.contains(addr))
     }
 
     fn remove_address(&mut self, peer: PeerId, addr: &Multiaddr) {
-        if let Some(set) = self.addresses.get_mut(&peer) {
-            set.remove(addr);
-            if set.is_empty() {
-                self.addresses.remove(&peer);
+        if let Some(normalized) = normalize_multiaddr(addr.clone()) {
+            if let Some(queue) = self.active.get_mut(&peer) {
+                if let Some(pos) = queue.iter().position(|existing| existing == &normalized) {
+                    queue.remove(pos);
+                }
+                if queue.is_empty() {
+                    self.active.remove(&peer);
+                }
             }
         }
     }
 
     fn info_for(&self, peer: PeerId) -> Libp2pConnectInfo {
-        if let Some(set) = self.addresses.get(&peer) {
-            if let Some(addr) = set.iter().next().cloned() {
-                let relay_used = addr_uses_relay(&addr);
-                return Libp2pConnectInfo::with_address(peer, addr, relay_used);
+        if let Some(queue) = self.active.get(&peer) {
+            if let Some(addr) = queue.back() {
+                return build_connect_info(peer, addr.clone());
+            }
+        }
+        if let Some(queue) = self.pending.get(&peer) {
+            if let Some(addr) = queue.back() {
+                return build_connect_info(peer, addr.clone());
             }
         }
         Libp2pConnectInfo::new(peer)
     }
 }
 
+fn push_unique(queue: &mut VecDeque<Multiaddr>, addr: Multiaddr) {
+    if let Some(pos) = queue.iter().position(|existing| existing == &addr) {
+        queue.remove(pos);
+    }
+    queue.push_back(addr);
+}
+
+fn normalize_multiaddr(mut addr: Multiaddr) -> Option<Multiaddr> {
+    if addr.iter().last().map_or(false, |p| matches!(p, Protocol::P2p(_))) {
+        addr.pop();
+    }
+    if addr.is_empty() {
+        None
+    } else {
+        Some(addr)
+    }
+}
+
+fn build_connect_info(peer: PeerId, addr: Multiaddr) -> Libp2pConnectInfo {
+    let relay_used = addr_uses_relay(&addr);
+    let mut full_addr = addr;
+    full_addr.push(Protocol::P2p(peer));
+    Libp2pConnectInfo::with_address(peer, full_addr, relay_used)
+}
 fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
@@ -557,6 +660,14 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         }
         SwarmEvent::IncomingConnectionError { error, .. } => {
             debug!(%error, "Incoming connection error");
+        }
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => {
+            debug!(?event, "Identify behaviour event");
+            if let identify::Event::Received { peer_id, info, .. } = event {
+                for addr in info.listen_addrs {
+                    peer_book.record_address(peer_id, addr);
+                }
+            }
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Relay(event)) => {
             debug!(?event, "Relay behaviour event");
@@ -595,7 +706,7 @@ fn addr_uses_relay(addr: &Multiaddr) -> bool {
 #[derive(Debug)]
 enum BridgeBehaviourEvent {
     Stream,
-    Identify,
+    Identify(identify::Event),
     Ping,
     Relay(relay::client::Event),
     Dcutr(dcutr::Event),
@@ -609,8 +720,7 @@ impl From<()> for BridgeBehaviourEvent {
 
 impl From<identify::Event> for BridgeBehaviourEvent {
     fn from(value: identify::Event) -> Self {
-        let _ = value;
-        Self::Identify
+        Self::Identify(value)
     }
 }
 
