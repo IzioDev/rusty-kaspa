@@ -107,5 +107,6 @@ These are not required for the proof-of-concept but will matter for production h
 | `tcp-hole-punch/bridge/tests/integration.rs` | Integration suite covering libp2p dial, tonic server acceptance, relay quota, counter instrumentation, and the >32 stream stress test. |
 | `tcp-hole-punch/logs/phase6-remote-validation.md` | Phase 6 remote rehearsal notes with pointers to the latest server/client/relay logs. |
 | `tcp-hole-punch/logs/phase6-{server,client,relay}-session.log` | Logs from the Phase 6 validation run (sanitised). |
-| `tcp-hole-punch/design/phase2-architecture.md` | Updated architecture and operational notes. |
+| `tcp-hole-punch/design/architecture.md` | Updated architecture and operational notes. |
 | `tcp-hole-punch/plan.md` | Phase tracking, now with post-Phase 4 follow-up tasks. |
+| `tcp-hole-punch/final-verification.md` | One-page checklist linking the decisive evidence, tests, and reproduction steps. |

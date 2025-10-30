@@ -256,8 +256,8 @@ pub fn spawn_swarm(local_key: libp2p::identity::Keypair) -> Result<SwarmHandle> 
 /// Spawn the libp2p swarm actor with a custom configuration and return a handle for issuing commands.
 pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: SwarmConfig) -> Result<SwarmHandle> {
     let peer_id_label = local_key.public().to_peer_id();
-    let (raw_sender, mut command_rx) = mpsc::channel::<SwarmCommand>(32);
-    let (incoming_tx, incoming_rx) = mpsc::channel::<Libp2pStreamHandle>(32);
+    let (raw_sender, mut command_rx) = mpsc::channel::<SwarmCommand>(128);
+    let (incoming_tx, incoming_rx) = mpsc::channel::<Libp2pStreamHandle>(128);
 
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 

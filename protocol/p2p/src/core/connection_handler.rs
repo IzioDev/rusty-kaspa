@@ -298,7 +298,9 @@ impl ProtoP2p for ConnectionHandler {
         &self,
         request: Request<Streaming<KaspadMessage>>,
     ) -> Result<Response<Self::MessageStreamStream>, TonicStatus> {
+        #[allow(unused_mut)]
         let mut socket_addr = request.remote_addr();
+        #[allow(unused_mut)]
         let mut libp2p_metadata: Option<crate::core::connection_info::Libp2pConnectInfo> = None;
 
         #[cfg(feature = "libp2p-bridge")]

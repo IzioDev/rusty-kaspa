@@ -2,24 +2,25 @@
 
 ## Progress Snapshot
 - ✅ **Phase 1 – Baseline hole punching**  
-  - Successful direct punch: see `TEST_SCENARIOS.md` (VPS dialer scenario) and raw logs in `logs/dialer_vps_scenario.log`.  
+  - Successful direct punch: see `research/test-scenarios.md` (VPS dialer scenario) and raw logs in `logs/dialer_vps_scenario.log`.  
   - Negative case (expected relay fallback): documented in `logs/hotspot-scenario-summary.md`.
 - ✅ **Phase 2 – Build the libp2p ⇄ tonic bridge**
 - ✅ **Phase 3 – Extend the Kaspa adaptor/router**
 - ✅ **Phase 4 – Two-private-peer PoC**
 - ✅ **Phase 5 – Libp2p hardening**
+- ✅ **Phase 6 – Validation & rollout prep**
 
 ## Phase 1 – Reproduce Baseline Hole Punching
 - ✅ Relay, listener, and dialer binaries exercised.  
-  - Positive case (VPS dialer ↔ home listener) produced a direct TCP channel – evidence in `logs/dialer_vps_scenario.log` and summary in `TEST_SCENARIOS.md`.  
+  - Positive case (VPS dialer ↔ home listener) produced a direct TCP channel – evidence in `logs/dialer_vps_scenario.log` and summary in `research/test-scenarios.md`.  
   - Negative case (hotspot dialer) remained on the relay, captured in `logs/hotspot-scenario-summary.md` for reference.
 - Timing, multiaddrs, and Swarm events recorded to guide Phase 2 expectations (`logs/phase1-summary.md`).
 
 ## Phase 2 – Build the libp2p ⇄ tonic Bridge
-- [x] Document bridge usage and swarm lifecycle in `design/phase2-architecture.md`.
+- [x] Document bridge usage and swarm lifecycle in `design/architecture.md`.
 - [x] Implement swarm actor, dual-stack stream wrapper, and tonic integration helper APIs under `bridge/src/`.
 - [x] Provide deterministic tests: `libp2p_dial_yields_stream`, `tonic_server_accepts_libp2p_stream`, and URI error coverage.
-- [x] Ensure the test suite (`cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`) runs cleanly in <50 ms.
+- [x] Ensure the bridge test suite runs cleanly (full run now completes in <1 s on a 6‑core dev laptop after enlarging swarm command/incoming buffers).
 - [x] Prepare Phase 3 handoff notes (adaptor integration, metrics, relay/DCUtR re-enable plan).
 
 ## Phase 3 – Extend the Kaspa Adaptor/Router
@@ -33,31 +34,25 @@
 - [x] libp2p env wiring: server accepts `LIBP2P_LISTEN_MULTIADDRS` (e.g., `/ip4/0.0.0.0/tcp/16000;/ip4/<relay>/tcp/<port>/p2p/<relay-peer>/p2p-circuit`) plus optional `LIBP2P_RELAY_MULTIADDR(S)` to issue manual reservations; client accepts `LIBP2P_REMOTE_MULTIADDR(S)` and `LIBP2P_REMOTE_PEER_ID`, attempting each address in order.
 - [x] Harden the libp2p handshake channel (HTTP/2 window + frame sizing, keep-alives) so tonic runs reliably over bridged streams (`protocol/p2p/src/core/connection_handler.rs`).
 - [x] Script the three-node test (public relay + two NATed Kaspa binaries) to demonstrate sustained Kaspa gossip over a hole-punched TCP connection, recording fallback behaviour (relay persistence, QUIC attempts, retry cadence).  
-  _Local rehearsal:_ `logs/local-libp2p-bridge.md` plus `logs/local-relay-session.log`, `logs/local-server-session.log`, and `logs/local-client-session.log`.  
   _Remote success (2025-10-29):_ see `logs/phase4-relay-session.log`, `logs/phase4-server-session.log`, `logs/phase4-client-session.log`, and the summary in `final-report.md` for the coordinating relay ↔ local server ↔ remote client run; note the reservation/handshake timeline and the synthesized inbound addresses now surfaced in the server log.
 - [x] Document operational knobs and open policy items: relay inventory, connection/relay limits, PeerId↔PeerKey unification, and peer-store schema updates for storing Multiaddrs/observed addresses.  
-  _See_ `design/phase2-architecture.md` (Operational Notes) _and_ `logs/phase4-remote-success.md` for the mixed-NAT runbook.
+  _See_ `design/architecture.md` (Operational Notes) _and_ `logs/phase4-remote-success.md` for the mixed-NAT runbook.
 
-## Post-Phase 4 – Follow-up Work
+## Outstanding Follow-up (Backlog)
+These items were intentionally left outside the PoC scope and remain open for production hardening.
 
-1. **Transport Policy & Fallback Strategy**
-   - Draft requirements: per-peer relay quota, retry cadence, TCP/QUIC toggles, and UI/CLI exposure.
-   - Implement adaptor-level policy (routing decisions, relay vs. direct fallback, connection limits) plus config serialization.
-   - Add documentation for operators (new knobs, recommended defaults, troubleshooting playbook).
+1. [ ] **Transport Policy & Fallback Strategy**  
+   Draft per-peer relay quotas, retry cadence, TCP/QUIC toggles, and operator-facing configuration; implement adaptor policy + docs.
 
-2. **Metrics & Observability**
-   - Instrument handshake path (reservation timing, punch success/failure, relay usage) and expose counters/gauges via existing metrics pipeline.
-   - Surface peer metadata (multiaddrs, relay flag, punch latency) to the hub and logging.
-   - Produce dashboards/alerts for punch success rate and relay load.
+2. [ ] **Metrics & Observability**  
+   Instrument reservation/punch success rates, latency, and relay load; surface dashboards/alerts.
 
-3. **Automation & Testing**
-   - Build an integration harness that spins up relay/server/client automatically (local containers or CI environment) and asserts Version/Verack/Ready over libp2p.
-   - Add regression tests for metadata synthesis and policy enforcement.
-   - Wire the harness into CI (nightly or targeted jobs) with artifacts (sanitized logs) for debugging.
+3. [ ] **Automation & Testing**  
+   Build an automated harness (containers/CI) that boots relay/server/client, asserts Version→Verack→Ready over libp2p, and publishes sanitized logs.
 
-4. **Peer Identity & Persistence**
-   - Align PeerId↔PeerKey mapping to ensure libp2p identity persists across restarts.
-   - Extend the peer-store schema to remember observed multiaddrs and relay provenance.
+4. [ ] **Peer Identity & Persistence**  
+   Persist libp2p PeerId↔PeerKey mapping and extend the peer-store schema for observed multiaddrs/relay provenance.
+
 
 ## Phase 5 – Libp2p Hardening (Complete)
 
@@ -87,16 +82,14 @@
   - Captured the new behaviour (synthetic IPv6 socket, byte counters) in `final-report.md`.
 
 - [x] **Update documentation and runbooks**
-  - Reflected the hardening changes in `design/phase2-architecture.md`, `final-report.md`, and added `logs/phase6-remote-validation.md`.
+  - Reflected the hardening changes in `design/architecture.md`, `final-report.md`, and added `logs/phase6-remote-validation.md`.
   - Highlighted new metrics and policy knobs for operators.
 
 - [ ] **Decide on merge readiness**
   - Review outstanding items from Phase 6 and Post-Phase 4 policy/automation tracks.
-  - Prepared `merge-readiness-checklist.md`; populate it once remaining policy/automation work lands.
+  - Prepare a merge-readiness checklist (open task; document will be added once policy/automation items land).
 
-## Phase 3 – Status (handover)
-- [x] Adopt `Libp2pStream` in the Kaspa adaptor/router
-- [x] Thread bridge metadata into logging/metrics
-- [x] Re-enable relay/DCUtR behaviours once adaptor path exists
-- [x] Extend adaptor tests to cover libp2p streams (run `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`)
-- Latest verification (2025-10-28): `cargo check -p kaspa-p2p-lib`, `cargo check -p kaspa-p2p-lib --no-default-features --features libp2p-bridge`, `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`, and `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml` all pass; libp2p-enabled demo usage is captured in `design/phase2-architecture.md`.
+## Verification Snapshot
+- ✅ `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`
+- ✅ `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`
+- Last run: 2025-10-30 (local 6‑core laptop, sub-second bridge suite after channel buffer enlargement). For environment and runbook context see `design/architecture.md` and `logs/phase6-remote-validation.md`.

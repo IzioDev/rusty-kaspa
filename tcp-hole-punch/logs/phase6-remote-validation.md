@@ -23,4 +23,4 @@ Repeats the mixed-NAT scenario using the Phase 5 hardening changes. The relay 
 - `tcp-hole-punch/logs/phase6-client-session.log` – Vultr client session (sanitised IPs and metadata).
 - `tcp-hole-punch/logs/phase6-relay-session.log` – relay excerpts covering the Phase 6 run.
 
-These replace the Phase 4 evidence in the rollout checklist and demonstrate that the hardened bridge (Phase 5) operates correctly across the real mixed-NAT topology.
+These replace the earlier Phase 4 evidence and demonstrate that the hardened bridge (Phase 5) operates correctly across the real mixed-NAT topology.
