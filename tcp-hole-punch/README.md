@@ -77,3 +77,20 @@ Watch for:
 - Client log: `Client connected via libp2p… relay=true`.
 - Relay log: `CircuitReqAccepted` for the server/client peer IDs.
 The consolidated runbook lives in `tcp-hole-punch/logs/phase6-remote-validation.md`, and the sanitised logs mirror what we committed for the Phase 6 evidence. Continuous replays can follow the same steps; feel free to adapt them into scripts or `just` recipes to shorten the loop further.
+
+## Node Configuration Cheat Sheet
+
+When running a production node, `kaspad` exposes dedicated libp2p flags:
+
+- `--libp2p-relay-mode={auto,on,off}` – defaults to `auto`, which starts the bridge relay only when `AddressManager` reports a public interface (from `--externalip`, routable `--listen`, or UPnP). Use `on` / `off` to force behaviour.
+- `--libp2p-relay-port=<port>` – binds the relay listener to a port that’s independent from the TCP P2P socket (default: `p2p_port + 1`).
+- `--libp2p-private-inbound-target=<n>` – cap libp2p inbound sessions when the node is private (default 8). The daemon automatically lowers the global inbound limit to this value when no public address is detected.
+- `--libp2p-relay-inbound-limit=<n>` – maximum number of hole-punched peers accepted per relay host (default 2) to avoid eclipsing via a single intermediary.
+
+You can verify the bridge at runtime via RPC:
+
+```bash
+kaspa-cli getlibpstatus
+```
+
+The command reports whether libp2p is enabled, the active role (client-only vs public relay), the current peer ID, and the configured inbound caps.

@@ -4,6 +4,8 @@ pub struct Libp2pStatusSnapshot {
     pub role: Option<String>,
     pub peer_id: Option<String>,
     pub listen_addrs: Vec<String>,
+    pub private_inbound_target: Option<usize>,
+    pub relay_inbound_limit: Option<usize>,
 }
 
 pub trait Libp2pStatusProvider: Send + Sync {

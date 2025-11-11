@@ -2499,6 +2499,60 @@ impl Deserializer for GetSyncStatusResponse {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct GetLibpStatusRequest {}
+
+impl Serializer for GetLibpStatusRequest {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &0, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetLibpStatusRequest {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let _version = load!(u16, reader)?;
+        Ok(Self {})
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetLibpStatusResponse {
+    pub enabled: bool,
+    pub role: Option<String>,
+    pub peer_id: Option<String>,
+    pub listen_addresses: Vec<String>,
+    pub private_inbound_target: Option<u32>,
+    pub relay_inbound_limit: Option<u32>,
+}
+
+impl Serializer for GetLibpStatusResponse {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+        store!(u16, &1, writer)?;
+        store!(bool, &self.enabled, writer)?;
+        store!(Option<String>, &self.role, writer)?;
+        store!(Option<String>, &self.peer_id, writer)?;
+        store!(Vec<String>, &self.listen_addresses, writer)?;
+        store!(Option<u32>, &self.private_inbound_target, writer)?;
+        store!(Option<u32>, &self.relay_inbound_limit, writer)?;
+        Ok(())
+    }
+}
+
+impl Deserializer for GetLibpStatusResponse {
+    fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let version = load!(u16, reader)?;
+        let enabled = load!(bool, reader)?;
+        let role = load!(Option<String>, reader)?;
+        let peer_id = load!(Option<String>, reader)?;
+        let listen_addresses = load!(Vec<String>, reader)?;
+        let private_inbound_target = if version >= 1 { load!(Option<u32>, reader)? } else { None };
+        let relay_inbound_limit = if version >= 1 { load!(Option<u32>, reader)? } else { None };
+        Ok(Self { enabled, role, peer_id, listen_addresses, private_inbound_target, relay_inbound_limit })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetDaaScoreTimestampEstimateRequest {
     pub daa_scores: Vec<u64>,

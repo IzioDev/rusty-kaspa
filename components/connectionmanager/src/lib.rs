@@ -266,6 +266,23 @@ impl ConnectionManager {
     }
 
     async fn enforce_libp2p_limits(&self, peers: &[&Peer], limits: &Libp2pLimits) {
+        let peers_to_drop = Self::select_libp2p_peers_to_drop(peers, limits);
+        if peers_to_drop.is_empty() {
+            return;
+        }
+        info!(
+            "libp2p inbound limits triggered: removing {} peers (total cap: {}, per relay cap: {})",
+            peers_to_drop.len(),
+            limits.total_inbound,
+            limits.per_relay,
+        );
+        for key in peers_to_drop {
+            debug!("Disconnecting libp2p peer {} due to inbound hole-punch limits", key);
+            self.p2p_adaptor.terminate(key).await;
+        }
+    }
+
+    fn select_libp2p_peers_to_drop(peers: &[&Peer], limits: &Libp2pLimits) -> HashSet<PeerKey> {
         let mut peers_to_drop = HashSet::new();
 
         if limits.total_inbound > 0 {
@@ -294,10 +311,7 @@ impl ConnectionManager {
             }
         }
 
-        for key in peers_to_drop {
-            debug!("Disconnecting libp2p peer {} due to inbound hole-punch limits", key);
-            self.p2p_adaptor.terminate(key).await;
-        }
+        peers_to_drop
     }
 
     fn libp2p_metadata(peer: &Peer) -> Option<&Libp2pConnectInfo> {
@@ -399,5 +413,62 @@ impl ConnectionManager {
     /// Returns whether the given IP has some permanent request.
     pub async fn ip_has_permanent_connection(&self, ip: IpAddr) -> bool {
         self.connection_requests.lock().await.iter().any(|(address, request)| request.is_permanent && address.ip() == ip)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kaspa_utils::networking::PeerId;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::Arc,
+        time::Instant,
+    };
+    fn make_peer(index: u8, relay: Option<&str>) -> Peer {
+        let mut bytes = [0u8; 16];
+        bytes[15] = index;
+        let peer_id = PeerId::from_slice(&bytes).unwrap();
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, index)), 1000 + index as u16);
+        let metadata = relay.map(|relay_id| {
+            let remote_multiaddr = format!("/ip4/1.1.1.{}/tcp/4001/p2p/{}/p2p-circuit/p2p/{}", index, relay_id, peer_id);
+            ConnectionMetadata::new(
+                Some(addr),
+                Some(Libp2pConnectInfo::with_address(peer_id.to_string(), Some(remote_multiaddr), true)),
+            )
+        });
+        Peer::new(peer_id, addr, false, Instant::now(), Arc::new(PeerProperties::default()), 0, metadata)
+    }
+
+    #[test]
+    fn total_limit_trims_excess_peers() {
+        let peers = vec![make_peer(1, Some("relay-a")), make_peer(2, Some("relay-b")), make_peer(3, Some("relay-c"))];
+        let refs: Vec<&Peer> = peers.iter().collect();
+        let limits = Libp2pLimits { total_inbound: 2, per_relay: usize::MAX };
+        let drop = ConnectionManager::select_libp2p_peers_to_drop(&refs, &limits);
+        assert_eq!(drop.len(), 1);
+    }
+
+    #[test]
+    fn per_relay_limit_enforced() {
+        let peers = vec![
+            make_peer(10, Some("relay-a")),
+            make_peer(11, Some("relay-a")),
+            make_peer(12, Some("relay-a")),
+            make_peer(13, Some("relay-b")),
+        ];
+        let refs: Vec<&Peer> = peers.iter().collect();
+        let limits = Libp2pLimits { total_inbound: usize::MAX, per_relay: 1 };
+        let drop = ConnectionManager::select_libp2p_peers_to_drop(&refs, &limits);
+        assert_eq!(drop.len(), 2);
+    }
+
+    #[test]
+    fn no_drops_when_under_limits() {
+        let peers = vec![make_peer(20, Some("relay-a")), make_peer(21, None)];
+        let refs: Vec<&Peer> = peers.iter().collect();
+        let limits = Libp2pLimits { total_inbound: 5, per_relay: 3 };
+        let drop = ConnectionManager::select_libp2p_peers_to_drop(&refs, &limits);
+        assert!(drop.is_empty());
     }
 }

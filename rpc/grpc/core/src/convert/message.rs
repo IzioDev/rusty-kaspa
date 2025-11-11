@@ -514,6 +514,19 @@ from!(item: RpcResult<&kaspa_rpc_core::GetServerInfoResponse>, protowire::GetSer
     }
 });
 
+from!(&kaspa_rpc_core::GetLibpStatusRequest, protowire::GetLibpStatusRequestMessage);
+from!(item: RpcResult<&kaspa_rpc_core::GetLibpStatusResponse>, protowire::GetLibpStatusResponseMessage, {
+    Self {
+        enabled: item.enabled,
+        role: item.role.clone().unwrap_or_default(),
+        peer_id: item.peer_id.clone().unwrap_or_default(),
+        listen_addresses: item.listen_addresses.clone(),
+        private_inbound_target: item.private_inbound_target.unwrap_or_default(),
+        relay_inbound_limit: item.relay_inbound_limit.unwrap_or_default(),
+        error: None,
+    }
+});
+
 from!(&kaspa_rpc_core::GetSyncStatusRequest, protowire::GetSyncStatusRequestMessage);
 from!(item: RpcResult<&kaspa_rpc_core::GetSyncStatusResponse>, protowire::GetSyncStatusResponseMessage, {
     Self {
@@ -1005,6 +1018,18 @@ try_from!(item: &protowire::GetServerInfoResponseMessage, RpcResult<kaspa_rpc_co
         libp2p_role: (!item.libp2p_role.is_empty()).then(|| item.libp2p_role.clone()),
         libp2p_peer_id: (!item.libp2p_peer_id.is_empty()).then(|| item.libp2p_peer_id.clone()),
         libp2p_listen_addresses: item.libp2p_listen_addresses.clone(),
+    }
+});
+
+try_from!(&protowire::GetLibpStatusRequestMessage, kaspa_rpc_core::GetLibpStatusRequest);
+try_from!(item: &protowire::GetLibpStatusResponseMessage, RpcResult<kaspa_rpc_core::GetLibpStatusResponse>, {
+    Self {
+        enabled: item.enabled,
+        role: (!item.role.is_empty()).then(|| item.role.clone()),
+        peer_id: (!item.peer_id.is_empty()).then(|| item.peer_id.clone()),
+        listen_addresses: item.listen_addresses.clone(),
+        private_inbound_target: (item.private_inbound_target != 0).then_some(item.private_inbound_target),
+        relay_inbound_limit: (item.relay_inbound_limit != 0).then_some(item.relay_inbound_limit),
     }
 });
 

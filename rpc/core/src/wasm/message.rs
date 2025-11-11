@@ -486,6 +486,41 @@ try_from! ( args: GetServerInfoResponse, IGetServerInfoResponse, {
     Ok(to_value(&args)?.into())
 });
 
+declare! {
+    IGetLibpStatusRequest,
+    r#"
+    /**
+     * @category Node RPC
+     */
+    export interface IGetLibpStatusRequest { }
+    "#,
+}
+
+try_from! ( args: IGetLibpStatusRequest, GetLibpStatusRequest, {
+    Ok(from_value(args.into())?)
+});
+
+declare! {
+    IGetLibpStatusResponse,
+    r#"
+    /**
+     * @category Node RPC
+     */
+    export interface IGetLibpStatusResponse {
+        enabled : boolean;
+        role? : string;
+        peerId? : string;
+        listenAddresses : string[];
+        privateInboundTarget? : number;
+        relayInboundLimit? : number;
+    }
+    "#,
+}
+
+try_from! ( args: GetLibpStatusResponse, IGetLibpStatusResponse, {
+    Ok(to_value(&args)?.into())
+});
+
 // ---
 
 declare! {

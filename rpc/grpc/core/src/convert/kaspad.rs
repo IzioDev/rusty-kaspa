@@ -58,6 +58,7 @@ pub mod kaspad_request_convert {
     impl_into_kaspad_request!(GetConnections);
     impl_into_kaspad_request!(GetSystemInfo);
     impl_into_kaspad_request!(GetServerInfo);
+    impl_into_kaspad_request!(GetLibpStatus);
     impl_into_kaspad_request!(GetSyncStatus);
     impl_into_kaspad_request!(GetDaaScoreTimestampEstimate);
     impl_into_kaspad_request!(GetFeeEstimate);
@@ -196,6 +197,7 @@ pub mod kaspad_response_convert {
     impl_into_kaspad_response!(GetConnections);
     impl_into_kaspad_response!(GetSystemInfo);
     impl_into_kaspad_response!(GetServerInfo);
+    impl_into_kaspad_response!(GetLibpStatus);
     impl_into_kaspad_response!(GetSyncStatus);
     impl_into_kaspad_response!(GetDaaScoreTimestampEstimate);
     impl_into_kaspad_response!(GetFeeEstimate);

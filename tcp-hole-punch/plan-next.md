@@ -10,9 +10,15 @@ _This document picks up after the Phase 6 PoC plan (see `plan.md`). It focuses
 ## Phase 8 – Connection Policy & Private Caps
 - Extend the connection manager to maintain separate budgets for direct public peers vs. hole-punched private peers; when dialing private peers, request relayed streams through the bridge while preferring direct TCP for public nodes.
 - Enforce a “private node” inbound cap near the current 8-peer norm (configurable) plus per-relay quotas so a single public host cannot flood a home node. Public nodes retain the higher inbound limit but reserve capacity for relay-mediated traffic.
-- Add lightweight local telemetry/RPC (e.g., `getLibp2pStatus`) that reports active relay sessions, punch success/fail counts, and current inbound cap usage—restricted to the local operator to avoid network-wide leakage.
+- Add lightweight local telemetry/RPC (e.g., `getLibpStatus`) that reports active relay sessions, punch success/fail counts, and current inbound cap usage—restricted to the local operator to avoid network-wide leakage.
 
-## Phase 9 – Relay Capability Metadata (Awaiting Design Decision)
+## Phase 9 – Usability & Telemetry Polish
+- Document the new libp2p flags (`--libp2p-relay-mode`, `--libp2p-private-inbound-target`, etc.) in the operator runbook and README so the bridge rollout is self-serve.
+- Add integration/unit tests around the inbound-cap logic (Libp2pLimits) to ensure future changes don’t regress quota enforcement.
+- Expose a lightweight RPC/CLI (`getLibpStatus`) and metrics counters so operators and dashboards can inspect relay role, peer id, and current inbound usage without parsing `getServerInfo`.
+- Add targeted logging/alerts when the bridge service fails or when libp2p caps trigger disconnects, making troubleshooting easier during the rollout phase.
+
+## Phase 10 – Relay Capability Metadata (Awaiting Design Decision)
 - Decide how relay capability is shared:  
   1. **Extend `Version.services` / address records** to advertise a relay bit + port (requires protowire + RocksDB changes, but keeps discovery decentralized).  
   2. **Sidecar relay registry** keyed by `NetAddress` (no wire/schema change, but needs a strategy to disseminate relay info without centralization).

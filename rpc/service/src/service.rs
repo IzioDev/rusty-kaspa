@@ -1244,6 +1244,22 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         })
     }
 
+    async fn get_libp_status_call(
+        &self,
+        _connection: Option<&DynRpcConnection>,
+        _request: GetLibpStatusRequest,
+    ) -> RpcResult<GetLibpStatusResponse> {
+        let snapshot = self.libp2p_status.snapshot();
+        Ok(GetLibpStatusResponse {
+            enabled: snapshot.enabled,
+            role: snapshot.role,
+            peer_id: snapshot.peer_id,
+            listen_addresses: snapshot.listen_addrs,
+            private_inbound_target: snapshot.private_inbound_target.map(|v| v as u32),
+            relay_inbound_limit: snapshot.relay_inbound_limit.map(|v| v as u32),
+        })
+    }
+
     async fn get_sync_status_call(
         &self,
         _connection: Option<&DynRpcConnection>,

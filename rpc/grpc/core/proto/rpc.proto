@@ -911,6 +911,19 @@ message GetSyncStatusResponseMessage{
   RPCError error = 1000;
 }
 
+message GetLibpStatusRequestMessage{
+}
+
+message GetLibpStatusResponseMessage{
+  bool enabled = 1;
+  string role = 2;
+  string peerId = 3;
+  repeated string listenAddresses = 4;
+  uint32 privateInboundTarget = 5;
+  uint32 relayInboundLimit = 6;
+  RPCError error = 1000;
+}
+
 message GetDaaScoreTimestampEstimateRequestMessage {
   repeated uint64 daaScores = 1;
 }

@@ -973,6 +973,9 @@ build_wrpc_wasm_bindgen_interface!(
         /// Returned information: Version of the Kaspa server, protocol
         /// version, network identifier.
         GetServerInfo,
+        /// Retrieves the libp2p bridge status (role, peer ID, listen addresses, and configured caps).
+        /// Returned information: Libp2p role, peer ID, listen addresses, inbound limits.
+        GetLibpStatus,
         /// Obtains basic information about the synchronization status of the Kaspa node.
         /// Returned information: Syncing status.
         GetSyncStatus,

@@ -92,6 +92,15 @@ pub trait RpcApi: Sync + Send + AnySync {
         request: GetServerInfoRequest,
     ) -> RpcResult<GetServerInfoResponse>;
 
+    async fn get_libp_status(&self) -> RpcResult<GetLibpStatusResponse> {
+        self.get_libp_status_call(None, GetLibpStatusRequest {}).await
+    }
+    async fn get_libp_status_call(
+        &self,
+        connection: Option<&DynRpcConnection>,
+        request: GetLibpStatusRequest,
+    ) -> RpcResult<GetLibpStatusResponse>;
+
     // Get current sync status of the node (should be converted to a notification subscription)
     async fn get_sync_status(&self) -> RpcResult<bool> {
         Ok(self.get_sync_status_call(None, GetSyncStatusRequest {}).await?.is_synced)

@@ -563,6 +563,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
 
     let (address_manager, port_mapping_extender_svc) = AddressManager::new(config.clone(), meta_db, tick_service.clone());
     let has_public_address = address_manager.lock().best_local_address().is_some();
+    let libp2p_status = Arc::new(Libp2pStatus::default());
     let libp2p_limits = if has_public_address {
         None
     } else {
@@ -573,6 +574,10 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         );
         Some(Libp2pLimits { total_inbound: args.libp2p_private_inbound_target, per_relay: args.libp2p_relay_inbound_limit })
     };
+    match libp2p_limits.as_ref() {
+        Some(limits) => libp2p_status.set_limits(Some(limits.total_inbound), Some(limits.per_relay)),
+        None => libp2p_status.set_limits(None, None),
+    }
 
     let mining_manager = MiningManagerProxy::new(Arc::new(MiningManager::new_with_extended_config(
         config.target_time_per_block(),
@@ -621,7 +626,6 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         p2p_tower_counters.clone(),
         libp2p_limits.clone(),
     ));
-    let libp2p_status = Arc::new(Libp2pStatus::default());
     let libp2p_config = Libp2pBridgeConfig {
         relay_mode: args.libp2p_relay_mode,
         listen_port: args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1),

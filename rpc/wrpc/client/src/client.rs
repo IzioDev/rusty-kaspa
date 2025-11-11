@@ -639,6 +639,7 @@ impl RpcApi for KaspaRpcClient {
             GetMetrics,
             GetPeerAddresses,
             GetServerInfo,
+            GetLibpStatus,
             GetSink,
             GetSinkBlueScore,
             GetSubnetwork,

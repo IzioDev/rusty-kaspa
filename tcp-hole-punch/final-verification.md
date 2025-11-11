@@ -22,6 +22,7 @@ All logs are sanitised (`<RELAY_IP>`, `<HOME_IP>`, `<CLIENT_VPS_IP>` placeholder
 - ✅ `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`  
   _Includes the 40-stream stress case; passes in <1 s after widening swarm channels._
 - ✅ `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`
+- ✅ `kaspa-cli getlibpstatus` on bridging nodes to confirm role/peer ID/inbound caps before each rehearsal.
 
 Both commands were rerun on 2025-10-30 (local 6‑core laptop); output is available on request.
 

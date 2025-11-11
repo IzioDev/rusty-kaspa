@@ -76,6 +76,7 @@ impl Factory {
                 GetConnections,
                 GetSystemInfo,
                 GetServerInfo,
+                GetLibpStatus,
                 GetSyncStatus,
                 GetDaaScoreTimestampEstimate,
                 GetFeeEstimate,

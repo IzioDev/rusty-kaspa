@@ -62,6 +62,7 @@ impl Router {
                 GetConnections,
                 GetPeerAddresses,
                 GetServerInfo,
+                GetLibpStatus,
                 GetSink,
                 GetSinkBlueScore,
                 GetSubnetwork,

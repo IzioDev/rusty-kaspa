@@ -90,11 +90,20 @@ struct Libp2pStatusInner {
     role: Libp2pRole,
     peer_id: Option<String>,
     listen_addrs: Vec<String>,
+    private_inbound_target: Option<usize>,
+    relay_inbound_limit: Option<usize>,
 }
 
 impl Default for Libp2pStatusInner {
     fn default() -> Self {
-        Self { enabled: false, role: Libp2pRole::Disabled, peer_id: None, listen_addrs: Vec::new() }
+        Self {
+            enabled: false,
+            role: Libp2pRole::Disabled,
+            peer_id: None,
+            listen_addrs: Vec::new(),
+            private_inbound_target: None,
+            relay_inbound_limit: None,
+        }
     }
 }
 
@@ -113,8 +122,15 @@ impl Libp2pStatus {
         guard.listen_addrs = listen_addrs;
     }
 
+    pub fn set_limits(&self, private_inbound_target: Option<usize>, relay_inbound_limit: Option<usize>) {
+        let mut guard = self.inner.write();
+        guard.private_inbound_target = private_inbound_target;
+        guard.relay_inbound_limit = relay_inbound_limit;
+    }
+
     pub fn disable(&self) {
         self.update(false, Libp2pRole::Disabled, None, Vec::new());
+        self.set_limits(None, None);
     }
 }
 
@@ -126,6 +142,8 @@ impl Libp2pStatusProvider for Libp2pStatus {
             role: Some(guard.role.to_string()).filter(|_| guard.enabled),
             peer_id: guard.peer_id.clone(),
             listen_addrs: guard.listen_addrs.clone(),
+            private_inbound_target: guard.private_inbound_target,
+            relay_inbound_limit: guard.relay_inbound_limit,
         }
     }
 }

@@ -1060,6 +1060,29 @@ mod mockery {
 
     test!(GetSyncStatusResponse);
 
+    impl Mock for GetLibpStatusRequest {
+        fn mock() -> Self {
+            GetLibpStatusRequest {}
+        }
+    }
+
+    test!(GetLibpStatusRequest);
+
+    impl Mock for GetLibpStatusResponse {
+        fn mock() -> Self {
+            GetLibpStatusResponse {
+                enabled: true,
+                role: Some("public-relay".to_string()),
+                peer_id: Some("peer-id".to_string()),
+                listen_addresses: vec!["/ip4/0.0.0.0/tcp/4011".to_string()],
+                private_inbound_target: Some(8),
+                relay_inbound_limit: Some(2),
+            }
+        }
+    }
+
+    test!(GetLibpStatusResponse);
+
     impl Mock for GetDaaScoreTimestampEstimateRequest {
         fn mock() -> Self {
             GetDaaScoreTimestampEstimateRequest { daa_scores: mock() }

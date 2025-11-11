@@ -53,6 +53,10 @@ impl Rpc {
                 let result = rpc.get_server_info_call(None, GetServerInfoRequest {}).await?;
                 self.println(&ctx, result);
             }
+            RpcApiOps::GetLibpStatus => {
+                let result = rpc.get_libp_status_call(None, GetLibpStatusRequest {}).await?;
+                self.println(&ctx, result);
+            }
             RpcApiOps::GetSyncStatus => {
                 let result = rpc.get_sync_status_call(None, GetSyncStatusRequest {}).await?;
                 self.println(&ctx, result);
