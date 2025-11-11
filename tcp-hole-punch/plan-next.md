@@ -18,11 +18,14 @@ _This document picks up after the Phase 6 PoC plan (see `plan.md`). It focuses
 - Expose a lightweight RPC/CLI (`getLibpStatus`) and metrics counters so operators and dashboards can inspect relay role, peer id, and current inbound usage without parsing `getServerInfo`.
 - Add targeted logging/alerts when the bridge service fails or when libp2p caps trigger disconnects, making troubleshooting easier during the rollout phase.
 
-## Phase 10 – Relay Capability Metadata (Awaiting Design Decision)
-- Decide how relay capability is shared:  
-  1. **Extend `Version.services` / address records** to advertise a relay bit + port (requires protowire + RocksDB changes, but keeps discovery decentralized).  
-  2. **Sidecar relay registry** keyed by `NetAddress` (no wire/schema change, but needs a strategy to disseminate relay info without centralization).
-- Implement the chosen approach, migrate existing stores if needed, and update the connection manager to rotate through the discovered relay set so each private connection uses a different public relay, as per Michael’s anti-eclipse guidance.
+## Phase 10 – Relay Capability Metadata (Protocol-Native)
+- Extend `Version.services` (and associated protowire structs) with a relay capability bit plus an advertised relay port, keeping the wire format backwards-compatible (e.g., bump version fields, default new bits to zero).
+- Update `AddressManager` schemas (RocksDB column family and `NetAddress` serialization) to persist the new capability bit and port for each peer; write a migration that gracefully upgrades existing stores.
+- Populate the capability flag during handshake: public nodes set the bit when their `--libp2p-relay-mode` exposes a relay listener, private nodes leave it unset.
+- Teach `address` flows (`RequestAddresses`, senders) to include the capability flag so the gossip-derived peer set knows which nodes can act as relays.
+- Update `ConnectionManager` selection logic to consume the new metadata: maintain a pool of relay-capable peers, ensure each private outbound connection chooses a distinct relay, and retry/fallback when a relay proves unhealthy.
+- Add RPC/CLI visibility (e.g., include the relay capability in `getPeerAddresses` or expose a filtered list) so operators can audit which peers are advertising relays.
+- Document upgrade and compatibility notes: mixed-version behavior, expected migrations, and how operators can verify their nodes are advertising/consuming the capability.
 
 ## Open Questions / Dependencies
 - Final decision on the relay metadata storage strategy (Phase 9 blocker).
