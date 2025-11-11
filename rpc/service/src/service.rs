@@ -3,6 +3,7 @@
 use super::collector::{CollectorFromConsensus, CollectorFromIndex};
 use crate::converter::feerate_estimate::{FeeEstimateConverter, FeeEstimateVerboseConverter};
 use crate::converter::{consensus::ConsensusConverter, index::IndexConverter, protocol::ProtocolConverter};
+use crate::libp2p::Libp2pStatusProvider;
 use async_trait::async_trait;
 use kaspa_consensus_core::api::counters::ProcessingCounters;
 use kaspa_consensus_core::daa_score_timestamp::DaaScoreTimestamp;
@@ -122,6 +123,7 @@ pub struct RpcCoreService {
     fee_estimate_cache: ExpiringCache<RpcFeeEstimate>,
     fee_estimate_verbose_cache: ExpiringCache<kaspa_mining::errors::MiningManagerResult<GetFeeEstimateExperimentalResponse>>,
     mining_rule_engine: Arc<MiningRuleEngine>,
+    libp2p_status: Arc<dyn Libp2pStatusProvider>,
 }
 
 const RPC_CORE: &str = "rpc-core";
@@ -148,6 +150,7 @@ impl RpcCoreService {
         grpc_tower_counters: Arc<TowerConnectionCounters>,
         system_info: SystemInfo,
         mining_rule_engine: Arc<MiningRuleEngine>,
+        libp2p_status: Arc<dyn Libp2pStatusProvider>,
     ) -> Self {
         // This notifier UTXOs subscription granularity to index-processor or consensus notifier
         let policies = match index_notifier {
@@ -227,6 +230,7 @@ impl RpcCoreService {
             fee_estimate_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             fee_estimate_verbose_cache: ExpiringCache::new(Duration::from_millis(500), Duration::from_millis(1000)),
             mining_rule_engine,
+            libp2p_status,
         }
     }
 
@@ -1223,6 +1227,7 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
         let sink_daa_score_timestamp = session.async_get_sink_daa_score_timestamp().await;
         let is_synced: bool = self.mining_rule_engine.is_sink_recent_and_connected(sink_daa_score_timestamp);
         let virtual_daa_score = session.get_virtual_daa_score();
+        let libp2p = self.libp2p_status.snapshot();
 
         Ok(GetServerInfoResponse {
             rpc_api_version: RPC_API_VERSION,
@@ -1232,6 +1237,10 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             has_utxo_index: self.config.utxoindex,
             is_synced,
             virtual_daa_score,
+            libp2p_enabled: libp2p.enabled,
+            libp2p_role: libp2p.role,
+            libp2p_peer_id: libp2p.peer_id,
+            libp2p_listen_addresses: libp2p.listen_addrs,
         })
     }
 

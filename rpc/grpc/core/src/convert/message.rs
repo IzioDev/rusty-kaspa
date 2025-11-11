@@ -506,6 +506,10 @@ from!(item: RpcResult<&kaspa_rpc_core::GetServerInfoResponse>, protowire::GetSer
         has_utxo_index: item.has_utxo_index,
         is_synced: item.is_synced,
         virtual_daa_score: item.virtual_daa_score,
+        libp2p_enabled: item.libp2p_enabled,
+        libp2p_role: item.libp2p_role.clone().unwrap_or_default(),
+        libp2p_peer_id: item.libp2p_peer_id.clone().unwrap_or_default(),
+        libp2p_listen_addresses: item.libp2p_listen_addresses.clone(),
         error: None,
     }
 });
@@ -997,6 +1001,10 @@ try_from!(item: &protowire::GetServerInfoResponseMessage, RpcResult<kaspa_rpc_co
         has_utxo_index: item.has_utxo_index,
         is_synced: item.is_synced,
         virtual_daa_score: item.virtual_daa_score,
+        libp2p_enabled: item.libp2p_enabled,
+        libp2p_role: (!item.libp2p_role.is_empty()).then(|| item.libp2p_role.clone()),
+        libp2p_peer_id: (!item.libp2p_peer_id.is_empty()).then(|| item.libp2p_peer_id.clone()),
+        libp2p_listen_addresses: item.libp2p_listen_addresses.clone(),
     }
 });
 

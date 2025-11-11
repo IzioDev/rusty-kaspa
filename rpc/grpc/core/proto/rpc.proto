@@ -896,6 +896,10 @@ message GetServerInfoResponseMessage{
   bool hasUtxoIndex = 5;
   bool isSynced = 6;
   uint64 virtualDaaScore = 7;
+  bool libp2pEnabled = 8;
+  string libp2pRole = 9;
+  string libp2pPeerId = 10;
+  repeated string libp2pListenAddresses = 11;
   RPCError error = 1000;
 }
 

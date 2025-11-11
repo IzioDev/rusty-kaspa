@@ -1034,6 +1034,10 @@ mod mockery {
                 has_utxo_index: true,
                 is_synced: false,
                 virtual_daa_score: mock(),
+                libp2p_enabled: false,
+                libp2p_role: None,
+                libp2p_peer_id: None,
+                libp2p_listen_addresses: vec![],
             }
         }
     }

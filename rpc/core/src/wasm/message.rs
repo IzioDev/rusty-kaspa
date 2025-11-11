@@ -474,6 +474,10 @@ declare! {
         hasUtxoIndex : boolean;
         isSynced : boolean;
         virtualDaaScore : bigint;
+        libp2pEnabled : boolean;
+        libp2pRole? : string;
+        libp2pPeerId? : string;
+        libp2pListenAddresses : string[];
     }
     "#,
 }

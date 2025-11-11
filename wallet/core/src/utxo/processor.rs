@@ -508,6 +508,7 @@ impl UtxoProcessor {
             has_utxo_index,
             is_synced,
             virtual_daa_score,
+            ..
         } = self.rpc_api().get_server_info().await?;
 
         if rpc_api_version > RPC_API_VERSION {

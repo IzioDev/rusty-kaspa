@@ -18,7 +18,7 @@ use kaspa_grpc_server::service::GrpcService;
 use kaspa_notify::{address::tracker::Tracker, subscription::context::SubscriptionContext};
 use kaspa_p2p_lib::Hub;
 use kaspa_p2p_mining::rule_engine::MiningRuleEngine;
-use kaspa_rpc_service::service::RpcCoreService;
+use kaspa_rpc_service::{libp2p::Libp2pStatusProvider, service::RpcCoreService};
 use kaspa_txscript::caches::TxScriptCacheCounters;
 use kaspa_utils::git;
 use kaspa_utils::networking::ContextualNetAddress;
@@ -59,7 +59,10 @@ pub const MINIMUM_DAEMON_SOFT_FD_LIMIT: u64 = 4 * 1024;
 const MINIMUM_RETENTION_PERIOD_DAYS: f64 = 2.0;
 const ONE_GIGABYTE: f64 = 1_000_000_000.0;
 
-use crate::args::Args;
+use crate::{
+    args::Args,
+    libp2p::{Libp2pBridgeConfig, Libp2pBridgeService, Libp2pStatus},
+};
 
 const DEFAULT_DATA_DIR: &str = "datadir";
 const CONSENSUS_DB: &str = "consensus";
@@ -605,6 +608,13 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         config.default_p2p_port(),
         p2p_tower_counters.clone(),
     ));
+    let libp2p_status = Arc::new(Libp2pStatus::default());
+    let libp2p_config = Libp2pBridgeConfig {
+        relay_mode: args.libp2p_relay_mode,
+        listen_port: args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1),
+        identity_path: app_dir.join(network.to_prefixed()).join("libp2p").join("identity.key"),
+    };
+    let libp2p_service = Arc::new(Libp2pBridgeService::new(flow_context.clone(), libp2p_config, libp2p_status.clone()));
 
     let rpc_core_service = Arc::new(RpcCoreService::new(
         consensus_manager.clone(),
@@ -624,6 +634,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         grpc_tower_counters.clone(),
         system_info,
         mining_rule_engine.clone(),
+        libp2p_status.clone() as Arc<dyn Libp2pStatusProvider>,
     ));
     let grpc_service_broadcasters: usize = 3; // TODO: add a command line argument or derive from other arg/config/host-related fields
     let grpc_service = if !args.disable_grpc {
@@ -653,6 +664,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     if let Some(grpc_service) = grpc_service {
         async_runtime.register(grpc_service)
     }
+    async_runtime.register(libp2p_service);
     async_runtime.register(p2p_service);
     async_runtime.register(consensus_monitor);
     async_runtime.register(mining_monitor);

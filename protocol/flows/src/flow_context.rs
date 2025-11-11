@@ -36,7 +36,7 @@ use kaspa_p2p_lib::{
     convert::model::version::Version,
     make_message,
     pb::{kaspad_message::Payload, InvRelayBlockMessage},
-    ConnectionInitializer, Hub, KaspadHandshake, PeerKey, PeerProperties, Router,
+    Adaptor, ConnectionInitializer, Hub, KaspadHandshake, PeerKey, PeerProperties, Router,
 };
 use kaspa_p2p_mining::rule_engine::MiningRuleEngine;
 use kaspa_utils::iter::IterExtensions;
@@ -225,6 +225,7 @@ pub struct FlowContextInner {
     ibd_metadata: Arc<RwLock<Option<IbdMetadata>>>,
     pub address_manager: Arc<Mutex<AddressManager>>,
     connection_manager: RwLock<Option<Arc<ConnectionManager>>>,
+    p2p_adaptor: RwLock<Option<Arc<Adaptor>>>,
     mining_manager: MiningManagerProxy,
     pub(crate) tick_service: Arc<TickService>,
     notification_root: Arc<ConsensusNotificationRoot>,
@@ -336,6 +337,7 @@ impl FlowContext {
                 hub,
                 address_manager,
                 connection_manager: Default::default(),
+                p2p_adaptor: Default::default(),
                 mining_manager,
                 tick_service,
                 notification_root,
@@ -377,6 +379,18 @@ impl FlowContext {
 
     pub fn connection_manager(&self) -> Option<Arc<ConnectionManager>> {
         self.connection_manager.read().clone()
+    }
+
+    pub fn set_p2p_adaptor(&self, adaptor: Arc<Adaptor>) {
+        self.p2p_adaptor.write().replace(adaptor);
+    }
+
+    pub fn drop_p2p_adaptor(&self) {
+        self.p2p_adaptor.write().take();
+    }
+
+    pub fn p2p_adaptor(&self) -> Option<Arc<Adaptor>> {
+        self.p2p_adaptor.read().clone()
     }
 
     pub fn consensus(&self) -> ConsensusInstance {

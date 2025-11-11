@@ -1,3 +1,4 @@
+use crate::libp2p::Libp2pRelayMode;
 use clap::{arg, Arg, ArgAction, Command};
 use kaspa_consensus_core::{
     config::Config,
@@ -91,6 +92,10 @@ pub struct Args {
     pub disable_grpc: bool,
     pub ram_scale: f64,
     pub retention_period_days: Option<f64>,
+    #[serde(rename = "libp2p-relay-mode")]
+    pub libp2p_relay_mode: Libp2pRelayMode,
+    #[serde(rename = "libp2p-relay-port")]
+    pub libp2p_relay_port: Option<u16>,
 }
 
 impl Default for Args {
@@ -142,6 +147,8 @@ impl Default for Args {
             disable_grpc: false,
             ram_scale: 1.0,
             retention_period_days: None,
+            libp2p_relay_mode: Libp2pRelayMode::Auto,
+            libp2p_relay_port: None,
         }
     }
 }
@@ -379,6 +386,21 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .value_parser(clap::value_parser!(f64))
                 .help("The number of total days of data to keep.")
         )
+        .arg(
+            Arg::new("libp2p-relay-mode")
+                .long("libp2p-relay-mode")
+                .require_equals(true)
+                .default_value("auto")
+                .value_parser(["auto", "on", "off"])
+                .help("Control the libp2p relay listener: auto (on when the node has a public address), on, or off.")
+        )
+        .arg(
+            Arg::new("libp2p-relay-port")
+                .long("libp2p-relay-port")
+                .require_equals(true)
+                .value_parser(clap::value_parser!(u16))
+                .help("TCP port for the libp2p relay listener (default: p2p port + 1).")
+        )
         ;
 
     #[cfg(feature = "devnet-prealloc")]
@@ -459,6 +481,11 @@ impl Args {
             disable_grpc: arg_match_unwrap_or::<bool>(&m, "nogrpc", defaults.disable_grpc),
             ram_scale: arg_match_unwrap_or::<f64>(&m, "ram-scale", defaults.ram_scale),
             retention_period_days: m.get_one::<f64>("retention-period-days").cloned().or(defaults.retention_period_days),
+            libp2p_relay_mode: m
+                .get_one::<String>("libp2p-relay-mode")
+                .map(|value| value.parse().expect("libp2p relay mode is validated by clap"))
+                .unwrap_or(defaults.libp2p_relay_mode),
+            libp2p_relay_port: m.get_one::<u16>("libp2p-relay-port").cloned().or(defaults.libp2p_relay_port),
 
             #[cfg(feature = "devnet-prealloc")]
             num_prealloc_utxos: m.get_one::<u64>("num-prealloc-utxos").cloned(),

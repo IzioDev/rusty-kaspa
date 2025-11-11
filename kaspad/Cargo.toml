@@ -31,7 +31,7 @@ kaspa-index-processor.workspace = true
 kaspa-mining.workspace = true
 kaspa-notify.workspace = true
 kaspa-p2p-flows.workspace = true
-kaspa-p2p-lib.workspace = true
+kaspa-p2p-lib = { workspace = true, features = ["libp2p-bridge"] }
 kaspa-p2p-mining.workspace = true
 kaspa-perf-monitor.workspace = true
 kaspa-rpc-core.workspace = true
@@ -42,15 +42,20 @@ kaspa-utils-tower.workspace = true
 kaspa-utxoindex.workspace = true
 kaspa-wrpc-server.workspace = true
 
+hole-punch-bridge = { path = "../tcp-hole-punch/bridge" }
+libp2p = "0.56"
+
 async-channel.workspace = true
 cfg-if.workspace = true
 clap.workspace = true
 dhat = { workspace = true, optional = true }
 dirs.workspace = true
 futures-util.workspace = true
+futures.workspace = true
 itertools.workspace = true
 log.workspace = true
 num_cpus.workspace = true
+parking_lot.workspace = true
 rand.workspace = true
 rayon.workspace = true
 rocksdb.workspace = true

@@ -2397,11 +2397,15 @@ pub struct GetServerInfoResponse {
     pub has_utxo_index: bool,
     pub is_synced: bool,
     pub virtual_daa_score: u64,
+    pub libp2p_enabled: bool,
+    pub libp2p_role: Option<String>,
+    pub libp2p_peer_id: Option<String>,
+    pub libp2p_listen_addresses: Vec<String>,
 }
 
 impl Serializer for GetServerInfoResponse {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
-        store!(u16, &1, writer)?;
+        store!(u16, &2, writer)?;
 
         store!(u16, &self.rpc_api_version, writer)?;
         store!(u16, &self.rpc_api_revision, writer)?;
@@ -2411,6 +2415,10 @@ impl Serializer for GetServerInfoResponse {
         store!(bool, &self.has_utxo_index, writer)?;
         store!(bool, &self.is_synced, writer)?;
         store!(u64, &self.virtual_daa_score, writer)?;
+        store!(bool, &self.libp2p_enabled, writer)?;
+        store!(Option<String>, &self.libp2p_role, writer)?;
+        store!(Option<String>, &self.libp2p_peer_id, writer)?;
+        store!(Vec<String>, &self.libp2p_listen_addresses, writer)?;
 
         Ok(())
     }
@@ -2418,7 +2426,7 @@ impl Serializer for GetServerInfoResponse {
 
 impl Deserializer for GetServerInfoResponse {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
-        let _version = load!(u16, reader)?;
+        let version = load!(u16, reader)?;
 
         let rpc_api_version = load!(u16, reader)?;
         let rpc_api_revision = load!(u16, reader)?;
@@ -2428,8 +2436,25 @@ impl Deserializer for GetServerInfoResponse {
         let has_utxo_index = load!(bool, reader)?;
         let is_synced = load!(bool, reader)?;
         let virtual_daa_score = load!(u64, reader)?;
+        let (libp2p_enabled, libp2p_role, libp2p_peer_id, libp2p_listen_addresses) = if version >= 2 {
+            (load!(bool, reader)?, load!(Option<String>, reader)?, load!(Option<String>, reader)?, load!(Vec<String>, reader)?)
+        } else {
+            (false, None, None, Vec::new())
+        };
 
-        Ok(Self { rpc_api_version, rpc_api_revision, server_version, network_id, has_utxo_index, is_synced, virtual_daa_score })
+        Ok(Self {
+            rpc_api_version,
+            rpc_api_revision,
+            server_version,
+            network_id,
+            has_utxo_index,
+            is_synced,
+            virtual_daa_score,
+            libp2p_enabled,
+            libp2p_role,
+            libp2p_peer_id,
+            libp2p_listen_addresses,
+        })
     }
 }
 
