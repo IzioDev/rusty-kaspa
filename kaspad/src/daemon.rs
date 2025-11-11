@@ -26,6 +26,7 @@ use kaspa_utils::sysinfo::SystemInfo;
 use kaspa_utils_tower::counters::TowerConnectionCounters;
 
 use kaspa_addressmanager::AddressManager;
+use kaspa_connectionmanager::Libp2pLimits;
 use kaspa_consensus::{consensus::factory::Factory as ConsensusFactory, pipeline::ProcessingCounters};
 use kaspa_consensus::{
     consensus::factory::MultiConsensusManagementStore, model::stores::headers::DbHeadersStore, pipeline::monitor::ConsensusMonitor,
@@ -489,7 +490,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     let p2p_server_addr = args.listen.unwrap_or(ContextualNetAddress::unspecified()).normalize(config.default_p2p_port());
     // connect_peers means no DNS seeding and no outbound/inbound peers
     let outbound_target = if connect_peers.is_empty() { args.outbound_target } else { 0 };
-    let inbound_limit = if connect_peers.is_empty() { args.inbound_limit } else { 0 };
+    let mut inbound_limit = if connect_peers.is_empty() { args.inbound_limit } else { 0 };
     let dns_seeders = if connect_peers.is_empty() && !args.disable_dns_seeding { config.dns_seeders } else { &[] };
 
     let grpc_server_addr = args.rpclisten.unwrap_or(ContextualNetAddress::loopback()).normalize(config.default_rpc_port());
@@ -561,6 +562,17 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     };
 
     let (address_manager, port_mapping_extender_svc) = AddressManager::new(config.clone(), meta_db, tick_service.clone());
+    let has_public_address = address_manager.lock().best_local_address().is_some();
+    let libp2p_limits = if has_public_address {
+        None
+    } else {
+        inbound_limit = inbound_limit.min(args.libp2p_private_inbound_target);
+        info!(
+            "Private node detected (no public address); limiting libp2p inbound peers to {} and per-relay to {}",
+            args.libp2p_private_inbound_target, args.libp2p_relay_inbound_limit
+        );
+        Some(Libp2pLimits { total_inbound: args.libp2p_private_inbound_target, per_relay: args.libp2p_relay_inbound_limit })
+    };
 
     let mining_manager = MiningManagerProxy::new(Arc::new(MiningManager::new_with_extended_config(
         config.target_time_per_block(),
@@ -607,12 +619,14 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         dns_seeders,
         config.default_p2p_port(),
         p2p_tower_counters.clone(),
+        libp2p_limits.clone(),
     ));
     let libp2p_status = Arc::new(Libp2pStatus::default());
     let libp2p_config = Libp2pBridgeConfig {
         relay_mode: args.libp2p_relay_mode,
         listen_port: args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1),
         identity_path: app_dir.join(network.to_prefixed()).join("libp2p").join("identity.key"),
+        has_public_address,
     };
     let libp2p_service = Arc::new(Libp2pBridgeService::new(flow_context.clone(), libp2p_config, libp2p_status.clone()));
 

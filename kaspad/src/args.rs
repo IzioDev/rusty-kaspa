@@ -92,6 +92,10 @@ pub struct Args {
     pub disable_grpc: bool,
     pub ram_scale: f64,
     pub retention_period_days: Option<f64>,
+    #[serde(rename = "libp2p-private-inbound-target")]
+    pub libp2p_private_inbound_target: usize,
+    #[serde(rename = "libp2p-relay-inbound-limit")]
+    pub libp2p_relay_inbound_limit: usize,
     #[serde(rename = "libp2p-relay-mode")]
     pub libp2p_relay_mode: Libp2pRelayMode,
     #[serde(rename = "libp2p-relay-port")]
@@ -147,6 +151,8 @@ impl Default for Args {
             disable_grpc: false,
             ram_scale: 1.0,
             retention_period_days: None,
+            libp2p_private_inbound_target: 8,
+            libp2p_relay_inbound_limit: 2,
             libp2p_relay_mode: Libp2pRelayMode::Auto,
             libp2p_relay_port: None,
         }
@@ -387,6 +393,22 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .help("The number of total days of data to keep.")
         )
         .arg(
+            Arg::new("libp2p-private-inbound-target")
+                .long("libp2p-private-inbound-target")
+                .require_equals(true)
+                .default_value("8")
+                .value_parser(clap::value_parser!(usize))
+                .help("Maximum libp2p inbound peers accepted when this node is not publicly reachable."),
+        )
+        .arg(
+            Arg::new("libp2p-relay-inbound-limit")
+                .long("libp2p-relay-inbound-limit")
+                .require_equals(true)
+                .default_value("2")
+                .value_parser(clap::value_parser!(usize))
+                .help("Maximum libp2p inbound peers accepted per relay host."),
+        )
+        .arg(
             Arg::new("libp2p-relay-mode")
                 .long("libp2p-relay-mode")
                 .require_equals(true)
@@ -481,6 +503,16 @@ impl Args {
             disable_grpc: arg_match_unwrap_or::<bool>(&m, "nogrpc", defaults.disable_grpc),
             ram_scale: arg_match_unwrap_or::<f64>(&m, "ram-scale", defaults.ram_scale),
             retention_period_days: m.get_one::<f64>("retention-period-days").cloned().or(defaults.retention_period_days),
+            libp2p_private_inbound_target: arg_match_unwrap_or::<usize>(
+                &m,
+                "libp2p-private-inbound-target",
+                defaults.libp2p_private_inbound_target,
+            ),
+            libp2p_relay_inbound_limit: arg_match_unwrap_or::<usize>(
+                &m,
+                "libp2p-relay-inbound-limit",
+                defaults.libp2p_relay_inbound_limit,
+            ),
             libp2p_relay_mode: m
                 .get_one::<String>("libp2p-relay-mode")
                 .map(|value| value.parse().expect("libp2p relay mode is validated by clap"))

@@ -11,7 +11,7 @@ use futures_util::future::{join_all, try_join_all};
 use itertools::Itertools;
 use kaspa_addressmanager::{AddressManager, NetAddress};
 use kaspa_core::{debug, info, warn};
-use kaspa_p2p_lib::{common::ProtocolError, ConnectionError, Peer};
+use kaspa_p2p_lib::{common::ProtocolError, ConnectionError, Libp2pConnectInfo, Peer, PeerKey};
 use kaspa_utils::triggers::SingleTrigger;
 use parking_lot::Mutex as ParkingLotMutex;
 use rand::{seq::SliceRandom, thread_rng};
@@ -34,6 +34,13 @@ pub struct ConnectionManager {
     connection_requests: TokioMutex<HashMap<SocketAddr, ConnectionRequest>>,
     force_next_iteration: UnboundedSender<()>,
     shutdown_signal: SingleTrigger,
+    libp2p_limits: Option<Libp2pLimits>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Libp2pLimits {
+    pub total_inbound: usize,
+    pub per_relay: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -57,6 +64,7 @@ impl ConnectionManager {
         dns_seeders: &'static [&'static str],
         default_port: u16,
         address_manager: Arc<ParkingLotMutex<AddressManager>>,
+        libp2p_limits: Option<Libp2pLimits>,
     ) -> Arc<Self> {
         let (tx, rx) = unbounded_channel::<()>();
         let manager = Arc::new(Self {
@@ -69,6 +77,7 @@ impl ConnectionManager {
             shutdown_signal: SingleTrigger::new(),
             dns_seeders,
             default_port,
+            libp2p_limits,
         });
         manager.clone().start_event_loop(rx);
         manager.force_next_iteration.send(()).unwrap();
@@ -240,6 +249,9 @@ impl ConnectionManager {
 
     async fn handle_inbound_connections(self: &Arc<Self>, peer_by_address: &HashMap<SocketAddr, Peer>) {
         let active_inbound = peer_by_address.values().filter(|peer| !peer.is_outbound()).collect_vec();
+        if let Some(limits) = &self.libp2p_limits {
+            self.enforce_libp2p_limits(&active_inbound, limits).await;
+        }
         let active_inbound_len = active_inbound.len();
         if self.inbound_limit >= active_inbound_len {
             return;
@@ -251,6 +263,57 @@ impl ConnectionManager {
             futures.push(self.p2p_adaptor.terminate(peer.key()));
         }
         join_all(futures).await;
+    }
+
+    async fn enforce_libp2p_limits(&self, peers: &[&Peer], limits: &Libp2pLimits) {
+        let mut peers_to_drop = HashSet::new();
+
+        if limits.total_inbound > 0 {
+            let mut libp2p_peers: Vec<PeerKey> =
+                peers.iter().filter(|peer| Self::libp2p_metadata(peer).is_some()).map(|peer| peer.key()).collect();
+            if libp2p_peers.len() > limits.total_inbound {
+                let mut rng = thread_rng();
+                libp2p_peers.shuffle(&mut rng);
+                for key in libp2p_peers.into_iter().skip(limits.total_inbound) {
+                    peers_to_drop.insert(key);
+                }
+            }
+        }
+
+        if limits.per_relay > 0 {
+            let mut per_relay: HashMap<String, usize> = HashMap::new();
+            for peer in peers.iter().filter(|peer| Self::libp2p_metadata(peer).map(|info| info.relay_used).unwrap_or(false)) {
+                if let Some(relay_id) = Self::relay_peer_id(peer) {
+                    let counter = per_relay.entry(relay_id.clone()).or_insert(0);
+                    if *counter >= limits.per_relay {
+                        peers_to_drop.insert(peer.key());
+                    } else {
+                        *counter += 1;
+                    }
+                }
+            }
+        }
+
+        for key in peers_to_drop {
+            debug!("Disconnecting libp2p peer {} due to inbound hole-punch limits", key);
+            self.p2p_adaptor.terminate(key).await;
+        }
+    }
+
+    fn libp2p_metadata(peer: &Peer) -> Option<&Libp2pConnectInfo> {
+        peer.connection_metadata().and_then(|metadata| metadata.libp2p.as_ref())
+    }
+
+    fn relay_peer_id(peer: &Peer) -> Option<String> {
+        let info = Self::libp2p_metadata(peer)?;
+        if !info.relay_used {
+            return None;
+        }
+        let multiaddr = info.remote_multiaddr.as_ref()?;
+        let mut parts = multiaddr.split("/p2p/").skip(1);
+        let relay_section = parts.next()?;
+        let relay = relay_section.split('/').next()?.to_string();
+        Some(relay)
     }
 
     /// Queries DNS seeders in random order, one after the other, until obtaining `min_addresses_to_fetch` addresses

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use kaspa_addressmanager::NetAddress;
-use kaspa_connectionmanager::ConnectionManager;
+use kaspa_connectionmanager::{ConnectionManager, Libp2pLimits};
 use kaspa_core::{
     task::service::{AsyncService, AsyncServiceFuture},
     trace,
@@ -25,6 +25,7 @@ pub struct P2pService {
     default_port: u16,
     shutdown: SingleTrigger,
     counters: Arc<TowerConnectionCounters>,
+    libp2p_limits: Option<Libp2pLimits>,
 }
 
 impl P2pService {
@@ -38,6 +39,7 @@ impl P2pService {
         dns_seeders: &'static [&'static str],
         default_port: u16,
         counters: Arc<TowerConnectionCounters>,
+        libp2p_limits: Option<Libp2pLimits>,
     ) -> Self {
         Self {
             flow_context,
@@ -50,6 +52,7 @@ impl P2pService {
             dns_seeders,
             default_port,
             counters,
+            libp2p_limits,
         }
     }
 }
@@ -78,6 +81,7 @@ impl AsyncService for P2pService {
             self.dns_seeders,
             self.default_port,
             self.flow_context.address_manager.clone(),
+            self.libp2p_limits.clone(),
         );
 
         self.flow_context.set_connection_manager(connection_manager.clone());

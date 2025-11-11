@@ -135,6 +135,7 @@ pub struct Libp2pBridgeConfig {
     pub relay_mode: Libp2pRelayMode,
     pub listen_port: u16,
     pub identity_path: PathBuf,
+    pub has_public_address: bool,
 }
 
 impl Libp2pBridgeConfig {
@@ -165,7 +166,8 @@ impl Libp2pBridgeService {
         let mut handle = spawn_swarm_with_config(identity, SwarmConfig::default()).map_err(Libp2pBridgeError::Bridge)?;
         let peer_id = handle.local_peer_id();
 
-        let has_public_addr = self.flow_context.address_manager.lock().best_local_address().is_some();
+        let has_public_addr =
+            self.config.has_public_address || self.flow_context.address_manager.lock().best_local_address().is_some();
         let role = self.config.role(has_public_addr);
 
         let listen_addrs = if matches!(role, Libp2pRole::PublicRelay) { self.start_listeners(&mut handle).await? } else { Vec::new() };
