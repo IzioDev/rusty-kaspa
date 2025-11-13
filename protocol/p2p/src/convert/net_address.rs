@@ -15,12 +15,11 @@ use kaspa_utils::networking::{IpAddress, NetAddress};
 
 impl From<(IpAddress, u16)> for protowire::NetAddress {
     fn from((ip, port): (IpAddress, u16)) -> Self {
-        let ip_bytes = match ip.0 {
-            // We follow the IP encoding of golang's net.IP type
+        let bytes = match ip.0 {
             IpAddr::V4(ip) => ip.octets().to_vec(),
             IpAddr::V6(ip) => ip.octets().to_vec(),
         };
-        Self { timestamp: 0, ip: ip_bytes, port: port as u32, services: 0, relay_port: 0 }
+        Self { timestamp: 0, ip: bytes, port: port as u32, services: 0, relay_port: 0 }
     }
 }
 
@@ -75,7 +74,7 @@ impl TryFrom<protowire::NetAddress> for NetAddress {
 
 #[cfg(test)]
 mod tests {
-    use kaspa_utils::networking::IpAddress;
+    use kaspa_utils::networking::{IpAddress, NetAddress, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
 
     use crate::pb;
     use std::{
@@ -105,11 +104,10 @@ mod tests {
 
     #[test]
     fn relay_metadata_roundtrip() {
-        let mut addr = NetAddress::new(IpAddress::from(Ipv4Addr::LOCALHOST), 16111)
-            .with_services(kaspa_utils::networking::NET_ADDRESS_SERVICE_LIBP2P_RELAY);
+        let mut addr = NetAddress::new(IpAddress::from(Ipv4Addr::LOCALHOST), 16111).with_services(NET_ADDRESS_SERVICE_LIBP2P_RELAY);
         addr.relay_port = Some(18111);
         let proto: pb::NetAddress = addr.into();
-        assert_eq!(proto.services, kaspa_utils::networking::NET_ADDRESS_SERVICE_LIBP2P_RELAY);
+        assert_eq!(proto.services, NET_ADDRESS_SERVICE_LIBP2P_RELAY);
         assert_eq!(proto.relay_port, 18111);
 
         let roundtrip: NetAddress = proto.try_into().unwrap();

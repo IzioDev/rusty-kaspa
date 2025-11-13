@@ -16,14 +16,13 @@ The [Crescendo Hardfork](docs/crescendo-guide.md) took place on May 5, 2025, at 
 
 ## Libp2p Relay Metadata (Protocol v9)
 
-Phase 10 of the TCP hole-punch rollout adds a dedicated service bit and advertised bridge port to every `Version` message so that private nodes can discover relay-capable peers immediately from the gossip set. The metadata is persisted in RocksDB, included in the `RequestAddresses`/`Addresses` flows, and surfaced via RPC:
+Protocol v9 extends the `Version` and `NetAddress` messages so that public relays can advertise a dedicated service bit (`0x1`) plus the bridge port they listen on. Private nodes persist the metadata inside RocksDB, learn it through the normal address gossip, and rotate across multiple relays automatically.
 
-- `kaspa-cli getpeeraddresses --json` now emits `services`/`relayPort` per entry (bit `0x1` marks relays).
-- `kaspa-cli getconnectedpeerinfo --json` reports the same fields for active peers alongside the existing libp2p telemetry (peer ID, multiaddr, relay usage).
-- `kaspa-cli getlibpstatus` remains the quickest way to confirm whether a node is currently running as a public relay or in client-only mode.
+- `kaspa-cli getpeeraddresses --json` now includes `services` and `relayPort` fields; filter on `services == 1` to see who is advertising relay support.
+- `kaspa-cli getconnectedpeerinfo --json` exposes the same fields for active peers so operators can verify that private nodes maintain at least two relay connections.
+- `kaspa-cli getlibpstatus` still reports whether the local bridge is running in `public-relay` or `client-only` mode.
 
-Nodes older than protocol 9 neither advertise nor consume this capability bit and therefore should not be relied on as relays for private deployments.
-
+Nodes older than protocol v9 ignore the new fields and cannot be used as relays for private peers.
 
 
 ## Installation

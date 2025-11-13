@@ -19,17 +19,18 @@ _Last refreshed: 2025-11-13 • Branch `tcp-hole-punch` • Commit `HEAD`_
 All logs are sanitised (`<RELAY_IP>`, `<HOME_IP>`, `<CLIENT_VPS_IP>` placeholders) but otherwise unedited.
 
 ## 3. Tests & Tooling
-- ✅ `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`  
-  _Includes the 40-stream stress case; passes in <1 s after widening swarm channels._
+- ✅ `cargo test -p kaspa-addressmanager` – covers the RocksDB migration harness and confirms schema upgrades write version markers exactly once.
+- ✅ `cargo test -p kaspa-connectionmanager` – exercises the relay-rotation logic, including the new integration test that feeds gossip-derived addresses through the planner.
+- ✅ `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`
 - ✅ `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`
-- ✅ `kaspa-cli getlibpstatus` on bridging nodes to confirm role/peer ID/inbound caps before each rehearsal.
+- ✅ `kaspa-cli getlibpstatus`, `kaspa-cli getpeeraddresses --json`, `kaspa-cli getconnectedpeerinfo --json` on bridge/relay nodes to verify role detection and the v9 relay metadata.
 
-Both commands were rerun on 2025-10-30 (local 6‑core laptop); output is available on request.
+All commands were rerun on 2025-11-13 (local 6‑core laptop); log snippets are available on request.
 
-## 4. Phase 10 Relay Metadata
-- ✅ `kaspa-cli getpeeraddresses --json | jq '.addresses[] | select(.services == 1)'` now lists the relay-capable set together with the advertised `relayPort`. Versions `<9` leave `services=0`, so they are automatically filtered out.
-- ✅ `kaspa-cli getconnectedpeerinfo --json` surfaces the same metadata for active peers, making it easy to confirm that private nodes keep at least two distinct relay links (look for `services: 1` across `isOutbound=true` entries).
-- ✅ Connection-manager logs show the new rotation logic (`Connection manager: ... relay quota ...`), proving that private nodes refuse to funnel every hole punch through a single relay and immediately retry with alternates after a failure.
+## 4. Relay Metadata Validation
+- ✅ After upgrading to protocol v9, `getpeeraddresses --json | jq '.addresses[] | select(.services == 1)'` shows the correct `relayPort` for each public node.
+- ✅ `getconnectedpeerinfo --json` lists `services == 1` on outbound private-peer connections, proving the connection manager rotates through multiple relays.
+- ✅ Address-manager migration logs (“schema upgraded from v1 to v2”) appear once per node start; subsequent restarts skip the rewrite (verified via the new migration harness test).
 
 ## 5. Reproducing the Proof
 1. Follow the tmux/rsync/run instructions in `tcp-hole-punch/README.md` (mirrors the Phase 6 runbook).

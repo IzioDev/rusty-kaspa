@@ -24,6 +24,8 @@ use tokio::{
     time::{interval, MissedTickBehavior},
 };
 
+const MIN_PRIVATE_RELAY_CONNECTIONS: usize = 2;
+
 pub struct ConnectionManager {
     p2p_adaptor: Arc<kaspa_p2p_lib::Adaptor>,
     outbound_target: usize,
@@ -36,8 +38,6 @@ pub struct ConnectionManager {
     shutdown_signal: SingleTrigger,
     libp2p_limits: Option<Libp2pLimits>,
 }
-
-const MIN_PRIVATE_RELAY_CONNECTIONS: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct Libp2pLimits {
@@ -473,13 +473,13 @@ impl ConnectionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use kaspa_consensus_core::config::{params::SIMNET_PARAMS, Config};
+    use kaspa_core::task::tick::TickService;
+    use kaspa_database::create_temp_db;
+    use kaspa_database::prelude::ConnBuilder;
     use kaspa_p2p_lib::{ConnectionMetadata, PeerProperties};
-    use kaspa_utils::networking::{PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
-    use std::{
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-        sync::Arc,
-        time::Instant,
-    };
+    use kaspa_utils::networking::{IpAddress, NetAddress, PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
+    use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, sync::Arc, time::Instant};
     fn make_peer(index: u8, relay: Option<&str>) -> Peer {
         let mut bytes = [0u8; 16];
         bytes[15] = index;
@@ -529,8 +529,8 @@ mod tests {
 
     #[test]
     fn relay_candidates_used_until_quota_met() {
-        let mut relays = VecDeque::from(vec![relay_addr(9001), relay_addr(9002)]);
-        let mut regular = VecDeque::from(vec![plain_addr(9010), plain_addr(9011)]);
+        let mut relays = VecDeque::from(vec![relay_addr(1001), relay_addr(1002)]);
+        let mut regular = VecDeque::from(vec![plain_addr(2001), plain_addr(2002)]);
         let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 2, 3);
         assert_eq!(batch.len(), 3);
         assert!(batch[0].is_libp2p_relay());
@@ -539,30 +539,67 @@ mod tests {
     }
 
     #[test]
-    fn regular_addresses_take_precedence_once_relay_quota_met() {
-        let mut relays = VecDeque::from(vec![relay_addr(9100), relay_addr(9101), relay_addr(9102)]);
-        let mut regular = VecDeque::from(vec![plain_addr(9200), plain_addr(9201)]);
+    fn regular_addresses_take_precedence_once_relays_met() {
+        let mut relays = VecDeque::from(vec![relay_addr(1010)]);
+        let mut regular = VecDeque::from(vec![plain_addr(2010), plain_addr(2011)]);
         let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 1, 3);
-        assert_eq!(batch.len(), 3);
         assert!(batch[0].is_libp2p_relay());
         assert!(!batch[1].is_libp2p_relay());
         assert!(!batch[2].is_libp2p_relay());
     }
 
     #[test]
-    fn relays_fill_remaining_slots_when_regular_pool_empty() {
-        let mut relays = VecDeque::from(vec![relay_addr(9300), relay_addr(9301), relay_addr(9302)]);
+    fn relays_fill_remaining_slots_when_no_regulars() {
+        let mut relays = VecDeque::from(vec![relay_addr(3000), relay_addr(3001), relay_addr(3002)]);
         let mut regular = VecDeque::new();
         let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 1, 3);
-        assert_eq!(batch.len(), 3);
-        assert!(batch.iter().filter(|addr| addr.is_libp2p_relay()).count() >= 2);
+        assert_eq!(batch.iter().filter(|addr| addr.is_libp2p_relay()).count(), 3);
+    }
+
+    #[test]
+    fn address_manager_metadata_reaches_planner() {
+        let (_db_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        let config = Arc::new(Config::new(SIMNET_PARAMS));
+        let (address_manager, _) = AddressManager::new(config, db, Arc::new(TickService::default()));
+        {
+            let mut guard = address_manager.lock();
+            guard.add_address(relay_addr(4001));
+            guard.add_address(relay_addr(4002));
+            guard.add_address(plain_addr(5001));
+        }
+
+        let scoped_addresses = {
+            let guard = address_manager.lock();
+            guard
+                .iterate_addresses()
+                .filter(|addr| (4000..6000).contains(&addr.port))
+                .collect_vec()
+        };
+        assert_eq!(scoped_addresses.len(), 3);
+
+        let mut relay_candidates = VecDeque::new();
+        let mut regular_candidates = VecDeque::new();
+        for addr in scoped_addresses {
+            if addr.is_libp2p_relay() {
+                relay_candidates.push_back(addr);
+            } else {
+                regular_candidates.push_back(addr);
+            }
+        }
+
+        let batch = ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, 2, 3);
+        assert_eq!(batch.iter().filter(|addr| addr.is_libp2p_relay()).count(), 2);
     }
 
     fn plain_addr(port: u16) -> NetAddress {
-        NetAddress::new(IpAddr::V4(Ipv4Addr::LOCALHOST).into(), port)
+        NetAddress::new(test_ip(port).into(), port)
     }
 
     fn relay_addr(port: u16) -> NetAddress {
         plain_addr(port).with_services(NET_ADDRESS_SERVICE_LIBP2P_RELAY)
+    }
+
+    fn test_ip(offset: u16) -> IpAddress {
+        IpAddress::from(IpAddr::V4(Ipv4Addr::new(198, 51, (offset % 200) as u8, (offset % 250) as u8)))
     }
 }

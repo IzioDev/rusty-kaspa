@@ -24,9 +24,10 @@ _This document picks up after the Phase 6 PoC plan (see `plan.md`). It focuses
 - Populate the capability flag during handshake: public nodes set the bit when their `--libp2p-relay-mode` exposes a relay listener, private nodes leave it unset.
 - Teach `address` flows (`RequestAddresses`, senders) to include the capability flag so the gossip-derived peer set knows which nodes can act as relays.
 - Update `ConnectionManager` selection logic to consume the new metadata: maintain a pool of relay-capable peers, ensure each private outbound connection chooses a distinct relay, and retry/fallback when a relay proves unhealthy.
+- Add a dedicated migration harness so RocksDB upgrades happen once at startup and record their schema version for future changes.
 - Add RPC/CLI visibility (e.g., include the relay capability in `getPeerAddresses` or expose a filtered list) so operators can audit which peers are advertising relays.
 - Document upgrade and compatibility notes: mixed-version behavior, expected migrations, and how operators can verify their nodes are advertising/consuming the capability.
-- **Implementation notes:** protocol version bumped to `v9` (minimum stays at `7`), `NetAddress` now carries `services`/`relayPort`, RocksDB migration rewrites legacy entries at startup, `getPeerAddresses`/`getConnectedPeerInfo` propagate the new fields, and the outbound connection manager keeps at least two relay-capable peers online for private nodes while rotating through alternatives when a relay drops.
+- Backfill integration-style tests that start with gossiped addresses (via the address manager) and end inside the connection manager’s relay rotation so we can prove the metadata is exercised end-to-end.
 
 ## Open Questions / Dependencies
 - Final decision on the relay metadata storage strategy (Phase 9 blocker).

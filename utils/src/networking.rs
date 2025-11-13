@@ -13,9 +13,6 @@ use std::{
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
 
-/// Service flag indicating that an address supports acting as a libp2p relay bridge.
-pub const NET_ADDRESS_SERVICE_LIBP2P_RELAY: u64 = 1 << 0;
-
 // A network address serialization of [`ContextualNetAddress`].
 #[wasm_bindgen(typescript_custom_section)]
 const TS_IP_ADDRESS: &'static str = r#"
@@ -222,6 +219,9 @@ impl BorshDeserialize for IpAddress {
         Ok(Self(ip))
     }
 }
+
+/// Service flag indicating that an address supports acting as a libp2p relay bridge.
+pub const NET_ADDRESS_SERVICE_LIBP2P_RELAY: u64 = 1 << 0;
 
 /// A network address, equivalent of a [SocketAddr], enriched with service metadata.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug)]

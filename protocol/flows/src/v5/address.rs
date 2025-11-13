@@ -48,13 +48,13 @@ impl ReceiveAddressesFlow {
             .await?;
 
         let msg = dequeue_with_timeout!(self.incoming_route, Payload::Addresses)?;
-        let address_list: Vec<NetAddress> = msg.try_into()?;
+        let address_list: Vec<(IpAddress, u16)> = msg.try_into()?;
         if address_list.len() > MAX_ADDRESSES_RECEIVE {
             return Err(ProtocolError::OtherOwned(format!("address count {} exceeded {}", address_list.len(), MAX_ADDRESSES_RECEIVE)));
         }
         let mut amgr_lock = self.ctx.address_manager.lock();
-        for address in address_list {
-            amgr_lock.add_address(address)
+        for (ip, port) in address_list {
+            amgr_lock.add_address(NetAddress::new(ip, port))
         }
 
         Ok(())

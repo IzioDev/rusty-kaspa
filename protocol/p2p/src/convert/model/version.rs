@@ -6,15 +6,15 @@ use kaspa_core::{
 };
 use kaspa_utils::networking::{NetAddress, PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
 
-/// Maximum allowed length for the user agent field in a version message `VersionMessage`.
-pub const MAX_USER_AGENT_LEN: usize = 256;
-
 bitflags! {
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
     pub struct ServiceFlags: u64 {
         const LIBP2P_RELAY = NET_ADDRESS_SERVICE_LIBP2P_RELAY;
     }
 }
+
+/// Maximum allowed length for the user agent field in a version message `VersionMessage`.
+pub const MAX_USER_AGENT_LEN: usize = 256;
 
 pub struct Version {
     pub protocol_version: u32,
@@ -60,14 +60,14 @@ impl Version {
 
     pub fn enable_service(&mut self, flag: ServiceFlags, relay_port: Option<u16>) {
         self.services.insert(flag);
-        if flag == ServiceFlags::LIBP2P_RELAY {
+        if flag.contains(ServiceFlags::LIBP2P_RELAY) {
             self.relay_port = relay_port;
         }
     }
 
     pub fn disable_service(&mut self, flag: ServiceFlags) {
         self.services.remove(flag);
-        if flag == ServiceFlags::LIBP2P_RELAY {
+        if flag.contains(ServiceFlags::LIBP2P_RELAY) {
             self.relay_port = None;
         }
     }

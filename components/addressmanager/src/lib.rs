@@ -1,3 +1,4 @@
+mod migrations;
 mod port_mapping_extender;
 mod stores;
 extern crate self as address_manager;
@@ -18,6 +19,7 @@ use kaspa_core::{debug, info, task::tick::TickService, time::unix_now, warn};
 use kaspa_database::prelude::{CachePolicy, StoreResultExtensions, DB};
 use kaspa_utils::networking::IpAddress;
 use local_ip_address::list_afinet_netifas;
+use migrations::AddressStoreMigrator;
 use parking_lot::Mutex;
 use stores::banned_address_store::{BannedAddressesStore, BannedAddressesStoreReader, ConnectionBanTimestamp, DbBannedAddressesStore};
 use thiserror::Error;
@@ -60,12 +62,14 @@ pub struct AddressManager {
 
 impl AddressManager {
     pub fn new(config: Arc<Config>, db: Arc<DB>, tick_service: Arc<TickService>) -> (Arc<Mutex<Self>>, Option<Extender>) {
+        let migrator = AddressStoreMigrator::new(db.clone());
         let mut instance = Self {
             banned_address_store: DbBannedAddressesStore::new(db.clone(), CachePolicy::Count(MAX_ADDRESSES)),
             address_store: address_store_with_cache::new(db),
             local_net_addresses: Vec::new(),
             config,
         };
+        migrator.ensure_latest(&mut instance.address_store).expect("address store migration failed");
 
         let extender = instance.init_local_addresses(tick_service);
 
@@ -73,11 +77,6 @@ impl AddressManager {
     }
 
     fn init_local_addresses(&mut self, tick_service: Arc<TickService>) -> Option<Extender> {
-        let rewritten = self.address_store.rewrite_all_entries();
-        if rewritten > 0 {
-            debug!("[Address manager] migrated {} persisted addresses to the latest schema", rewritten);
-        }
-
         self.local_net_addresses = self.local_addresses().collect();
 
         let extender = if self.local_net_addresses.is_empty() && !self.config.disable_upnp {
@@ -263,11 +262,11 @@ impl AddressManager {
         }
 
         if self.address_store.has(address) {
-            self.address_store.merge_metadata(address);
-        } else {
-            // We mark `connection_failed_count` as 0 only after first success
-            self.address_store.set(address, 1);
+            return;
         }
+
+        // We mark `connection_failed_count` as 0 only after first success
+        self.address_store.set(address, 1);
     }
 
     pub fn mark_connection_failure(&mut self, address: NetAddress) {
@@ -332,7 +331,7 @@ impl AddressManager {
     }
 }
 
-mod address_store_with_cache {
+pub(crate) mod address_store_with_cache {
     // Since we need operations such as iterating all addresses, count, etc, we keep an easy to use copy of the database addresses.
     // We don't expect it to be expensive since we limit the number of saved addresses.
     use std::{
@@ -378,28 +377,6 @@ mod address_store_with_cache {
             self.addresses.contains_key(&address.into())
         }
 
-        pub fn merge_metadata(&mut self, address: NetAddress) {
-            let key: AddressKey = address.into();
-            if let Some(entry) = self.addresses.get_mut(&key) {
-                let mut updated = false;
-
-                let merged_services = entry.address.services | address.services;
-                if merged_services != entry.address.services {
-                    entry.address.services = merged_services;
-                    updated = true;
-                }
-
-                if address.relay_port.is_some() && entry.address.relay_port != address.relay_port {
-                    entry.address.relay_port = address.relay_port;
-                    updated = true;
-                }
-
-                if updated {
-                    self.db_store.set(key, *entry).unwrap();
-                }
-            }
-        }
-
         pub fn set(&mut self, address: NetAddress, connection_failed_count: u64) {
             let entry = match self.addresses.get(&address.into()) {
                 Some(entry) => Entry { connection_failed_count, address: entry.address },
@@ -429,6 +406,15 @@ mod address_store_with_cache {
         fn remove_by_key(&mut self, key: AddressKey) {
             self.addresses.remove(&key);
             self.db_store.remove(key).unwrap()
+        }
+
+        pub fn rewrite_all_entries(&mut self) -> usize {
+            let mut rewritten = 0;
+            for (key, entry) in self.addresses.iter() {
+                self.db_store.set(*key, *entry).unwrap();
+                rewritten += 1;
+            }
+            rewritten
         }
 
         pub fn iterate_addresses(&self) -> impl Iterator<Item = NetAddress> + '_ {
@@ -481,15 +467,6 @@ mod address_store_with_cache {
             for key in self.addresses.keys().filter(|key| key.is_ip(ip)).copied().collect_vec() {
                 self.remove_by_key(key);
             }
-        }
-
-        pub fn rewrite_all_entries(&mut self) -> usize {
-            let mut rewritten = 0;
-            for (key, entry) in self.addresses.iter() {
-                self.db_store.set(*key, *entry).unwrap();
-                rewritten += 1;
-            }
-            rewritten
         }
     }
 

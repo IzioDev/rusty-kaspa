@@ -3,7 +3,7 @@ use crate::flowcontext::{
     process_queue::ProcessQueue,
     transactions::TransactionsSpread,
 };
-use crate::{v5, v6, v7, v8, v9};
+use crate::{v5, v6, v7, v8};
 use async_trait::async_trait;
 use futures::future::join_all;
 use kaspa_addressmanager::AddressManager;
@@ -789,8 +789,8 @@ impl ConnectionInitializer for FlowContext {
         let mut local_address = self.address_manager.lock().best_local_address();
         let libp2p_advertisement = self.libp2p_advertisement();
         if let (Some(advertisement), Some(addr)) = (libp2p_advertisement, local_address.as_mut()) {
-            addr.services |= ServiceFlags::LIBP2P_RELAY.bits();
-            addr.relay_port = Some(advertisement.listen_port());
+            addr.set_services(addr.services | ServiceFlags::LIBP2P_RELAY.bits());
+            addr.set_relay_port(Some(advertisement.listen_port()));
         }
 
         // Build the local version message
@@ -854,8 +854,6 @@ impl ConnectionInitializer for FlowContext {
             disable_relay_tx: peer_version.disable_relay_tx,
             subnetwork_id: peer_version.subnetwork_id.to_owned(),
             time_offset,
-            services: peer_version.services,
-            relay_port: peer_version.relay_port,
         });
         router.set_properties(peer_properties);
 

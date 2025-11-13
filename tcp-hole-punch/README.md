@@ -97,11 +97,10 @@ The command reports whether libp2p is enabled, the active role (client-only vs p
 
 ### Relay capability metadata
 
-From Phase 10 onwards every Kaspa node running protocol version ≥ 9 advertises a dedicated service bit in its `Version` message plus the libp2p listener port it is willing to broker. The metadata flows through the P2P address gossip and is persisted by the RocksDB address manager so that private nodes always know which peers can act as relays even before they meet on the network.
+Protocol v9 nodes now surface relay capability directly in the gossip set. Every `NetAddress` carries a `services` bitmap and a `relayPort`, and the connection manager keeps at least two distinct relays online for private nodes by default.
 
-- `kaspa-cli getpeeraddresses --json` now returns entries with `services` and `relayPort`. A relay-capable peer exposes bit `0x1` and a non-zero `relayPort`.
-- `kaspa-cli getconnectedpeerinfo --json` surfaces the same data for currently connected peers, alongside the existing libp2p telemetry (peer ID, multiaddr, whether a relay was used for the connection).
-- Older nodes (protocol < 9) neither advertise nor consume this metadata; do not rely on them as relays for private nodes.
+- `kaspa-cli getpeeraddresses --json | jq '.addresses[] | select(.services == 1)'` shows all advertised relays plus their bridge ports.
+- `kaspa-cli getconnectedpeerinfo --json` reports the same data for active peers so you can confirm that private nodes rotate between relays (`services == 1` + distinct `relayPort` values).
 
 Example snippet:
 
@@ -113,4 +112,4 @@ Example snippet:
 }
 ```
 
-Use this output, together with `getlibpstatus`, to confirm that your public nodes are advertising the expected relay port and that private nodes keep at least two relay connections for anti-eclipse safety.
+If you see `services: 0`, the peer is either running an older protocol or operating in client-only mode and will be skipped by the private-node relay selector.

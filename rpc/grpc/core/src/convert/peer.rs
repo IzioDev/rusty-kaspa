@@ -77,7 +77,7 @@ mod tests {
             advertised_protocol_version: 5,
             time_connected: 7,
             services: 1,
-            relay_port: Some(18444),
+            relay_port: Some(18111),
             is_ibd_peer: false,
             is_libp2p: true,
             libp2p_peer_id: Some("12D3KooWTestPeer".to_string()),
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(proto.libp2p_multiaddr, "/ip4/127.0.0.1/tcp/4010");
         assert!(proto.libp2p_relay_used);
         assert_eq!(proto.services, 1);
-        assert_eq!(proto.relay_port, 18444);
+        assert_eq!(proto.relay_port, 18111);
 
         let roundtrip = RpcPeerInfo::try_from(&proto).unwrap();
         assert!(roundtrip.is_libp2p);
@@ -99,7 +99,7 @@ mod tests {
         assert_eq!(roundtrip.libp2p_multiaddr.as_deref(), Some("/ip4/127.0.0.1/tcp/4010"));
         assert_eq!(roundtrip.libp2p_relay_used, Some(true));
         assert_eq!(roundtrip.services, 1);
-        assert_eq!(roundtrip.relay_port, Some(18444));
+        assert_eq!(roundtrip.relay_port, Some(18111));
     }
 }
 
