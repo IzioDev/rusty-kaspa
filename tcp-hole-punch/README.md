@@ -94,3 +94,23 @@ kaspa-cli getlibpstatus
 ```
 
 The command reports whether libp2p is enabled, the active role (client-only vs public relay), the current peer ID, and the configured inbound caps.
+
+### Relay capability metadata
+
+From Phase 10 onwards every Kaspa node running protocol version ≥ 9 advertises a dedicated service bit in its `Version` message plus the libp2p listener port it is willing to broker. The metadata flows through the P2P address gossip and is persisted by the RocksDB address manager so that private nodes always know which peers can act as relays even before they meet on the network.
+
+- `kaspa-cli getpeeraddresses --json` now returns entries with `services` and `relayPort`. A relay-capable peer exposes bit `0x1` and a non-zero `relayPort`.
+- `kaspa-cli getconnectedpeerinfo --json` surfaces the same data for currently connected peers, alongside the existing libp2p telemetry (peer ID, multiaddr, whether a relay was used for the connection).
+- Older nodes (protocol < 9) neither advertise nor consume this metadata; do not rely on them as relays for private nodes.
+
+Example snippet:
+
+```json
+{
+  "address": "203.0.113.42:16211",
+  "services": 1,
+  "relayPort": 18111
+}
+```
+
+Use this output, together with `getlibpstatus`, to confirm that your public nodes are advertising the expected relay port and that private nodes keep at least two relay connections for anti-eclipse safety.

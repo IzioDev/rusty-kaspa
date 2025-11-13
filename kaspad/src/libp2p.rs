@@ -18,7 +18,7 @@ use kaspa_core::{
     task::service::{AsyncService, AsyncServiceError, AsyncServiceFuture},
     trace, warn,
 };
-use kaspa_p2p_flows::flow_context::FlowContext;
+use kaspa_p2p_flows::flow_context::{FlowContext, Libp2pRelayAdvertisement};
 use kaspa_rpc_service::libp2p::{Libp2pStatusProvider, Libp2pStatusSnapshot};
 use kaspa_utils::triggers::SingleTrigger;
 use libp2p::{
@@ -191,6 +191,12 @@ impl Libp2pBridgeService {
         let listen_addrs = if matches!(role, Libp2pRole::PublicRelay) { self.start_listeners(&mut handle).await? } else { Vec::new() };
         self.status.update(true, role, Some(peer_id.to_string()), listen_addrs.clone());
 
+        if matches!(role, Libp2pRole::PublicRelay) {
+            self.flow_context.set_libp2p_advertisement(Some(Libp2pRelayAdvertisement::new(self.config.listen_port)));
+        } else {
+            self.flow_context.set_libp2p_advertisement(None);
+        }
+
         match role {
             Libp2pRole::PublicRelay => {
                 info!("libp2p bridge running as public relay (peer {}), listening on: {}", peer_id, listen_addrs.join(", "));
@@ -218,6 +224,7 @@ impl Libp2pBridgeService {
         self.shutdown.listener.clone().await;
         self.shutdown_swarm().await;
         self.status.disable();
+        self.flow_context.set_libp2p_advertisement(None);
         Ok(())
     }
 

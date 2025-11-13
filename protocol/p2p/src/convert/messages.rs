@@ -2,7 +2,7 @@ use super::{
     error::ConversionError,
     model::{
         trusted::{TrustedDataEntry, TrustedDataPackage},
-        version::Version,
+        version::{ServiceFlags, Version},
     },
     option::TryIntoOptionEx,
 };
@@ -13,7 +13,7 @@ use kaspa_consensus_core::{
     tx::{TransactionId, TransactionOutpoint, UtxoEntry},
 };
 use kaspa_hashes::Hash;
-use kaspa_utils::networking::{IpAddress, PeerId};
+use kaspa_utils::networking::{NetAddress, PeerId};
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -25,7 +25,7 @@ impl From<Version> for protowire::VersionMessage {
     fn from(item: Version) -> Self {
         Self {
             protocol_version: item.protocol_version,
-            services: item.services,
+            services: item.services.bits(),
             timestamp: item.timestamp as i64,
             address: item.address.map(|x| x.into()),
             id: item.id.as_bytes().to_vec(),
@@ -33,6 +33,7 @@ impl From<Version> for protowire::VersionMessage {
             disable_relay_tx: item.disable_relay_tx,
             subnetwork_id: item.subnetwork_id.map(|x| x.into()),
             network: item.network.clone(),
+            relay_port: item.relay_port.unwrap_or_default().into(),
         }
     }
 }
@@ -46,7 +47,7 @@ impl TryFrom<protowire::VersionMessage> for Version {
     fn try_from(msg: protowire::VersionMessage) -> Result<Self, Self::Error> {
         Ok(Self {
             protocol_version: msg.protocol_version,
-            services: msg.services,
+            services: ServiceFlags::from_bits_retain(msg.services),
             timestamp: msg.timestamp as u64,
             address: if msg.address.is_none() { None } else { Some(msg.address.unwrap().try_into()?) },
             id: PeerId::from_slice(&msg.id)?,
@@ -54,6 +55,7 @@ impl TryFrom<protowire::VersionMessage> for Version {
             disable_relay_tx: msg.disable_relay_tx,
             subnetwork_id: if msg.subnetwork_id.is_none() { None } else { Some(msg.subnetwork_id.unwrap().try_into()?) },
             network: msg.network.clone(),
+            relay_port: if msg.relay_port == 0 { None } else { Some(msg.relay_port.try_into()?) },
         })
     }
 }
@@ -198,7 +200,7 @@ impl TryFrom<protowire::BlockLocatorMessage> for Vec<Hash> {
     }
 }
 
-impl TryFrom<protowire::AddressesMessage> for Vec<(IpAddress, u16)> {
+impl TryFrom<protowire::AddressesMessage> for Vec<NetAddress> {
     type Error = ConversionError;
 
     fn try_from(msg: protowire::AddressesMessage) -> Result<Self, Self::Error> {

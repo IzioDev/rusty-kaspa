@@ -14,6 +14,16 @@ The default branch of this repository is `master` and new contributions are cons
 
 The [Crescendo Hardfork](docs/crescendo-guide.md) took place on May 5, 2025, at approximately 15:00 UTC. The fork has transitioned the network from a blockrate of 1 BPS to that of 10 BPS, and incorporated several major KIPs.
 
+## Libp2p Relay Metadata (Protocol v9)
+
+Phase 10 of the TCP hole-punch rollout adds a dedicated service bit and advertised bridge port to every `Version` message so that private nodes can discover relay-capable peers immediately from the gossip set. The metadata is persisted in RocksDB, included in the `RequestAddresses`/`Addresses` flows, and surfaced via RPC:
+
+- `kaspa-cli getpeeraddresses --json` now emits `services`/`relayPort` per entry (bit `0x1` marks relays).
+- `kaspa-cli getconnectedpeerinfo --json` reports the same fields for active peers alongside the existing libp2p telemetry (peer ID, multiaddr, relay usage).
+- `kaspa-cli getlibpstatus` remains the quickest way to confirm whether a node is currently running as a public relay or in client-only mode.
+
+Nodes older than protocol 9 neither advertise nor consume this capability bit and therefore should not be relied on as relays for private deployments.
+
 
 
 ## Installation

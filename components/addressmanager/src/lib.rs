@@ -73,6 +73,11 @@ impl AddressManager {
     }
 
     fn init_local_addresses(&mut self, tick_service: Arc<TickService>) -> Option<Extender> {
+        let rewritten = self.address_store.rewrite_all_entries();
+        if rewritten > 0 {
+            debug!("[Address manager] migrated {} persisted addresses to the latest schema", rewritten);
+        }
+
         self.local_net_addresses = self.local_addresses().collect();
 
         let extender = if self.local_net_addresses.is_empty() && !self.config.disable_upnp {
@@ -210,7 +215,7 @@ impl AddressManager {
             let port =
                 gateway.add_any_port(igd::PortMappingProtocol::TCP, local_addr, UPNP_DEADLINE_SEC as u32, UPNP_REGISTRATION_NAME)?;
             info!("[UPnP] Added port mapping to random external port: {ip}:{port}");
-            return Ok(Some((NetAddress { ip, port }, ExtendHelper { gateway, local_addr, external_port: port })));
+            return Ok(Some((NetAddress::new(ip, port), ExtendHelper { gateway, local_addr, external_port: port })));
         }
 
         match gateway.add_port(
@@ -223,7 +228,7 @@ impl AddressManager {
             Ok(_) => {
                 info!("[UPnP] Added port mapping to default external port: {ip}:{desired_external_port}");
                 Ok(Some((
-                    NetAddress { ip, port: desired_external_port },
+                    NetAddress::new(ip, desired_external_port),
                     ExtendHelper { gateway, local_addr, external_port: desired_external_port },
                 )))
             }
@@ -235,7 +240,7 @@ impl AddressManager {
                     UPNP_REGISTRATION_NAME,
                 )?;
                 info!("[UPnP] Added port mapping to random external port: {ip}:{port}");
-                Ok(Some((NetAddress { ip, port }, ExtendHelper { gateway, local_addr, external_port: port })))
+                Ok(Some((NetAddress::new(ip, port), ExtendHelper { gateway, local_addr, external_port: port })))
             }
             Err(err) => Err(err.into()),
         }
@@ -258,11 +263,11 @@ impl AddressManager {
         }
 
         if self.address_store.has(address) {
-            return;
+            self.address_store.merge_metadata(address);
+        } else {
+            // We mark `connection_failed_count` as 0 only after first success
+            self.address_store.set(address, 1);
         }
-
-        // We mark `connection_failed_count` as 0 only after first success
-        self.address_store.set(address, 1);
     }
 
     pub fn mark_connection_failure(&mut self, address: NetAddress) {
@@ -373,6 +378,28 @@ mod address_store_with_cache {
             self.addresses.contains_key(&address.into())
         }
 
+        pub fn merge_metadata(&mut self, address: NetAddress) {
+            let key: AddressKey = address.into();
+            if let Some(entry) = self.addresses.get_mut(&key) {
+                let mut updated = false;
+
+                let merged_services = entry.address.services | address.services;
+                if merged_services != entry.address.services {
+                    entry.address.services = merged_services;
+                    updated = true;
+                }
+
+                if address.relay_port.is_some() && entry.address.relay_port != address.relay_port {
+                    entry.address.relay_port = address.relay_port;
+                    updated = true;
+                }
+
+                if updated {
+                    self.db_store.set(key, *entry).unwrap();
+                }
+            }
+        }
+
         pub fn set(&mut self, address: NetAddress, connection_failed_count: u64) {
             let entry = match self.addresses.get(&address.into()) {
                 Some(entry) => Entry { connection_failed_count, address: entry.address },
@@ -454,6 +481,15 @@ mod address_store_with_cache {
             for key in self.addresses.keys().filter(|key| key.is_ip(ip)).copied().collect_vec() {
                 self.remove_by_key(key);
             }
+        }
+
+        pub fn rewrite_all_entries(&mut self) -> usize {
+            let mut rewritten = 0;
+            for (key, entry) in self.addresses.iter() {
+                self.db_store.set(*key, *entry).unwrap();
+                rewritten += 1;
+            }
+            rewritten
         }
     }
 

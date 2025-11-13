@@ -571,16 +571,8 @@ impl PeerBook {
     }
 
     fn relay_address_count_for(&self, peer: PeerId) -> usize {
-        let active = self
-            .active
-            .get(&peer)
-            .map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count())
-            .unwrap_or(0);
-        let pending = self
-            .pending
-            .get(&peer)
-            .map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count())
-            .unwrap_or(0);
+        let active = self.active.get(&peer).map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count()).unwrap_or(0);
+        let pending = self.pending.get(&peer).map(|queue| queue.iter().filter(|addr| addr_uses_relay(addr)).count()).unwrap_or(0);
         active + pending
     }
 

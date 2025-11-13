@@ -1,3 +1,4 @@
+use crate::convert::model::version::ServiceFlags;
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_utils::networking::{IpAddress, PeerId};
 use std::{fmt::Display, net::SocketAddr, sync::Arc, time::Instant};
@@ -13,6 +14,8 @@ pub struct PeerProperties {
     pub disable_relay_tx: bool,
     pub subnetwork_id: Option<SubnetworkId>,
     pub time_offset: i64,
+    pub services: ServiceFlags,
+    pub relay_port: Option<u16>,
 }
 
 #[derive(Debug)]

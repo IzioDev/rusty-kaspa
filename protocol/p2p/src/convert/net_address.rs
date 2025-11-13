@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{
+    mem::size_of,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+};
 
 use super::error::ConversionError;
 use crate::pb as protowire;
@@ -12,21 +15,21 @@ use kaspa_utils::networking::{IpAddress, NetAddress};
 
 impl From<(IpAddress, u16)> for protowire::NetAddress {
     fn from((ip, port): (IpAddress, u16)) -> Self {
-        Self {
-            timestamp: 0, // This field is not used anymore
-            ip: match ip.0 {
-                // We follow the IP encoding of golang's net.IP type
-                IpAddr::V4(ip) => ip.octets().to_vec(),
-                IpAddr::V6(ip) => ip.octets().to_vec(),
-            },
-            port: port as u32,
-        }
+        let ip_bytes = match ip.0 {
+            // We follow the IP encoding of golang's net.IP type
+            IpAddr::V4(ip) => ip.octets().to_vec(),
+            IpAddr::V6(ip) => ip.octets().to_vec(),
+        };
+        Self { timestamp: 0, ip: ip_bytes, port: port as u32, services: 0, relay_port: 0 }
     }
 }
 
 impl From<NetAddress> for protowire::NetAddress {
     fn from(item: NetAddress) -> Self {
-        (item.ip, item.port).into()
+        let mut proto: protowire::NetAddress = (item.ip, item.port).into();
+        proto.services = item.services;
+        proto.relay_port = item.relay_port.unwrap_or_default() as u32;
+        proto
     }
 }
 
@@ -60,8 +63,13 @@ impl TryFrom<protowire::NetAddress> for NetAddress {
     type Error = ConversionError;
 
     fn try_from(item: protowire::NetAddress) -> Result<Self, Self::Error> {
-        let (ip, port) = item.try_into()?;
-        Ok(NetAddress::new(ip, port))
+        let services = item.services;
+        let relay_port = item.relay_port;
+        let (ip, port) = item.clone().try_into()?;
+        let mut net_address = NetAddress::new(ip, port);
+        net_address.services = services;
+        net_address.relay_port = if relay_port == 0 { None } else { Some(relay_port.try_into()?) };
+        Ok(net_address)
     }
 }
 
@@ -77,14 +85,35 @@ mod tests {
 
     #[test]
     fn test_netaddress() {
-        let net_addr_ipv4 = pb::NetAddress { timestamp: 0, ip: hex::decode("6a0a8af0").unwrap(), port: 123 };
+        let net_addr_ipv4 =
+            pb::NetAddress { timestamp: 0, ip: hex::decode("6a0a8af0").unwrap(), port: 123, services: 0, relay_port: 0 };
         let ipv4 = Ipv4Addr::from_str("106.10.138.240").unwrap().into();
         assert_eq!(<(IpAddress, u16)>::try_from(net_addr_ipv4.clone()).unwrap(), (ipv4, 123u16));
         assert_eq!(pb::NetAddress::from((ipv4, 123u16)), net_addr_ipv4);
 
-        let net_addr_ipv6 = pb::NetAddress { timestamp: 0, ip: hex::decode("20010db885a3000000008a2e03707334").unwrap(), port: 456 };
+        let net_addr_ipv6 = pb::NetAddress {
+            timestamp: 0,
+            ip: hex::decode("20010db885a3000000008a2e03707334").unwrap(),
+            port: 456,
+            services: 0,
+            relay_port: 0,
+        };
         let ipv6 = Ipv6Addr::from_str("2001:0db8:85a3:0000:0000:8a2e:0370:7334").unwrap().into();
         assert_eq!(<(IpAddress, u16)>::try_from(net_addr_ipv6.clone()).unwrap(), (ipv6, 456u16));
         assert_eq!(pb::NetAddress::from((ipv6, 456u16)), net_addr_ipv6);
+    }
+
+    #[test]
+    fn relay_metadata_roundtrip() {
+        let mut addr = NetAddress::new(IpAddress::from(Ipv4Addr::LOCALHOST), 16111)
+            .with_services(kaspa_utils::networking::NET_ADDRESS_SERVICE_LIBP2P_RELAY);
+        addr.relay_port = Some(18111);
+        let proto: pb::NetAddress = addr.into();
+        assert_eq!(proto.services, kaspa_utils::networking::NET_ADDRESS_SERVICE_LIBP2P_RELAY);
+        assert_eq!(proto.relay_port, 18111);
+
+        let roundtrip: NetAddress = proto.try_into().unwrap();
+        assert!(roundtrip.is_libp2p_relay());
+        assert_eq!(roundtrip.relay_port, Some(18111));
     }
 }

@@ -665,7 +665,10 @@ mod tests {
         let addr4 = ConnectionHandler::synthetic_socket_addr(&metadata);
 
         assert_ne!(addr3, addr4, "different metadata should lead to different synthetic addresses");
-        assert_eq!(addr3, ConnectionHandler::synthetic_socket_addr(&ConnectionMetadata::new(None, Some(Libp2pConnectInfo::new("peer-id")))));
+        assert_eq!(
+            addr3,
+            ConnectionHandler::synthetic_socket_addr(&ConnectionMetadata::new(None, Some(Libp2pConnectInfo::new("peer-id"))))
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

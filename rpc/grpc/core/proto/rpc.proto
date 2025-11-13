@@ -202,6 +202,8 @@ message GetPeerAddressesResponseMessage{
 
 message GetPeerAddressesKnownAddressMessage {
   string Addr = 1;
+  uint64 services = 2;
+  uint32 relayPort = 3;
 }
 
 // GetSinkRequestMessage requests the hash of the current virtual's
@@ -284,6 +286,8 @@ message GetConnectedPeerInfoMessage{
   string libp2pPeerId = 13;
   string libp2pMultiaddr = 14;
   bool libp2pRelayUsed = 15;
+  uint64 services = 16;
+  uint32 relayPort = 17;
 }
 
 // AddPeerRequestMessage adds a peer to kaspad's outgoing connection list.

@@ -34,6 +34,8 @@ impl ProtocolConverter {
             user_agent: properties.user_agent.clone(),
             advertised_protocol_version: properties.advertised_protocol_version,
             time_connected: peer.time_connected(),
+            services: properties.services.bits(),
+            relay_port: properties.relay_port,
             is_libp2p,
             libp2p_peer_id,
             libp2p_multiaddr,

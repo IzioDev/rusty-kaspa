@@ -23,11 +23,15 @@ from!(item: &kaspa_rpc_core::RpcPeerInfo, protowire::GetConnectedPeerInfoMessage
         libp2p_peer_id: item.libp2p_peer_id.clone().unwrap_or_default(),
         libp2p_multiaddr: item.libp2p_multiaddr.clone().unwrap_or_default(),
         libp2p_relay_used: item.libp2p_relay_used.unwrap_or(false),
+        services: item.services,
+        relay_port: item.relay_port.unwrap_or_default().into(),
     }
 });
 
-from!(item: &kaspa_rpc_core::RpcPeerAddress, protowire::GetPeerAddressesKnownAddressMessage, { Self { addr: item.to_string() } });
-from!(item: &kaspa_rpc_core::RpcIpAddress, protowire::GetPeerAddressesKnownAddressMessage, { Self { addr: item.to_string() } });
+from!(item: &kaspa_rpc_core::RpcPeerAddress, protowire::GetPeerAddressesKnownAddressMessage, {
+    Self { addr: item.to_string(), services: item.services, relay_port: item.relay_port.unwrap_or_default().into() }
+});
+from!(item: &kaspa_rpc_core::RpcIpAddress, protowire::GetPeerAddressesKnownAddressMessage, { Self { addr: item.to_string(), services: 0, relay_port: 0 } });
 
 // ----------------------------------------------------------------------------
 // protowire to rpc_core
@@ -48,6 +52,8 @@ try_from!(item: &protowire::GetConnectedPeerInfoMessage, kaspa_rpc_core::RpcPeer
         libp2p_peer_id: if item.libp2p_peer_id.is_empty() { None } else { Some(item.libp2p_peer_id.clone()) },
         libp2p_multiaddr: if item.libp2p_multiaddr.is_empty() { None } else { Some(item.libp2p_multiaddr.clone()) },
         libp2p_relay_used: if item.is_libp2p { Some(item.libp2p_relay_used) } else { None },
+        services: item.services,
+        relay_port: if item.relay_port == 0 { None } else { Some(item.relay_port as u16) },
     }
 });
 
@@ -70,6 +76,8 @@ mod tests {
             user_agent: "kaspa-libp2p-test".to_string(),
             advertised_protocol_version: 5,
             time_connected: 7,
+            services: 1,
+            relay_port: Some(18444),
             is_ibd_peer: false,
             is_libp2p: true,
             libp2p_peer_id: Some("12D3KooWTestPeer".to_string()),
@@ -82,14 +90,23 @@ mod tests {
         assert_eq!(proto.libp2p_peer_id, "12D3KooWTestPeer");
         assert_eq!(proto.libp2p_multiaddr, "/ip4/127.0.0.1/tcp/4010");
         assert!(proto.libp2p_relay_used);
+        assert_eq!(proto.services, 1);
+        assert_eq!(proto.relay_port, 18444);
 
         let roundtrip = RpcPeerInfo::try_from(&proto).unwrap();
         assert!(roundtrip.is_libp2p);
         assert_eq!(roundtrip.libp2p_peer_id.as_deref(), Some("12D3KooWTestPeer"));
         assert_eq!(roundtrip.libp2p_multiaddr.as_deref(), Some("/ip4/127.0.0.1/tcp/4010"));
         assert_eq!(roundtrip.libp2p_relay_used, Some(true));
+        assert_eq!(roundtrip.services, 1);
+        assert_eq!(roundtrip.relay_port, Some(18444));
     }
 }
 
-try_from!(item: &protowire::GetPeerAddressesKnownAddressMessage, kaspa_rpc_core::RpcPeerAddress, { Self::from_str(&item.addr)? });
+try_from!(item: &protowire::GetPeerAddressesKnownAddressMessage, kaspa_rpc_core::RpcPeerAddress, {
+    let mut addr = Self::from_str(&item.addr)?;
+    addr.services = item.services;
+    addr.relay_port = if item.relay_port == 0 { None } else { Some(item.relay_port as u16) };
+    Ok(addr)
+});
 try_from!(item: &protowire::GetPeerAddressesKnownAddressMessage, kaspa_rpc_core::RpcIpAddress, { Self::from_str(&item.addr)? });

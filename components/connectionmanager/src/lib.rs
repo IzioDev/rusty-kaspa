@@ -1,6 +1,6 @@
 use std::{
     cmp::min,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     net::{IpAddr, SocketAddr, ToSocketAddrs},
     sync::Arc,
     time::{Duration, SystemTime},
@@ -11,7 +11,7 @@ use futures_util::future::{join_all, try_join_all};
 use itertools::Itertools;
 use kaspa_addressmanager::{AddressManager, NetAddress};
 use kaspa_core::{debug, info, warn};
-use kaspa_p2p_lib::{common::ProtocolError, ConnectionError, Libp2pConnectInfo, Peer, PeerKey};
+use kaspa_p2p_lib::{common::ProtocolError, convert::model::version::ServiceFlags, ConnectionError, Libp2pConnectInfo, Peer, PeerKey};
 use kaspa_utils::triggers::SingleTrigger;
 use parking_lot::Mutex as ParkingLotMutex;
 use rand::{seq::SliceRandom, thread_rng};
@@ -36,6 +36,8 @@ pub struct ConnectionManager {
     shutdown_signal: SingleTrigger,
     libp2p_limits: Option<Libp2pLimits>,
 }
+
+const MIN_PRIVATE_RELAY_CONNECTIONS: usize = 2;
 
 #[derive(Clone, Debug)]
 pub struct Libp2pLimits {
@@ -176,25 +178,40 @@ impl ConnectionManager {
         }
 
         let mut missing_connections = self.outbound_target - active_outbound.len();
-        let mut addr_iter = self.address_manager.lock().iterate_prioritized_random_addresses(active_outbound);
+        let relay_outbound_target =
+            if self.libp2p_limits.is_some() { MIN_PRIVATE_RELAY_CONNECTIONS.min(self.outbound_target) } else { 0 };
+        let active_relay_connections = peer_by_address
+            .values()
+            .filter(|peer| peer.is_outbound() && peer.properties().services.contains(ServiceFlags::LIBP2P_RELAY))
+            .count();
+        let mut remaining_relay_quota = relay_outbound_target.saturating_sub(active_relay_connections);
+
+        let prioritized_iter = self.address_manager.lock().iterate_prioritized_random_addresses(active_outbound);
+        let mut relay_candidates = VecDeque::new();
+        let mut regular_candidates = VecDeque::new();
+        for addr in prioritized_iter {
+            if addr.is_libp2p_relay() {
+                relay_candidates.push_back(addr);
+            } else {
+                regular_candidates.push_back(addr);
+            }
+        }
 
         let mut progressing = true;
-        let mut connecting = true;
-        while connecting && missing_connections > 0 {
+        while missing_connections > 0 {
             if self.shutdown_signal.trigger.is_triggered() {
                 return;
             }
-            let mut addrs_to_connect = Vec::with_capacity(missing_connections);
-            let mut jobs = Vec::with_capacity(missing_connections);
-            for _ in 0..missing_connections {
-                let Some(net_addr) = addr_iter.next() else {
-                    connecting = false;
-                    break;
-                };
+            let addrs_to_connect =
+                Self::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, remaining_relay_quota, missing_connections);
+            if addrs_to_connect.is_empty() {
+                break;
+            }
+            let mut jobs = Vec::with_capacity(addrs_to_connect.len());
+            for net_addr in &addrs_to_connect {
                 let socket_addr = SocketAddr::new(net_addr.ip.into(), net_addr.port).to_string();
                 debug!("Connecting to {}", &socket_addr);
-                addrs_to_connect.push(net_addr);
-                jobs.push(self.p2p_adaptor.connect_peer(socket_addr.clone()));
+                jobs.push(self.p2p_adaptor.connect_peer(socket_addr));
             }
 
             if progressing && !jobs.is_empty() {
@@ -212,7 +229,7 @@ impl ConnectionManager {
                     self.outbound_target - missing_connections,
                     self.outbound_target,
                     jobs.len(),
-                    addr_iter.len(),
+                    relay_candidates.len() + regular_candidates.len(),
                 );
             }
 
@@ -220,6 +237,9 @@ impl ConnectionManager {
                 match res {
                     Ok(_) => {
                         self.address_manager.lock().mark_connection_success(net_addr);
+                        if net_addr.is_libp2p_relay() && remaining_relay_quota > 0 {
+                            remaining_relay_quota = remaining_relay_quota.saturating_sub(1);
+                        }
                         missing_connections -= 1;
                         progressing = true;
                     }
@@ -245,6 +265,40 @@ impl ConnectionManager {
                 self.dns_seed_with_address_target(2 * missing_connections).await;
             }
         }
+    }
+
+    fn plan_outbound_batch(
+        relay_candidates: &mut VecDeque<NetAddress>,
+        regular_candidates: &mut VecDeque<NetAddress>,
+        relay_quota: usize,
+        missing_connections: usize,
+    ) -> Vec<NetAddress> {
+        if missing_connections == 0 {
+            return Vec::new();
+        }
+
+        let mut batch = Vec::with_capacity(missing_connections);
+        let mut relays_planned = 0;
+        while relays_planned < relay_quota && batch.len() < missing_connections {
+            if let Some(addr) = relay_candidates.pop_front() {
+                batch.push(addr);
+                relays_planned += 1;
+            } else {
+                break;
+            }
+        }
+
+        while batch.len() < missing_connections {
+            if let Some(addr) = regular_candidates.pop_front() {
+                batch.push(addr);
+            } else if let Some(addr) = relay_candidates.pop_front() {
+                batch.push(addr);
+            } else {
+                break;
+            }
+        }
+
+        batch
     }
 
     async fn handle_inbound_connections(self: &Arc<Self>, peer_by_address: &HashMap<SocketAddr, Peer>) {
@@ -419,7 +473,8 @@ impl ConnectionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kaspa_utils::networking::PeerId;
+    use kaspa_p2p_lib::{ConnectionMetadata, PeerProperties};
+    use kaspa_utils::networking::{PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
     use std::{
         net::{IpAddr, Ipv4Addr, SocketAddr},
         sync::Arc,
@@ -470,5 +525,44 @@ mod tests {
         let limits = Libp2pLimits { total_inbound: 5, per_relay: 3 };
         let drop = ConnectionManager::select_libp2p_peers_to_drop(&refs, &limits);
         assert!(drop.is_empty());
+    }
+
+    #[test]
+    fn relay_candidates_used_until_quota_met() {
+        let mut relays = VecDeque::from(vec![relay_addr(9001), relay_addr(9002)]);
+        let mut regular = VecDeque::from(vec![plain_addr(9010), plain_addr(9011)]);
+        let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 2, 3);
+        assert_eq!(batch.len(), 3);
+        assert!(batch[0].is_libp2p_relay());
+        assert!(batch[1].is_libp2p_relay());
+        assert!(!batch[2].is_libp2p_relay());
+    }
+
+    #[test]
+    fn regular_addresses_take_precedence_once_relay_quota_met() {
+        let mut relays = VecDeque::from(vec![relay_addr(9100), relay_addr(9101), relay_addr(9102)]);
+        let mut regular = VecDeque::from(vec![plain_addr(9200), plain_addr(9201)]);
+        let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 1, 3);
+        assert_eq!(batch.len(), 3);
+        assert!(batch[0].is_libp2p_relay());
+        assert!(!batch[1].is_libp2p_relay());
+        assert!(!batch[2].is_libp2p_relay());
+    }
+
+    #[test]
+    fn relays_fill_remaining_slots_when_regular_pool_empty() {
+        let mut relays = VecDeque::from(vec![relay_addr(9300), relay_addr(9301), relay_addr(9302)]);
+        let mut regular = VecDeque::new();
+        let batch = ConnectionManager::plan_outbound_batch(&mut relays, &mut regular, 1, 3);
+        assert_eq!(batch.len(), 3);
+        assert!(batch.iter().filter(|addr| addr.is_libp2p_relay()).count() >= 2);
+    }
+
+    fn plain_addr(port: u16) -> NetAddress {
+        NetAddress::new(IpAddr::V4(Ipv4Addr::LOCALHOST).into(), port)
+    }
+
+    fn relay_addr(port: u16) -> NetAddress {
+        plain_addr(port).with_services(NET_ADDRESS_SERVICE_LIBP2P_RELAY)
     }
 }

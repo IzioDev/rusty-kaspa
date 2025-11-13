@@ -4,12 +4,17 @@ use ipnet::IpNet;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
+    hash::{Hash, Hasher},
+    io::ErrorKind,
     net::{AddrParseError, IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     ops::Deref,
     str::FromStr,
 };
 use uuid::Uuid;
 use wasm_bindgen::prelude::*;
+
+/// Service flag indicating that an address supports acting as a libp2p relay bridge.
+pub const NET_ADDRESS_SERVICE_LIBP2P_RELAY: u64 = 1 << 0;
 
 // A network address serialization of [`ContextualNetAddress`].
 #[wasm_bindgen(typescript_custom_section)]
@@ -218,20 +223,50 @@ impl BorshDeserialize for IpAddress {
     }
 }
 
-/// A network address, equivalent of a [SocketAddr].
-#[derive(PartialEq, Eq, Hash, Copy, Clone, Serialize, Deserialize, Debug, BorshSerialize, BorshDeserialize)]
+/// A network address, equivalent of a [SocketAddr], enriched with service metadata.
+#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
 pub struct NetAddress {
     pub ip: IpAddress,
     pub port: u16,
+    #[serde(default)]
+    pub services: u64,
+    #[serde(default)]
+    pub relay_port: Option<u16>,
 }
 
 impl NetAddress {
     pub fn new(ip: IpAddress, port: u16) -> Self {
-        Self { ip, port }
+        Self { ip, port, services: 0, relay_port: None }
     }
 
     pub fn prefix_bucket(&self) -> PrefixBucket {
         PrefixBucket::from(self)
+    }
+
+    pub fn with_services(mut self, services: u64) -> Self {
+        self.services = services;
+        self
+    }
+
+    pub fn with_relay_port(mut self, relay_port: Option<u16>) -> Self {
+        self.relay_port = relay_port;
+        self
+    }
+
+    pub fn set_services(&mut self, services: u64) {
+        self.services = services;
+    }
+
+    pub fn set_relay_port(&mut self, relay_port: Option<u16>) {
+        self.relay_port = relay_port;
+    }
+
+    pub fn has_services(&self, mask: u64) -> bool {
+        (self.services & mask) == mask
+    }
+
+    pub fn is_libp2p_relay(&self) -> bool {
+        self.has_services(NET_ADDRESS_SERVICE_LIBP2P_RELAY)
     }
 }
 
@@ -258,6 +293,52 @@ impl FromStr for NetAddress {
 impl Display for NetAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         SocketAddr::from(self.to_owned()).fmt(f)
+    }
+}
+
+impl PartialEq for NetAddress {
+    fn eq(&self, other: &Self) -> bool {
+        self.ip == other.ip && self.port == other.port
+    }
+}
+
+impl Eq for NetAddress {}
+
+impl Hash for NetAddress {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ip.hash(state);
+        self.port.hash(state);
+    }
+}
+
+impl BorshSerialize for NetAddress {
+    fn serialize<W: std::io::Write>(&self, writer: &mut W) -> ::core::result::Result<(), std::io::Error> {
+        BorshSerialize::serialize(&self.ip, writer)?;
+        BorshSerialize::serialize(&self.port, writer)?;
+        BorshSerialize::serialize(&self.services, writer)?;
+        BorshSerialize::serialize(&self.relay_port, writer)?;
+        Ok(())
+    }
+}
+
+impl BorshDeserialize for NetAddress {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> ::core::result::Result<Self, borsh::io::Error> {
+        let ip = IpAddress::deserialize_reader(reader)?;
+        let port = u16::deserialize_reader(reader)?;
+
+        let services = match u64::deserialize_reader(reader) {
+            Ok(bits) => bits,
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => 0,
+            Err(err) => return Err(err),
+        };
+
+        let relay_port = match Option::<u16>::deserialize_reader(reader) {
+            Ok(port) => port,
+            Err(err) if err.kind() == ErrorKind::UnexpectedEof => None,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Self { ip, port, services, relay_port })
     }
 }
 

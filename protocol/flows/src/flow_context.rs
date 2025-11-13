@@ -3,7 +3,7 @@ use crate::flowcontext::{
     process_queue::ProcessQueue,
     transactions::TransactionsSpread,
 };
-use crate::{v5, v6, v7, v8};
+use crate::{v5, v6, v7, v8, v9};
 use async_trait::async_trait;
 use futures::future::join_all;
 use kaspa_addressmanager::AddressManager;
@@ -33,7 +33,7 @@ use kaspa_mining::{manager::MiningManagerProxy, mempool::tx::RbfPolicy};
 use kaspa_notify::notifier::Notify;
 use kaspa_p2p_lib::{
     common::ProtocolError,
-    convert::model::version::Version,
+    convert::model::version::{ServiceFlags, Version},
     make_message,
     pb::{kaspad_message::Payload, InvRelayBlockMessage},
     Adaptor, ConnectionInitializer, Hub, KaspadHandshake, PeerKey, PeerProperties, Router,
@@ -62,7 +62,7 @@ use tokio_stream::{wrappers::UnboundedReceiverStream, StreamExt};
 use uuid::Uuid;
 
 /// The P2P protocol version.
-const PROTOCOL_VERSION: u32 = 8;
+const PROTOCOL_VERSION: u32 = 9;
 
 /// See `check_orphan_resolution_range`
 const BASELINE_ORPHAN_RESOLUTION_RANGE: u32 = 5;
@@ -226,6 +226,7 @@ pub struct FlowContextInner {
     pub address_manager: Arc<Mutex<AddressManager>>,
     connection_manager: RwLock<Option<Arc<ConnectionManager>>>,
     p2p_adaptor: RwLock<Option<Arc<Adaptor>>>,
+    libp2p_advertisement: RwLock<Option<Libp2pRelayAdvertisement>>,
     mining_manager: MiningManagerProxy,
     pub(crate) tick_service: Arc<TickService>,
     notification_root: Arc<ConsensusNotificationRoot>,
@@ -247,6 +248,21 @@ pub struct FlowContextInner {
 #[derive(Clone)]
 pub struct FlowContext {
     inner: Arc<FlowContextInner>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Libp2pRelayAdvertisement {
+    listen_port: u16,
+}
+
+impl Libp2pRelayAdvertisement {
+    pub fn new(listen_port: u16) -> Self {
+        Self { listen_port }
+    }
+
+    pub fn listen_port(&self) -> u16 {
+        self.listen_port
+    }
 }
 
 pub struct IbdRunningGuard {
@@ -338,6 +354,7 @@ impl FlowContext {
                 address_manager,
                 connection_manager: Default::default(),
                 p2p_adaptor: Default::default(),
+                libp2p_advertisement: RwLock::new(None),
                 mining_manager,
                 tick_service,
                 notification_root,
@@ -391,6 +408,14 @@ impl FlowContext {
 
     pub fn p2p_adaptor(&self) -> Option<Arc<Adaptor>> {
         self.p2p_adaptor.read().clone()
+    }
+
+    pub fn set_libp2p_advertisement(&self, advertisement: Option<Libp2pRelayAdvertisement>) {
+        *self.libp2p_advertisement.write() = advertisement;
+    }
+
+    pub fn libp2p_advertisement(&self) -> Option<Libp2pRelayAdvertisement> {
+        *self.libp2p_advertisement.read()
     }
 
     pub fn consensus(&self) -> ConsensusInstance {
@@ -761,11 +786,19 @@ impl ConnectionInitializer for FlowContext {
 
         let network_name = self.config.network_name();
 
-        let local_address = self.address_manager.lock().best_local_address();
+        let mut local_address = self.address_manager.lock().best_local_address();
+        let libp2p_advertisement = self.libp2p_advertisement();
+        if let (Some(advertisement), Some(addr)) = (libp2p_advertisement, local_address.as_mut()) {
+            addr.services |= ServiceFlags::LIBP2P_RELAY.bits();
+            addr.relay_port = Some(advertisement.listen_port());
+        }
 
         // Build the local version message
         // Subnets are not currently supported
         let mut self_version_message = Version::new(local_address, self.node_id, network_name.clone(), None, PROTOCOL_VERSION);
+        if let Some(advertisement) = libp2p_advertisement {
+            self_version_message.enable_service(ServiceFlags::LIBP2P_RELAY, Some(advertisement.listen_port()));
+        }
         self_version_message.add_user_agent(name(), version(), &self.config.user_agent_comments);
         // TODO: get number of live services
         // TODO: disable_relay_tx from config/cmd
@@ -797,13 +830,15 @@ impl ConnectionInitializer for FlowContext {
 
         let (flows, applied_protocol_version) = if connect_only_new_versions {
             match peer_version.protocol_version {
-                v if v >= PROTOCOL_VERSION => (v8::register(self.clone(), router.clone()), PROTOCOL_VERSION),
+                v if v >= PROTOCOL_VERSION => (v9::register(self.clone(), router.clone()), PROTOCOL_VERSION),
+                8 => (v8::register(self.clone(), router.clone()), 8),
                 7 => (v7::register(self.clone(), router.clone()), 7),
                 v => return Err(ProtocolError::VersionMismatch(PROTOCOL_VERSION, v)),
             }
         } else {
             match peer_version.protocol_version {
-                v if v >= PROTOCOL_VERSION => (v8::register(self.clone(), router.clone()), PROTOCOL_VERSION),
+                v if v >= PROTOCOL_VERSION => (v9::register(self.clone(), router.clone()), PROTOCOL_VERSION),
+                8 => (v8::register(self.clone(), router.clone()), 8),
                 7 => (v7::register(self.clone(), router.clone()), 7),
                 6 => (v6::register(self.clone(), router.clone()), 6),
                 5 => (v5::register(self.clone(), router.clone()), 5),
@@ -819,6 +854,8 @@ impl ConnectionInitializer for FlowContext {
             disable_relay_tx: peer_version.disable_relay_tx,
             subnetwork_id: peer_version.subnetwork_id.to_owned(),
             time_offset,
+            services: peer_version.services,
+            relay_port: peer_version.relay_port,
         });
         router.set_properties(peer_properties);
 

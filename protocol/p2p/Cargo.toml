@@ -32,6 +32,7 @@ kaspa-hashes.workspace = true
 kaspa-math.workspace = true
 kaspa-utils.workspace = true
 kaspa-utils-tower.workspace = true
+bitflags.workspace = true
 
 borsh.workspace = true
 ctrlc.workspace = true

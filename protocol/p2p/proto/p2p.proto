@@ -16,6 +16,8 @@ message NetAddress{
   int64 timestamp = 1;
   bytes ip = 3;
   uint32 port = 4;
+  uint64 services = 5;
+  uint32 relayPort = 6;
 }
 
 message SubnetworkId{
@@ -151,6 +153,7 @@ message VersionMessage{
   bool disableRelayTx = 8;
   SubnetworkId subnetworkId = 9;
   string network = 10;
+  uint32 relayPort = 11;
 }
 
 message RejectMessage{

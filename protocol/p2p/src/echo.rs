@@ -101,6 +101,7 @@ fn build_dummy_version_message() -> VersionMessage {
         disable_relay_tx: false,
         subnetwork_id: None,
         network: "kaspa-mainnet".to_string(),
+        relay_port: 0,
     }
 }
 

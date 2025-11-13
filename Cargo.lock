@@ -3523,6 +3523,7 @@ dependencies = [
 name = "kaspa-p2p-lib"
 version = "1.0.1"
 dependencies = [
+ "bitflags 2.6.0",
  "borsh",
  "ctrlc",
  "futures",

@@ -1,23 +1,32 @@
+use bitflags::bitflags;
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_core::{
     kaspad_env::{name, version},
     time::unix_now,
 };
-use kaspa_utils::networking::{NetAddress, PeerId};
+use kaspa_utils::networking::{NetAddress, PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
 
 /// Maximum allowed length for the user agent field in a version message `VersionMessage`.
 pub const MAX_USER_AGENT_LEN: usize = 256;
 
+bitflags! {
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct ServiceFlags: u64 {
+        const LIBP2P_RELAY = NET_ADDRESS_SERVICE_LIBP2P_RELAY;
+    }
+}
+
 pub struct Version {
     pub protocol_version: u32,
     pub network: String,
-    pub services: u64, // TODO
+    pub services: ServiceFlags,
     pub timestamp: u64,
     pub address: Option<NetAddress>,
     pub id: PeerId,
     pub user_agent: String,
     pub disable_relay_tx: bool,
     pub subnetwork_id: Option<SubnetworkId>,
+    pub relay_port: Option<u16>,
 }
 
 impl Version {
@@ -31,13 +40,14 @@ impl Version {
         Self {
             protocol_version,
             network,
-            services: 0, // TODO: get number of live services
+            services: ServiceFlags::empty(),
             timestamp: unix_now(),
             address,
             id,
             user_agent: format!("/{}:{}/", name(), version()),
             disable_relay_tx: false,
             subnetwork_id,
+            relay_port: None,
         }
     }
 
@@ -46,5 +56,19 @@ impl Version {
         let new_user_agent = format!("{}:{}{}", name, version, comments);
         self.user_agent = format!("{}{}/", self.user_agent, new_user_agent);
         self.user_agent.truncate(MAX_USER_AGENT_LEN);
+    }
+
+    pub fn enable_service(&mut self, flag: ServiceFlags, relay_port: Option<u16>) {
+        self.services.insert(flag);
+        if flag == ServiceFlags::LIBP2P_RELAY {
+            self.relay_port = relay_port;
+        }
+    }
+
+    pub fn disable_service(&mut self, flag: ServiceFlags) {
+        self.services.remove(flag);
+        if flag == ServiceFlags::LIBP2P_RELAY {
+            self.relay_port = None;
+        }
     }
 }
