@@ -1,6 +1,7 @@
 use crate::{flow_context::FlowContext, flow_trait::Flow};
 use itertools::Itertools;
 use kaspa_addressmanager::NetAddress;
+use kaspa_utils::networking::IpAddress;
 use kaspa_p2p_lib::{
     common::ProtocolError,
     dequeue, dequeue_with_timeout, make_message,
@@ -48,13 +49,13 @@ impl ReceiveAddressesFlow {
             .await?;
 
         let msg = dequeue_with_timeout!(self.incoming_route, Payload::Addresses)?;
-        let address_list: Vec<(IpAddress, u16)> = msg.try_into()?;
-        if address_list.len() > MAX_ADDRESSES_RECEIVE {
-            return Err(ProtocolError::OtherOwned(format!("address count {} exceeded {}", address_list.len(), MAX_ADDRESSES_RECEIVE)));
+        let addresses: Vec<NetAddress> = msg.try_into()?;
+        if addresses.len() > MAX_ADDRESSES_RECEIVE {
+            return Err(ProtocolError::OtherOwned(format!("address count {} exceeded {}", addresses.len(), MAX_ADDRESSES_RECEIVE)));
         }
         let mut amgr_lock = self.ctx.address_manager.lock();
-        for (ip, port) in address_list {
-            amgr_lock.add_address(NetAddress::new(ip, port))
+        for addr in addresses {
+            amgr_lock.add_address(addr);
         }
 
         Ok(())

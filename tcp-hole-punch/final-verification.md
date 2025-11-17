@@ -20,7 +20,7 @@ All logs are sanitised (`<RELAY_IP>`, `<HOME_IP>`, `<CLIENT_VPS_IP>` placeholder
 
 ## 3. Tests & Tooling
 - ✅ `cargo test -p kaspa-addressmanager` – covers the RocksDB migration harness and confirms schema upgrades write version markers exactly once.
-- ✅ `cargo test -p kaspa-connectionmanager` – exercises the relay-rotation logic, including the new integration test that feeds gossip-derived addresses through the planner.
+- ✅ `cargo test -p kaspa-connectionmanager gossip_to_rotation_end_to_end rotation_recovers_after_unhealthy_relay relay_candidates_with_missing_ports_are_ignored_in_planner -- --nocapture` – exercises the gossip→store→planner flow, unhealthy relay rotation/backoff, and the zero-port guard on relay candidates.
 - ✅ `cargo test --manifest-path tcp-hole-punch/bridge/Cargo.toml`
 - ✅ `cargo test -p kaspa-p2p-lib connect_with_stream_establishes_router -- --nocapture`
 - ✅ `kaspa-cli getlibpstatus`, `kaspa-cli getpeeraddresses --json`, `kaspa-cli getconnectedpeerinfo --json` on bridge/relay nodes to verify role detection and the v9 relay metadata.

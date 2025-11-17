@@ -592,12 +592,163 @@ mod tests {
         assert_eq!(batch.iter().filter(|addr| addr.is_libp2p_relay()).count(), 2);
     }
 
+    #[test]
+    fn gossip_to_rotation_end_to_end() {
+        let (_db_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        let config = Arc::new(Config::new(SIMNET_PARAMS));
+        let (address_manager, _) = AddressManager::new(config, db, Arc::new(TickService::default()));
+
+        let relay_a = relay_addr_with_metadata(16001, 18111);
+        let relay_b = relay_addr_with_metadata(16002, 18112);
+        let regular_a = plain_addr(17001);
+        {
+            let mut guard = address_manager.lock();
+            guard.add_address(relay_a);
+            guard.add_address(relay_b);
+            guard.add_address(regular_a);
+        }
+
+        let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
+        assert_eq!(relay_candidates.len(), 2);
+        assert_eq!(regular_candidates.len(), 1);
+
+        let batch = ConnectionManager::plan_outbound_batch(
+            &mut relay_candidates,
+            &mut regular_candidates,
+            MIN_PRIVATE_RELAY_CONNECTIONS,
+            3,
+        );
+        let relay_ports = selected_relay_ports(&batch);
+        assert_eq!(relay_ports.len(), MIN_PRIVATE_RELAY_CONNECTIONS);
+        assert_ne!(relay_ports[0], relay_ports[1]);
+        assert!(batch.last().unwrap().relay_port.is_none());
+    }
+
+    #[test]
+    fn rotation_recovers_after_unhealthy_relay() {
+        let (_db_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        let config = Arc::new(Config::new(SIMNET_PARAMS));
+        let (address_manager, _) = AddressManager::new(config, db, Arc::new(TickService::default()));
+
+        let relay_a = relay_addr_with_metadata(16001, 18111);
+        let relay_b = relay_addr_with_metadata(16002, 18112);
+        let relay_c = relay_addr_with_metadata(16003, 18113);
+        let regular = plain_addr(17002);
+        {
+            let mut guard = address_manager.lock();
+            guard.add_address(relay_a);
+            guard.add_address(relay_b);
+            guard.add_address(relay_c);
+            guard.add_address(regular);
+        }
+
+        let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
+        let batch = ConnectionManager::plan_outbound_batch(
+            &mut relay_candidates,
+            &mut regular_candidates,
+            MIN_PRIVATE_RELAY_CONNECTIONS,
+            3,
+        );
+        assert_eq!(selected_relay_ports(&batch), vec![18111, 18112]);
+
+        mark_address_unhealthy(&address_manager, relay_b, 4);
+
+        let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
+        let batch = ConnectionManager::plan_outbound_batch(
+            &mut relay_candidates,
+            &mut regular_candidates,
+            MIN_PRIVATE_RELAY_CONNECTIONS,
+            3,
+        );
+        assert_eq!(selected_relay_ports(&batch), vec![18111, 18113]);
+
+        {
+            let mut guard = address_manager.lock();
+            guard.add_address(relay_b);
+        }
+
+        let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
+        let batch = ConnectionManager::plan_outbound_batch(
+            &mut relay_candidates,
+            &mut regular_candidates,
+            MIN_PRIVATE_RELAY_CONNECTIONS,
+            3,
+        );
+        let relay_ports = selected_relay_ports(&batch);
+        assert_eq!(relay_ports.len(), MIN_PRIVATE_RELAY_CONNECTIONS);
+        assert!(relay_ports.contains(&18112));
+    }
+
+    #[test]
+    fn relay_candidates_with_missing_ports_are_ignored_in_planner() {
+        let (_db_lifetime, db) = create_temp_db!(ConnBuilder::default().with_files_limit(10));
+        let config = Arc::new(Config::new(SIMNET_PARAMS));
+        let (address_manager, _) = AddressManager::new(config, db, Arc::new(TickService::default()));
+
+        {
+            let mut guard = address_manager.lock();
+            guard.add_address(relay_addr(19001));
+            guard.add_address(relay_addr(19002));
+            guard.add_address(plain_addr(19010));
+            guard.add_address(plain_addr(19011));
+        }
+
+        let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
+        assert!(relay_candidates.is_empty());
+
+        let batch = ConnectionManager::plan_outbound_batch(
+            &mut relay_candidates,
+            &mut regular_candidates,
+            MIN_PRIVATE_RELAY_CONNECTIONS,
+            3,
+        );
+        assert_eq!(batch.len(), 3);
+        assert!(batch.iter().all(|addr| addr.relay_port.unwrap_or(0) == 0));
+    }
+
     fn plain_addr(port: u16) -> NetAddress {
         NetAddress::new(test_ip(port).into(), port)
     }
 
     fn relay_addr(port: u16) -> NetAddress {
         plain_addr(port).with_services(NET_ADDRESS_SERVICE_LIBP2P_RELAY)
+    }
+
+    fn relay_addr_with_metadata(port: u16, relay_port: u16) -> NetAddress {
+        relay_addr(port).with_relay_port(Some(relay_port))
+    }
+
+    fn collect_candidates(address_manager: &Arc<ParkingLotMutex<AddressManager>>) -> (VecDeque<NetAddress>, VecDeque<NetAddress>) {
+        let mut addresses = {
+            let guard = address_manager.lock();
+            guard.iterate_addresses().collect_vec()
+        };
+        addresses.sort_by_key(|addr| (addr.relay_port.unwrap_or(0), addr.port));
+        let mut relay_candidates = VecDeque::new();
+        let mut regular_candidates = VecDeque::new();
+        for addr in addresses {
+            if is_viable_relay(&addr) {
+                relay_candidates.push_back(addr);
+            } else {
+                regular_candidates.push_back(addr);
+            }
+        }
+        (relay_candidates, regular_candidates)
+    }
+
+    fn is_viable_relay(addr: &NetAddress) -> bool {
+        addr.is_libp2p_relay() && addr.relay_port.unwrap_or(0) > 0
+    }
+
+    fn selected_relay_ports(batch: &[NetAddress]) -> Vec<u16> {
+        batch.iter().filter_map(|addr| addr.relay_port).collect()
+    }
+
+    fn mark_address_unhealthy(address_manager: &Arc<ParkingLotMutex<AddressManager>>, addr: NetAddress, times: usize) {
+        let mut guard = address_manager.lock();
+        for _ in 0..times {
+            guard.mark_connection_failure(addr);
+        }
     }
 
     fn test_ip(offset: u16) -> IpAddress {

@@ -10,6 +10,10 @@ Your feedback, contributions, and issue reports will be integral to evolving thi
 
 The default branch of this repository is `master` and new contributions are constantly merged into it. For a stable branch corresponding to the latest stable release please pull and compile the `stable` branch. 
 
+## Upgrading to Protocol v9 (relay capability)
+
+Protocol v9 introduces relay metadata (`services` bit 0 plus `relayPort`) on the wire and the accompanying AddressManager schema-v2 migration. Follow the [release notes](docs/RELEASE_NOTES_v9.md) for the mixed-version behavior, disk changes, and operator verification steps before rolling relays or private nodes.
+
 ## The Crescendo Hardfork  
 
 The [Crescendo Hardfork](docs/crescendo-guide.md) took place on May 5, 2025, at approximately 15:00 UTC. The fork has transitioned the network from a blockrate of 1 BPS to that of 10 BPS, and incorporated several major KIPs.

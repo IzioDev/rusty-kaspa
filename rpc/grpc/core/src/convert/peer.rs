@@ -107,6 +107,6 @@ try_from!(item: &protowire::GetPeerAddressesKnownAddressMessage, kaspa_rpc_core:
     let mut addr = Self::from_str(&item.addr)?;
     addr.services = item.services;
     addr.relay_port = if item.relay_port == 0 { None } else { Some(item.relay_port as u16) };
-    Ok(addr)
+    addr
 });
 try_from!(item: &protowire::GetPeerAddressesKnownAddressMessage, kaspa_rpc_core::RpcIpAddress, { Self::from_str(&item.addr)? });

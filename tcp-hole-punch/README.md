@@ -113,3 +113,21 @@ Example snippet:
 ```
 
 If you see `services: 0`, the peer is either running an older protocol or operating in client-only mode and will be skipped by the private-node relay selector.
+
+### Upgrade to v9
+
+Follow the [Protocol v9 release notes](../docs/RELEASE_NOTES_v9.md) for the full description of wire/disk changes plus the AddressManager schema-v2 migration details. The safe path is: stop the daemon, deploy the v9 binaries, start the daemon, and confirm the one-time schema bump log before proceeding to the next node.
+
+**Verify in 60 seconds**
+
+```bash
+# On a public relay-capable node
+kaspa-cli getlibpstatus --json
+kaspa-cli getpeeraddresses --json | jq '.addresses[] | select(.services == 1) | {addr: .address, relayPort: .relayPort}'
+
+# On a private node
+kaspa-cli getlibpstatus --json | jq '{role, privateInboundTarget, relayInboundLimit}'
+kaspa-cli getconnectedpeerinfo --json | jq '.peers[] | {addr: .address, services: .services}'
+```
+
+Expected: public relays present `"services": 1` with a positive `relayPort`; private nodes show `role: "client-only"` plus the private/relay inbound targets reported by `getlibpstatus`.

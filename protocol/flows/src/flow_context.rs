@@ -3,7 +3,7 @@ use crate::flowcontext::{
     process_queue::ProcessQueue,
     transactions::TransactionsSpread,
 };
-use crate::{v5, v6, v7, v8};
+use crate::{v5, v6, v7, v8, v9};
 use async_trait::async_trait;
 use futures::future::join_all;
 use kaspa_addressmanager::AddressManager;
@@ -854,6 +854,8 @@ impl ConnectionInitializer for FlowContext {
             disable_relay_tx: peer_version.disable_relay_tx,
             subnetwork_id: peer_version.subnetwork_id.to_owned(),
             time_offset,
+            services: peer_version.services,
+            relay_port: peer_version.relay_port,
         });
         router.set_properties(peer_properties);
 
