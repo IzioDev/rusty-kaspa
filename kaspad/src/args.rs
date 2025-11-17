@@ -100,6 +100,10 @@ pub struct Args {
     pub libp2p_relay_mode: Libp2pRelayMode,
     #[serde(rename = "libp2p-relay-port")]
     pub libp2p_relay_port: Option<u16>,
+    #[serde(rename = "libp2p-helper-address")]
+    pub libp2p_helper_address: Option<String>,
+    #[serde(rename = "libp2p-reservation")]
+    pub libp2p_reservation_multiaddrs: Vec<String>,
 }
 
 impl Default for Args {
@@ -155,6 +159,8 @@ impl Default for Args {
             libp2p_relay_inbound_limit: 2,
             libp2p_relay_mode: Libp2pRelayMode::Auto,
             libp2p_relay_port: None,
+            libp2p_helper_address: None,
+            libp2p_reservation_multiaddrs: Vec::new(),
         }
     }
 }
@@ -226,6 +232,13 @@ pub fn cli() -> Command {
                 .require_equals(true)
                 .value_parser(clap::value_parser!(usize))
                 .help(format!("Specify number of async threads (default: {}).", defaults.async_threads)),
+        )
+        .arg(
+            Arg::new("libp2p-reservation")
+                .long("libp2p-reservation")
+                .require_equals(true)
+                .action(ArgAction::Append)
+                .help("Multiaddr (repeatable) to reserve via a remote relay, e.g. /ip4/relay/tcp/18111/p2p/<relay_id>/p2p-circuit"),
         )
         .arg(
             Arg::new("log_level")
@@ -423,6 +436,13 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .value_parser(clap::value_parser!(u16))
                 .help("TCP port for the libp2p relay listener (default: p2p port + 1).")
         )
+        .arg(
+            Arg::new("libp2p-helper-address")
+                .long("libp2p-helper-address")
+                .require_equals(true)
+                .value_parser(clap::value_parser!(String))
+                .help("Optional <host:port> for the libp2p helper control server (set to 'off' to disable). Defaults to 127.0.0.1:(relay_port+100).")
+        )
         ;
 
     #[cfg(feature = "devnet-prealloc")]
@@ -518,6 +538,12 @@ impl Args {
                 .map(|value| value.parse().expect("libp2p relay mode is validated by clap"))
                 .unwrap_or(defaults.libp2p_relay_mode),
             libp2p_relay_port: m.get_one::<u16>("libp2p-relay-port").cloned().or(defaults.libp2p_relay_port),
+            libp2p_helper_address: m.get_one::<String>("libp2p-helper-address").cloned().or(defaults.libp2p_helper_address),
+            libp2p_reservation_multiaddrs: arg_match_many_unwrap_or::<String>(
+                &m,
+                "libp2p-reservation",
+                defaults.libp2p_reservation_multiaddrs,
+            ),
 
             #[cfg(feature = "devnet-prealloc")]
             num_prealloc_utxos: m.get_one::<u64>("num-prealloc-utxos").cloned(),

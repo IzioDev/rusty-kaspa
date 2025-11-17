@@ -1,0 +1,12 @@
+[package]
+name = "kaspa-libp2p-helper-protocol"
+description = "Shared request/response types for the kaspa libp2p circuit helper control plane"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }

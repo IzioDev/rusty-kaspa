@@ -1,0 +1,19 @@
+[package]
+name = "kaspa-libp2p-circuit-helper"
+description = "Operator helper that requests libp2p circuit dials from a running kaspad node"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1.0"
+clap = { workspace = true, features = ["derive", "env"] }
+humantime = "2.1"
+kaspa-libp2p-helper-protocol = { path = "../helper-protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "time", "io-util"] }

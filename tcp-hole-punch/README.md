@@ -131,3 +131,69 @@ kaspa-cli getconnectedpeerinfo --json | jq '.peers[] | {addr: .address, services
 ```
 
 Expected: public relays present `"services": 1` with a positive `relayPort`; private nodes show `role: "client-only"` plus the private/relay inbound targets reported by `getlibpstatus`.
+
+## Libp2p circuit helper
+
+The helper control plane is enabled automatically when running the patched `kaspad`. By default it binds to `127.0.0.1:(libp2p_relay_port + 100)` and can be overridden (or disabled) with `--libp2p-helper-address=<host:port>` / `--libp2p-helper-address=off`. The helper executable is built via:
+
+```bash
+cargo build -p kaspa-libp2p-circuit-helper --release
+```
+
+Invoke it on each private node after the daemon is up:
+
+```bash
+target/release/kaspa-libp2p-circuit-helper \
+  --relay-ma "/ip4/149.28.164.184/tcp/18111/p2p/12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG/p2p-circuit" \
+  --relay-peer 12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG \
+  --target-peer 12D3KooWLLFP6CANQAaDoDSs3ZGqMMgn75EA1aY3osFPPUKAvUrk \
+  --control 127.0.0.1:38081 \
+  --timeout 30s
+```
+
+The output prints the multiaddr and peer key on success; failures return a non-zero exit status together with the error description propagated by kaspad.
+
+## Deterministic validation script
+
+`tcp-hole-punch/scripts/prove_libp2p_circuit.sh` orchestrates the end-to-end proof: it restarts the nodes (optional), seeds the relay once via the wRPC probe, runs the helper to open A→B (and optionally B→A) circuits, polls each node until the “Active libp2p relay circuits” section is populated, and writes timestamped probe captures under `tcp-hole-punch/proof/`.
+
+Environment variables control the workflow:
+
+| Variable | Purpose |
+| --- | --- |
+| `NODE_A_CMD_PREFIX` / `NODE_B_CMD_PREFIX` | Optional command prefix for remote execution, e.g. `ssh ubuntu@10.0.3.26`. |
+| `NODE_A_WSRPC_URL` / `NODE_B_WSRPC_URL` | Local wRPC endpoints (default `ws://127.0.0.1:17110/` & `ws://127.0.0.1:27110/`). |
+| `NODE_A_HELPER_ADDR` / `NODE_B_HELPER_ADDR` | Helper control endpoints exposed by kaspad (`--libp2p-helper-address`). |
+| `NODE_A_PEER_ID` / `NODE_B_PEER_ID` | Static peer IDs used when dialing. |
+| `NODE_A_START_CMD` / `NODE_B_START_CMD` | Optional restart commands (e.g. `systemctl restart kaspad`). |
+| `RELAY_MULTIADDR`, `RELAY_PEER_ID`, `ADD_PEER_ADDR` | Relay coordinates injected into the helper/probe. |
+
+Example invocation (local nodes):
+
+```bash
+export NODE_A_WSRPC_URL=ws://127.0.0.1:17110/
+export NODE_B_WSRPC_URL=ws://127.0.0.1:27110/
+export NODE_A_HELPER_ADDR=127.0.0.1:38081
+export NODE_B_HELPER_ADDR=127.0.0.1:38082
+tcp-hole-punch/scripts/prove_libp2p_circuit.sh
+```
+
+When running against remote hosts, prefix the commands via SSH:
+
+```bash
+export NODE_A_CMD_PREFIX="ssh ubuntu@10.0.3.26"
+export NODE_B_CMD_PREFIX="ssh luke@mac-mini"
+export NODE_A_WORKDIR=/home/ubuntu/rusty-kaspa
+export NODE_B_WORKDIR=/Users/luke/Documents/GitHub/rusty-kaspa
+tcp-hole-punch/scripts/prove_libp2p_circuit.sh
+```
+
+The script emits the paths to the captured probe logs when the active circuits appear.
+
+## Proof artefacts
+
+Redacted sample probe outputs demonstrating the “Active libp2p relay circuits” section live under `tcp-hole-punch/logs/sample-node-a.log` and `tcp-hole-punch/logs/sample-node-b.log`. Each file records the environment snapshot, relay gossip, connected peer summary, and the populated relay circuit section with `/p2p-circuit/…` multiaddrs.
+
+## Reverting
+
+To revert to the previous behaviour, remove `--libp2p-helper-address` (or set it to `off`), restart kaspad, and skip the helper/validation steps. The helper control port is only bound locally, so no firewall changes are required. After disabling the helper simply restart the daemon (`systemctl restart kaspad` or the chosen supervisor) to return to the default configuration.

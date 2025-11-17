@@ -1,4 +1,11 @@
-use std::{fs, path::PathBuf, process::exit, sync::Arc, time::Duration};
+use std::{
+    fs,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    process::exit,
+    sync::Arc,
+    time::Duration,
+};
 
 use async_channel::unbounded;
 use kaspa_consensus_core::{
@@ -24,6 +31,7 @@ use kaspa_utils::git;
 use kaspa_utils::networking::ContextualNetAddress;
 use kaspa_utils::sysinfo::SystemInfo;
 use kaspa_utils_tower::counters::TowerConnectionCounters;
+use libp2p::multiaddr::Multiaddr;
 
 use kaspa_addressmanager::AddressManager;
 use kaspa_connectionmanager::Libp2pLimits;
@@ -77,6 +85,20 @@ fn get_home_dir() -> PathBuf {
     return dirs::data_local_dir().unwrap();
     #[cfg(not(target_os = "windows"))]
     return dirs::home_dir().unwrap();
+}
+
+fn derive_helper_address(value: Option<String>, relay_port: u16) -> Option<SocketAddr> {
+    match value {
+        Some(raw) if raw.eq_ignore_ascii_case("off") || raw.eq_ignore_ascii_case("none") => None,
+        Some(raw) => Some(raw.parse::<SocketAddr>().unwrap_or_else(|err| panic!("invalid --libp2p-helper-address '{raw}': {err}"))),
+        None => {
+            let mut port = relay_port.saturating_add(100);
+            if port == 0 {
+                port = relay_port;
+            }
+            Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port))
+        }
+    }
 }
 
 /// Get the default application directory.
@@ -626,11 +648,20 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         p2p_tower_counters.clone(),
         libp2p_limits.clone(),
     ));
+    let relay_listen_port = args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1);
+    let helper_address = derive_helper_address(args.libp2p_helper_address.clone(), relay_listen_port);
+    let reservation_multiaddrs: Vec<Multiaddr> = args
+        .libp2p_reservation_multiaddrs
+        .iter()
+        .map(|raw| raw.parse().unwrap_or_else(|err| panic!("invalid --libp2p-reservation multiaddr '{raw}': {err}")))
+        .collect();
     let libp2p_config = Libp2pBridgeConfig {
         relay_mode: args.libp2p_relay_mode,
-        listen_port: args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1),
+        listen_port: relay_listen_port,
         identity_path: app_dir.join(network.to_prefixed()).join("libp2p").join("identity.key"),
         has_public_address,
+        helper_address,
+        reservation_multiaddrs,
     };
     let libp2p_service = Arc::new(Libp2pBridgeService::new(flow_context.clone(), libp2p_config, libp2p_status.clone()));
 

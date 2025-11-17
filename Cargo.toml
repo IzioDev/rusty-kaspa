@@ -62,6 +62,8 @@ members = [
     "utils/alloc",
     "tcp-hole-punch/bridge",
     "tcp-hole-punch/relay",
+    "tcp-hole-punch/helper-protocol",
+    "tcp-hole-punch/circuit-helper",
 ]
 
 [workspace.package]

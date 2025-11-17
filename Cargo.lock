@@ -3362,6 +3362,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-libp2p-circuit-helper"
+version = "1.0.1"
+dependencies = [
+ "anyhow",
+ "clap 4.5.19",
+ "humantime",
+ "kaspa-libp2p-helper-protocol",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.64",
+ "tokio",
+]
+
+[[package]]
+name = "kaspa-libp2p-helper-protocol"
+version = "1.0.1"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "kaspa-math"
 version = "1.0.1"
 dependencies = [
@@ -4247,6 +4268,7 @@ dependencies = [
  "kaspa-grpc-server",
  "kaspa-hashes",
  "kaspa-index-processor",
+ "kaspa-libp2p-helper-protocol",
  "kaspa-mining",
  "kaspa-notify",
  "kaspa-p2p-flows",
@@ -4268,6 +4290,7 @@ dependencies = [
  "rayon",
  "rocksdb",
  "serde",
+ "serde_json",
  "serde_with",
  "tempfile",
  "thiserror 1.0.64",

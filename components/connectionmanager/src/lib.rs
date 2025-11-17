@@ -612,12 +612,8 @@ mod tests {
         assert_eq!(relay_candidates.len(), 2);
         assert_eq!(regular_candidates.len(), 1);
 
-        let batch = ConnectionManager::plan_outbound_batch(
-            &mut relay_candidates,
-            &mut regular_candidates,
-            MIN_PRIVATE_RELAY_CONNECTIONS,
-            3,
-        );
+        let batch =
+            ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, MIN_PRIVATE_RELAY_CONNECTIONS, 3);
         let relay_ports = selected_relay_ports(&batch);
         assert_eq!(relay_ports.len(), MIN_PRIVATE_RELAY_CONNECTIONS);
         assert_ne!(relay_ports[0], relay_ports[1]);
@@ -643,23 +639,15 @@ mod tests {
         }
 
         let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
-        let batch = ConnectionManager::plan_outbound_batch(
-            &mut relay_candidates,
-            &mut regular_candidates,
-            MIN_PRIVATE_RELAY_CONNECTIONS,
-            3,
-        );
+        let batch =
+            ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, MIN_PRIVATE_RELAY_CONNECTIONS, 3);
         assert_eq!(selected_relay_ports(&batch), vec![18111, 18112]);
 
         mark_address_unhealthy(&address_manager, relay_b, 4);
 
         let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
-        let batch = ConnectionManager::plan_outbound_batch(
-            &mut relay_candidates,
-            &mut regular_candidates,
-            MIN_PRIVATE_RELAY_CONNECTIONS,
-            3,
-        );
+        let batch =
+            ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, MIN_PRIVATE_RELAY_CONNECTIONS, 3);
         assert_eq!(selected_relay_ports(&batch), vec![18111, 18113]);
 
         {
@@ -668,12 +656,8 @@ mod tests {
         }
 
         let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
-        let batch = ConnectionManager::plan_outbound_batch(
-            &mut relay_candidates,
-            &mut regular_candidates,
-            MIN_PRIVATE_RELAY_CONNECTIONS,
-            3,
-        );
+        let batch =
+            ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, MIN_PRIVATE_RELAY_CONNECTIONS, 3);
         let relay_ports = selected_relay_ports(&batch);
         assert_eq!(relay_ports.len(), MIN_PRIVATE_RELAY_CONNECTIONS);
         assert!(relay_ports.contains(&18112));
@@ -696,12 +680,8 @@ mod tests {
         let (mut relay_candidates, mut regular_candidates) = collect_candidates(&address_manager);
         assert!(relay_candidates.is_empty());
 
-        let batch = ConnectionManager::plan_outbound_batch(
-            &mut relay_candidates,
-            &mut regular_candidates,
-            MIN_PRIVATE_RELAY_CONNECTIONS,
-            3,
-        );
+        let batch =
+            ConnectionManager::plan_outbound_batch(&mut relay_candidates, &mut regular_candidates, MIN_PRIVATE_RELAY_CONNECTIONS, 3);
         assert_eq!(batch.len(), 3);
         assert!(batch.iter().all(|addr| addr.relay_port.unwrap_or(0) == 0));
     }
