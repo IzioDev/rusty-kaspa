@@ -479,7 +479,11 @@ mod tests {
     use kaspa_database::prelude::ConnBuilder;
     use kaspa_p2p_lib::{ConnectionMetadata, PeerProperties};
     use kaspa_utils::networking::{IpAddress, NetAddress, PeerId, NET_ADDRESS_SERVICE_LIBP2P_RELAY};
-    use std::{net::{IpAddr, Ipv4Addr, SocketAddr}, sync::Arc, time::Instant};
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::Arc,
+        time::Instant,
+    };
     fn make_peer(index: u8, relay: Option<&str>) -> Peer {
         let mut bytes = [0u8; 16];
         bytes[15] = index;
@@ -570,10 +574,7 @@ mod tests {
 
         let scoped_addresses = {
             let guard = address_manager.lock();
-            guard
-                .iterate_addresses()
-                .filter(|addr| (4000..6000).contains(&addr.port))
-                .collect_vec()
+            guard.iterate_addresses().filter(|addr| (4000..6000).contains(&addr.port)).collect_vec()
         };
         assert_eq!(scoped_addresses.len(), 3);
 
