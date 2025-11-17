@@ -63,6 +63,19 @@ impl Default for RelayConfig {
     }
 }
 
+/// Configuration for running a relay server (hop) behaviour.
+#[derive(Clone, Debug)]
+pub struct RelayServerConfig {
+    /// Toggle the relay server behaviour.
+    pub enabled: bool,
+}
+
+impl Default for RelayServerConfig {
+    fn default() -> Self {
+        Self { enabled: false }
+    }
+}
+
 /// Configuration for hole-punching behaviour.
 #[derive(Clone, Debug)]
 pub struct HolePunchConfig {
@@ -82,6 +95,7 @@ pub struct SwarmConfig {
     pub transport: TransportConfig,
     pub relay: RelayConfig,
     pub hole_punch: HolePunchConfig,
+    pub relay_server: RelayServerConfig,
 }
 
 /// Public command sender wrapper used by tonic integration.
@@ -243,7 +257,8 @@ impl SwarmHandle {
 struct BridgeBehaviour {
     identify: identify::Behaviour,
     ping: libp2p::ping::Behaviour,
-    relay: Toggle<relay::client::Behaviour>,
+    relay_client: Toggle<relay::client::Behaviour>,
+    relay_server: Toggle<relay::Behaviour>,
     dcutr: Toggle<dcutr::Behaviour>,
     stream: lpstream::Behaviour,
 }
@@ -478,7 +493,13 @@ fn build_behaviour(
 ) -> BridgeBehaviour {
     let public = key.public();
 
-    let relay = Toggle::from(relay_behaviour);
+    let relay_client = Toggle::from(relay_behaviour);
+    let relay_server = if config.relay_server.enabled {
+        info!(peer = %public.to_peer_id(), "libp2p relay server behaviour enabled");
+        Toggle::from(Some(relay::Behaviour::new(public.to_peer_id(), Default::default())))
+    } else {
+        Toggle::from(None)
+    };
     let dcutr = if config.hole_punch.enable_dcutr {
         Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())))
     } else {
@@ -488,7 +509,8 @@ fn build_behaviour(
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
-        relay,
+        relay_client,
+        relay_server,
         dcutr,
         stream: lpstream::Behaviour::default(),
     }
@@ -661,8 +683,77 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 }
             }
         }
-        SwarmEvent::Behaviour(BridgeBehaviourEvent::Relay(event)) => {
-            debug!(?event, "Relay behaviour event");
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
+            use libp2p::relay::client::Event;
+            match event {
+                Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
+                    if renewal {
+                        info!(%relay_peer_id, "libp2p relay reservation renewed");
+                    } else {
+                        info!(%relay_peer_id, "libp2p relay reservation accepted");
+                    }
+                }
+                Event::OutboundCircuitEstablished { relay_peer_id, limit } => {
+                    info!(%relay_peer_id, ?limit, "Outbound circuit established via relay");
+                }
+                Event::InboundCircuitEstablished { src_peer_id, limit } => {
+                    info!(%src_peer_id, ?limit, "Inbound circuit established");
+                }
+            }
+        }
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayServer(event)) => {
+            use libp2p::relay::Event;
+            match event {
+                Event::ReservationReqAccepted { src_peer_id, renewed } => {
+                    if renewed {
+                        info!(%src_peer_id, "Relay server: reservation renewed");
+                    } else {
+                        info!(%src_peer_id, "Relay server: reservation accepted");
+                    }
+                }
+                #[allow(deprecated)]
+                Event::ReservationReqAcceptFailed { src_peer_id, error } => {
+                    warn!(%src_peer_id, ?error, "Relay server: reservation accept failed");
+                }
+                Event::ReservationReqDenied { src_peer_id, status } => {
+                    warn!(%src_peer_id, ?status, "Relay server: reservation request denied");
+                }
+                #[allow(deprecated)]
+                Event::ReservationReqDenyFailed { src_peer_id, error } => {
+                    debug!(%src_peer_id, ?error, "Relay server: reservation deny failed");
+                }
+                Event::ReservationClosed { src_peer_id } => {
+                    debug!(%src_peer_id, "Relay server: reservation closed");
+                }
+                Event::ReservationTimedOut { src_peer_id } => {
+                    debug!(%src_peer_id, "Relay server: reservation timed out");
+                }
+                Event::CircuitReqAccepted { src_peer_id, dst_peer_id } => {
+                    info!(%src_peer_id, %dst_peer_id, "Relay server: circuit request accepted");
+                }
+                Event::CircuitReqDenied { src_peer_id, dst_peer_id, status } => {
+                    debug!(%src_peer_id, %dst_peer_id, ?status, "Relay server: circuit request denied");
+                }
+                #[allow(deprecated)]
+                Event::CircuitReqOutboundConnectFailed { src_peer_id, dst_peer_id, error } => {
+                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit outbound connect failed");
+                }
+                #[allow(deprecated)]
+                Event::CircuitReqAcceptFailed { src_peer_id, dst_peer_id, error } => {
+                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit accept failed");
+                }
+                #[allow(deprecated)]
+                Event::CircuitReqDenyFailed { src_peer_id, dst_peer_id, error } => {
+                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit deny failed");
+                }
+                Event::CircuitClosed { src_peer_id, dst_peer_id, error } => {
+                    if let Some(err) = error {
+                        debug!(%src_peer_id, %dst_peer_id, ?err, "Relay server: circuit closed with error");
+                    } else {
+                        debug!(%src_peer_id, %dst_peer_id, "Relay server: circuit closed");
+                    }
+                }
+            }
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
             debug!(?event, "DCUtR behaviour event");
@@ -700,7 +791,8 @@ enum BridgeBehaviourEvent {
     Stream,
     Identify(identify::Event),
     Ping,
-    Relay(relay::client::Event),
+    RelayClient(relay::client::Event),
+    RelayServer(relay::Event),
     Dcutr(dcutr::Event),
 }
 
@@ -725,7 +817,13 @@ impl From<libp2p::ping::Event> for BridgeBehaviourEvent {
 
 impl From<relay::client::Event> for BridgeBehaviourEvent {
     fn from(value: relay::client::Event) -> Self {
-        Self::Relay(value)
+        Self::RelayClient(value)
+    }
+}
+
+impl From<relay::Event> for BridgeBehaviourEvent {
+    fn from(value: relay::Event) -> Self {
+        Self::RelayServer(value)
     }
 }
 
