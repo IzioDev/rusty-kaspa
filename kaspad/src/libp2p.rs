@@ -215,6 +215,11 @@ impl Libp2pBridgeService {
             info!("libp2p relay server enabled for public relay mode");
         }
 
+        // Enable relay client behavior if reservations are configured
+        if !self.config.reservation_multiaddrs.is_empty() {
+            swarm_config.relay.enabled = true;
+        }
+
         let identity = self.load_or_create_identity().await?;
         let mut handle = spawn_swarm_with_config(identity, swarm_config).map_err(Libp2pBridgeError::Bridge)?;
         let peer_id = handle.local_peer_id();
@@ -301,22 +306,66 @@ impl Libp2pBridgeService {
     }
 
     async fn start_reservations(&self, handle: &mut SwarmHandle) -> Result<(), Libp2pBridgeError> {
+        use libp2p::core::multiaddr::Protocol;
+
         for addr in &self.config.reservation_multiaddrs {
             let addr_string = addr.to_string();
-            info!("requesting libp2p reservation via {addr_string}");
 
-            let (response_tx, response_rx) = oneshot::channel();
+            // Extract the relay peer ID and address (everything before /p2p-circuit)
+            let mut relay_addr = libp2p::Multiaddr::empty();
+            let mut relay_peer_id: Option<libp2p::PeerId> = None;
+
+            for proto in addr.iter() {
+                if matches!(proto, Protocol::P2pCircuit) {
+                    break;
+                }
+                if let Protocol::P2p(peer_id) = proto {
+                    relay_peer_id = Some(peer_id);
+                }
+                relay_addr.push(proto);
+            }
+
+            let relay_peer_id = match relay_peer_id {
+                Some(peer_id) => peer_id,
+                None => {
+                    warn!("reservation multiaddr missing relay peer ID: {addr_string}");
+                    continue;
+                }
+            };
+
+            // First dial the relay peer to establish a connection
+            info!("dialing relay peer {relay_peer_id} at {relay_addr} for reservation");
+            let (dial_tx, dial_rx) = futures::channel::oneshot::channel();
             handle
                 .command_tx()
-                .send(SwarmCommand::ListenOn { addr: addr.clone(), response: Some(response_tx) })
+                .send(SwarmCommand::Dial {
+                    peer: relay_peer_id,
+                    addrs: vec![relay_addr],
+                    response: dial_tx,
+                })
                 .await
                 .map_err(|_| Libp2pBridgeError::CommandChannelClosed)?;
 
-            match response_rx.await {
-                Ok(Ok(())) => info!("libp2p reservation request sent for {addr_string}"),
-                Ok(Err(err)) => warn!("libp2p reservation request failed for {addr_string}: {err}"),
-                Err(_) => warn!("libp2p reservation response channel dropped for {addr_string}"),
+            // Wait for dial to complete (or fail)
+            match dial_rx.await {
+                Ok(Ok(_handle)) => info!("connected to relay, requesting reservation via {addr_string}"),
+                Ok(Err(e)) => {
+                    warn!("failed to connect to relay for reservation: {e}");
+                    continue;
+                }
+                Err(_) => {
+                    warn!("dial response channel dropped");
+                    continue;
+                }
             }
+
+            // Now request the reservation (circuit relay reservations are async)
+            // Success/failure will be logged via RelayClient::Event::ReservationReqAccepted
+            handle
+                .command_tx()
+                .send(SwarmCommand::ListenOn { addr: addr.clone(), response: None })
+                .await
+                .map_err(|_| Libp2pBridgeError::CommandChannelClosed)?;
         }
         Ok(())
     }
