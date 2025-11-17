@@ -200,6 +200,29 @@ impl TryFrom<protowire::BlockLocatorMessage> for Vec<Hash> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compat_v9_version_zero_relay_port_defaults_to_none() {
+        let mut msg = protowire::VersionMessage::default();
+        msg.protocol_version = 9;
+        msg.network = "simnet".to_string();
+        msg.timestamp = 1700000000;
+        msg.id = vec![42; 16];
+        msg.services = ServiceFlags::LIBP2P_RELAY.bits();
+        msg.relay_port = 0;
+
+        let version = Version::try_from(msg).unwrap();
+        assert!(version.relay_port.is_none());
+
+        // Consumers treat relays as usable only when a non-zero port accompanies the capability bit.
+        let advertises_relay_service = version.services.contains(ServiceFlags::LIBP2P_RELAY) && version.relay_port.is_some();
+        assert!(!advertises_relay_service);
+    }
+}
+
 impl TryFrom<protowire::AddressesMessage> for Vec<NetAddress> {
     type Error = ConversionError;
 

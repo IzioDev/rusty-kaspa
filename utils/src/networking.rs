@@ -490,7 +490,8 @@ impl BorshDeserialize for PeerId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
+    use borsh::{BorshDeserialize, BorshSerialize};
+    use std::{net::Ipv4Addr, str::FromStr};
 
     #[test]
     fn test_ip_address_borsh() {
@@ -542,6 +543,24 @@ mod tests {
         let net_addr = ContextualNetAddress::new(addr, port);
         let s = serde_json::to_string(&net_addr).unwrap();
         assert_eq!(s, r#"{"ip":"127.0.0.1","port":1234}"#);
+    }
+
+    #[test]
+    fn compat_v8_net_address_legacy_deserialize_defaults() {
+        let ip: IpAddress = Ipv4Addr::new(203, 0, 113, 7).into();
+        let port: u16 = 16000;
+
+        // Legacy payload only included the IP/port tuple.
+        let mut legacy_bytes = Vec::new();
+        BorshSerialize::serialize(&ip, &mut legacy_bytes).unwrap();
+        BorshSerialize::serialize(&port, &mut legacy_bytes).unwrap();
+
+        let mut slice = legacy_bytes.as_slice();
+        let decoded = <NetAddress as BorshDeserialize>::deserialize_reader(&mut slice).unwrap();
+        assert_eq!(decoded.ip, ip);
+        assert_eq!(decoded.port, port);
+        assert_eq!(decoded.services, 0);
+        assert_eq!(decoded.relay_port, None);
     }
 
     #[test]

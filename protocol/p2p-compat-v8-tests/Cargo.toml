@@ -1,0 +1,22 @@
+[package]
+name = "p2p-compat-v8-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "p2p_compat_v8_tests"
+path = "src/lib.rs"
+
+[dependencies]
+kaspa-p2p-lib = { path = "../p2p" }
+prost = { workspace = true }
+
+[dev-dependencies]
+bytes = "1"
+prost-types = "0.13"
+prost-reflect = "0.14"
+
+[build-dependencies]
+prost-build = "0.13"
+prost-types = "0.13"

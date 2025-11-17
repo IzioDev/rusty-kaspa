@@ -32,12 +32,20 @@ All commands were rerun on 2025-11-13 (local 6‑core laptop); log snippets are 
 - ✅ `getconnectedpeerinfo --json` lists `services == 1` on outbound private-peer connections, proving the connection manager rotates through multiple relays.
 - ✅ Address-manager migration logs (“schema upgraded from v1 to v2”) appear once per node start; subsequent restarts skip the rewrite (verified via the new migration harness test).
 
-## 5. Reproducing the Proof
+## 5. Protocol v9 Compatibility Proof
+- `p2p-compat-v8-tests::compat_v8_ignores_v9_relay_fields_on_version`
+- `p2p-compat-v8-tests::compat_v9_handles_v8_version_without_relay_fields`
+- `p2p-compat-v8-tests::compat_v8_address_gossip_survives_relay_metadata`
+- `utils::networking::tests::compat_v8_net_address_legacy_deserialize_defaults`
+- `protocol::p2p::convert::messages::tests::compat_v9_version_zero_relay_port_defaults_to_none`
+- Older readers ignore the new relay metadata, and newer readers safely default missing fields away.
+
+## 6. Reproducing the Proof
 1. Follow the tmux/rsync/run instructions in `tcp-hole-punch/README.md` (mirrors the Phase 6 runbook).
 2. Use the same environment variables as documented in `phase6-remote-validation.md`.
 3. Capture fresh logs if desired and compare to the referenced line numbers above.
 
-## 6. Supporting Documentation
+## 7. Supporting Documentation
 - `tcp-hole-punch/final-report.md` – full narrative of the implementation and troubleshooting timeline.
 - `tcp-hole-punch/design/architecture.md` – architecture & configuration details for the libp2p ⇄ tonic bridge.
 - `tcp-hole-punch/plan.md` – completed phase tracker plus outstanding backlog for production hardening.

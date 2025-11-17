@@ -45,6 +45,7 @@ members = [
     "mining",
     "mining/errors",
     "protocol/p2p",
+    "protocol/p2p-compat-v8-tests",
     "protocol/flows",
     "components/addressmanager",
     "components/connectionmanager",

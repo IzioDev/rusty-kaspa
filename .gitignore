@@ -15,3 +15,4 @@ Servers.toml
 release
 package-sizes.js
 pruning-optimisation/
+/protocol/p2p-compat-v8-tests/src/p2p_v8.desc
