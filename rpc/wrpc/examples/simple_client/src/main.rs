@@ -28,8 +28,13 @@ async fn main() -> ExitCode {
     }
 }
 
+fn env_flag(name: &str) -> bool {
+    std::env::var(name).map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "True")).unwrap_or(false)
+}
+
 async fn check_node_status() -> Result<()> {
-    let quick_mode = std::env::var("KASPA_WSRPC_QUICK").map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "True")).unwrap_or(false);
+    let quick_mode = env_flag("KASPA_WSRPC_QUICK");
+    let circuit_only_mode = env_flag("KASPA_WSRPC_CIRCUIT_ONLY");
     // Allow overriding the target URL/encoding via environment variables so we can hit custom nodes during testing.
     let env_snapshot: Vec<_> = std::env::vars().collect();
     println!("ENV SNAPSHOT: {:?}", env_snapshot);
@@ -83,25 +88,27 @@ async fn check_node_status() -> Result<()> {
         }
     }
 
-    // Retrieve and show Kaspa node information
-    let GetServerInfoResponse { is_synced, server_version, network_id, has_utxo_index, .. } = client.get_server_info().await?;
+    if !circuit_only_mode {
+        // Retrieve and show Kaspa node information
+        let GetServerInfoResponse { is_synced, server_version, network_id, has_utxo_index, .. } = client.get_server_info().await?;
 
-    println!("Node version: {server_version}");
-    println!("Network: {network_id}");
-    println!("Node is synced: {is_synced}");
-    println!("Node is indexing UTXOs: {has_utxo_index}");
+        println!("Node version: {server_version}");
+        println!("Network: {network_id}");
+        println!("Node is synced: {is_synced}");
+        println!("Node is indexing UTXOs: {has_utxo_index}");
 
-    // Retrieve libp2p status so we can validate relay/private roles
-    match client.get_libp_status().await {
-        Ok(GetLibpStatusResponse { enabled, role, listen_addresses, private_inbound_target, relay_inbound_limit, .. }) => {
-            println!("libp2p enabled: {enabled}, role: {:?}", role);
-            println!("listen addresses: {listen_addresses:?}");
-            println!("private inbound target: {:?}, relay inbound limit: {:?}", private_inbound_target, relay_inbound_limit);
+        // Retrieve libp2p status so we can validate relay/private roles
+        match client.get_libp_status().await {
+            Ok(GetLibpStatusResponse { enabled, role, listen_addresses, private_inbound_target, relay_inbound_limit, .. }) => {
+                println!("libp2p enabled: {enabled}, role: {:?}", role);
+                println!("listen addresses: {listen_addresses:?}");
+                println!("private inbound target: {:?}, relay inbound limit: {:?}", private_inbound_target, relay_inbound_limit);
+            }
+            Err(err) => println!("get_libp_status RPC failed: {err}"),
         }
-        Err(err) => println!("get_libp_status RPC failed: {err}"),
     }
 
-    if !quick_mode {
+    if !quick_mode && !circuit_only_mode {
         // Retrieve and show Kaspa network information
         let GetBlockDagInfoResponse {
             block_count,
@@ -133,8 +140,12 @@ async fn check_node_status() -> Result<()> {
         println!("Sink: {sink}");
     }
 
+    if circuit_only_mode {
+        println!("Circuit-only mode enabled; skipping server/block/peer address detail queries");
+    }
+
     // Inspect peer addresses / connections when running against custom nodes
-    if url.is_some() {
+    if url.is_some() && !circuit_only_mode {
         match client.get_peer_addresses().await {
             Ok(GetPeerAddressesResponse { known_addresses, .. }) => {
                 let relay_advertisers: Vec<_> = known_addresses
@@ -144,48 +155,47 @@ async fn check_node_status() -> Result<()> {
                     .collect();
                 println!("Gossiped relays: {:?}", relay_advertisers);
             }
-            Err(err) => println!("get_peer_addresses RPC failed: {err}"),
-        }
-
-        match client.get_connected_peer_info().await {
-            Ok(GetConnectedPeerInfoResponse { peer_info }) => {
-                println!("Total connected peers: {}", peer_info.len());
-                let relay_candidates: Vec<_> = peer_info.iter().filter(|p| p.relay_port.is_some()).collect();
-                println!("Connected relay-capable peers (relay_port present): {}", relay_candidates.len());
-                for peer in relay_candidates.iter().take(5) {
-                    println!(
-                        "  {} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
-                        peer.address, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
-                    );
-                }
-
-                let active_circuits: Vec<_> =
-                    peer_info.iter().filter(|p| p.is_libp2p && p.libp2p_relay_used.unwrap_or(false)).collect();
-                println!("Active libp2p relay circuits:");
-                if active_circuits.is_empty() {
-                    println!("  (none)");
-                } else {
-                    for peer in active_circuits {
-                        println!(
-                            "  peer={} multiaddr={:?} libp2p_relay_used={:?}",
-                            peer.address, peer.libp2p_multiaddr, peer.libp2p_relay_used
-                        );
-                        if let Some(ma) = &peer.libp2p_multiaddr {
-                            println!("    libp2p_multiaddr={ma}");
-                        }
-                    }
-                }
-
-                println!("Sample peer set:");
-                for peer in peer_info.iter().take(5) {
-                    println!(
-                        "  {} outbound={} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
-                        peer.address, peer.is_outbound, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
-                    );
-                }
-            }
             Err(err) => println!("get_connected_peer_info RPC failed: {err}"),
         }
+    }
+
+    match client.get_connected_peer_info().await {
+        Ok(GetConnectedPeerInfoResponse { peer_info }) => {
+            println!("Total connected peers: {}", peer_info.len());
+            let relay_candidates: Vec<_> = peer_info.iter().filter(|p| p.relay_port.is_some()).collect();
+            println!("Connected relay-capable peers (relay_port present): {}", relay_candidates.len());
+            for peer in relay_candidates.iter().take(5) {
+                println!(
+                    "  {} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
+                    peer.address, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
+                );
+            }
+
+            let active_circuits: Vec<_> = peer_info.iter().filter(|p| p.is_libp2p && p.libp2p_relay_used.unwrap_or(false)).collect();
+            println!("Active libp2p relay circuits:");
+            if active_circuits.is_empty() {
+                println!("  (none)");
+            } else {
+                for peer in active_circuits {
+                    println!(
+                        "  peer={} multiaddr={:?} libp2p_relay_used={:?}",
+                        peer.address, peer.libp2p_multiaddr, peer.libp2p_relay_used
+                    );
+                    if let Some(ma) = &peer.libp2p_multiaddr {
+                        println!("    libp2p_multiaddr={ma}");
+                    }
+                }
+            }
+
+            println!("Sample peer set:");
+            for peer in peer_info.iter().take(5) {
+                println!(
+                    "  {} outbound={} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
+                    peer.address, peer.is_outbound, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
+                );
+            }
+        }
+        Err(err) => println!("get_connected_peer_info RPC failed: {err}"),
     }
 
     // Disconnect client from Kaspa node

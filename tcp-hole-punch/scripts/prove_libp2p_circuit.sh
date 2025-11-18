@@ -23,6 +23,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 : "${ADD_PEER_ADDR:=149.28.164.184:16111}"
 : "${POLL_ATTEMPTS:=24}"
 : "${POLL_INTERVAL:=5}"
+: "${HELPER_ATTEMPTS:=5}"
+: "${HELPER_RETRY_DELAY:=1}"
 : "${PROOF_DIR:=$REPO_ROOT/tcp-hole-punch/proof}"
 : "${RUN_REVERSE_DIAL:=1}"
 
@@ -75,7 +77,7 @@ poll_for_circuit() {
     local outfile="$5"
     echo "Waiting for libp2p circuit on $label"
     for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
-        if run_cmd "$prefix" "$workdir" "KASPA_WSRPC_QUICK=1 KASPA_WSRPC_URL=$url $PROBE_BIN" >"$outfile"; then
+        if run_cmd "$prefix" "$workdir" "KASPA_WSRPC_CIRCUIT_ONLY=1 KASPA_WSRPC_QUICK=1 KASPA_WSRPC_URL=$url $PROBE_BIN" >"$outfile"; then
             if grep -q "Active libp2p relay circuits:" "$outfile" && grep -q "libp2p_relay_used=Some(true)" "$outfile"; then
                 if ! (grep -A1 "Active libp2p relay circuits" "$outfile" | grep -q "(none)"); then
                     echo "  ✓ detected active circuit on $label after ${attempt} attempt(s)"
@@ -107,19 +109,46 @@ start_node_if_needed "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_START_CMD" 
 
 sleep 3
 
-seed_relay "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_WSRPC_URL"
-seed_relay "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_WSRPC_URL"
-
-run_helper "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_HELPER_ADDR" "$NODE_B_PEER_ID"
-if [ "${RUN_REVERSE_DIAL}" -eq 1 ]; then
-    run_helper "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_HELPER_ADDR" "$NODE_A_PEER_ID"
-fi
-
 node_a_log="$PROOF_DIR/node-a-$timestamp.log"
 node_b_log="$PROOF_DIR/node-b-$timestamp.log"
 
-poll_for_circuit "node A" "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_WSRPC_URL" "$node_a_log"
-poll_for_circuit "node B" "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_WSRPC_URL" "$node_b_log"
+seed_relay "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_WSRPC_URL"
+seed_relay "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_WSRPC_URL"
+
+# Capture the probes in the background before dialing so short-lived circuits are detected.
+poll_for_circuit "node A" "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_WSRPC_URL" "$node_a_log" &
+poll_a_pid=$!
+poll_for_circuit "node B" "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_WSRPC_URL" "$node_b_log" &
+poll_b_pid=$!
+
+for attempt in $(seq 1 "$HELPER_ATTEMPTS"); do
+    if ! run_helper "$NODE_A_CMD_PREFIX" "$NODE_A_WORKDIR" "$NODE_A_HELPER_ADDR" "$NODE_B_PEER_ID"; then
+        echo "  ⚠ helper dial attempt $attempt from node A failed" >&2
+    fi
+    if [ "${RUN_REVERSE_DIAL}" -eq 1 ]; then
+        if ! run_helper "$NODE_B_CMD_PREFIX" "$NODE_B_WORKDIR" "$NODE_B_HELPER_ADDR" "$NODE_A_PEER_ID"; then
+            echo "  ⚠ helper dial attempt $attempt from node B failed" >&2
+        fi
+    fi
+
+    poll_a_active=0
+    if kill -0 "$poll_a_pid" 2>/dev/null; then
+        poll_a_active=1
+    fi
+    poll_b_active=0
+    if kill -0 "$poll_b_pid" 2>/dev/null; then
+        poll_b_active=1
+    fi
+    if [ "$poll_a_active" -eq 0 ] && [ "$poll_b_active" -eq 0 ]; then
+        break
+    fi
+    if [ "$attempt" -lt "$HELPER_ATTEMPTS" ]; then
+        sleep "$HELPER_RETRY_DELAY"
+    fi
+done
+
+wait "$poll_a_pid"
+wait "$poll_b_pid"
 
 echo "Final probe outputs stored in:"
 echo "  $node_a_log"
