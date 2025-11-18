@@ -67,7 +67,7 @@ impl Hub {
                                     "P2P, removing libp2p peer {} relay_used={} addr={:?} outbound={}",
                                     router,
                                     libp2p.relay_used,
-                                    libp2p.libp2p_multiaddr(),
+                                    libp2p.remote_multiaddr.as_deref(),
                                     router.is_outbound()
                                 );
                             }
