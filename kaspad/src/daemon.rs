@@ -626,9 +626,10 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         hub.clone(),
         mining_rules,
     ));
+    let address_manager_for_flow = address_manager.clone();
     let flow_context = Arc::new(FlowContext::new(
         consensus_manager.clone(),
-        address_manager,
+        address_manager_for_flow,
         config.clone(),
         mining_manager.clone(),
         tick_service.clone(),
@@ -656,11 +657,27 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         .iter()
         .map(|raw| raw.parse().unwrap_or_else(|err| panic!("invalid --libp2p-reservation multiaddr '{raw}': {err}")))
         .collect();
+    let mut advertised_ips: Vec<IpAddr> = Vec::new();
+    if let Some(external) = args.externalip.as_ref() {
+        let normalized = external.normalize(config.default_p2p_port());
+        let ip: IpAddr = normalized.ip.into();
+        if !ip.is_unspecified() && !advertised_ips.contains(&ip) {
+            advertised_ips.push(ip);
+        }
+    }
+    if let Some(best_local) = address_manager.lock().best_local_address() {
+        let ip: IpAddr = best_local.ip.into();
+        if !ip.is_unspecified() && !advertised_ips.contains(&ip) {
+            advertised_ips.push(ip);
+        }
+    }
+
     let libp2p_config = Libp2pBridgeConfig {
         relay_mode: args.libp2p_relay_mode,
         listen_port: relay_listen_port,
         identity_path: app_dir.join(network.to_prefixed()).join("libp2p").join("identity.key"),
         has_public_address,
+        advertised_ips,
         helper_address,
         reservation_multiaddrs,
     };

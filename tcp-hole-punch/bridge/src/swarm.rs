@@ -24,7 +24,7 @@ use libp2p::{
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
 use std::task::{Context, Poll};
 use tokio::task::JoinHandle;
-use tracing::{debug, error, info, warn};
+use kaspa_core::{debug, error, info, warn};
 
 use crate::{
     stream::{Libp2pConnectInfo, Libp2pStreamHandle},
@@ -96,6 +96,7 @@ pub struct SwarmConfig {
     pub relay: RelayConfig,
     pub hole_punch: HolePunchConfig,
     pub relay_server: RelayServerConfig,
+    pub external_addresses: Vec<Multiaddr>,
 }
 
 /// Public command sender wrapper used by tonic integration.
@@ -277,6 +278,9 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 
     let mut swarm = build_swarm(local_key.clone(), &config)?;
+    for addr in &config.external_addresses {
+        swarm.add_external_address(addr.clone());
+    }
     let config = Arc::new(config);
     let mut control = swarm.behaviour_mut().stream.new_control();
     let mut incoming_streams = control.accept(stream_protocol()).map_err(|e| match e {
@@ -297,7 +301,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                 cmd = command_rx.next() => {
                     match cmd {
                         Some(SwarmCommand::Dial { peer, addrs, response }) => {
-                            debug!(%peer, ?addrs, "Received dial command");
+                            debug!("Received dial command peer={} addrs={:?}", peer, addrs);
                             let mut reserved_relays: Vec<Multiaddr> = Vec::new();
                             if config.relay.enabled {
                                 let relay_candidates: Vec<_> = addrs.iter().cloned().filter(|addr| addr_uses_relay(addr)).collect();
@@ -336,9 +340,9 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                 // Dial using full multiaddrs - this is the most explicit approach
                                 for addr in &full_addrs {
                                     if let Err(err) = swarm.dial(addr.clone()) {
-                                        warn!(%peer, %err, ?addr, "Failed to dial address");
+                                        warn!("Failed to dial address peer={} addr={} err={}", peer, addr, err);
                                     } else {
-                                        debug!(%peer, ?addr, "Dial initiated successfully");
+                                        debug!("Dial initiated successfully peer={} addr={}", peer, addr);
                                         break; // Successfully initiated one dial, that's enough
                                     }
                                 }
@@ -351,7 +355,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                         }
                         Some(SwarmCommand::ListenOn { addr, response }) => {
                             let addr_string = addr.to_string();
-                            info!(%addr_string, has_response = response.is_some(), "Received ListenOn command");
+                            info!("Received ListenOn command addr={} has_response={}", addr_string, response.is_some());
                             match swarm.listen_on(addr) {
                                 Ok(_) => {
                                     if let Some(tx) = response {
@@ -359,7 +363,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                     }
                                 }
                                 Err(err) => {
-                                    error!(%addr_string, %err, "failed to listen");
+                                    error!("failed to listen addr={} err={}", addr_string, err);
                                     if let Some(tx) = response {
                                         let _ = tx.send(Err(BridgeError::DialFailed(format!("listen error: {err}"))));
                                     }
@@ -374,19 +378,19 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     if let Some((peer, response, outcome, reserved_relays)) = dial_result {
                         match outcome {
                             Ok(stream) => {
-                                debug!(%peer, "Stream opened successfully");
+                                debug!("Stream opened successfully peer={}", peer);
                                 peer_book.confirm_addresses(peer, &reserved_relays);
                                 let info = peer_book.info_for(peer);
                                 let handle = Libp2pStreamHandle::new(stream, info);
                                 if response.send(Ok(handle)).is_err() {
-                                    debug!(%peer, "dial response channel dropped");
+                                    debug!("dial response channel dropped peer={}", peer);
                                 }
                             }
                             Err(err) => {
-                                warn!(%peer, %err, "Failed to open stream");
+                                warn!("Failed to open stream peer={} err={}", peer, err);
                                 peer_book.release_pending(peer, &reserved_relays);
                                 if response.send(Err(err)).is_err() {
-                                    debug!(%peer, "dial response channel dropped (error)");
+                                    debug!("dial response channel dropped (error) peer={}", peer);
                                 }
                             }
                         }
@@ -398,7 +402,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             let info = peer_book.info_for(peer_id);
                             let handle = Libp2pStreamHandle::new(stream, info);
                             if incoming_tx.send(handle).await.is_err() {
-                                warn!(%peer_id, "incoming queue closed; dropping inbound stream");
+                                warn!("incoming queue closed; dropping inbound stream peer={}", peer_id);
                             }
                         }
                         None => break,
@@ -407,9 +411,9 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                 swarm_event = swarm.select_next_some() => {
                     match swarm_event {
                         SwarmEvent::NewListenAddr { ref address, .. } => {
-                            info!(%address, "Swarm listening");
+                            info!("Swarm listening address={}", address);
                             for (requested, ack) in pending_listen_acks.drain(..) {
-                                info!(listen_addr = %address, requested_addr = %requested, "Resolving ListenOn command");
+                                info!("Resolving ListenOn command listen_addr={} requested_addr={}", address, requested);
                                 let _ = ack.send(Ok(()));
                             }
                         }
@@ -497,8 +501,8 @@ fn build_behaviour(
     let public = key.public();
 
     let relay_client = Toggle::from(relay_behaviour);
-    let relay_server = if config.relay_server.enabled {
-        info!(peer = %public.to_peer_id(), "libp2p relay server behaviour enabled");
+        let relay_server = if config.relay_server.enabled {
+        info!("libp2p relay server behaviour enabled peer={}", public.to_peer_id());
         Toggle::from(Some(relay::Behaviour::new(public.to_peer_id(), Default::default())))
     } else {
         Toggle::from(None)
@@ -661,25 +665,25 @@ fn build_connect_info(peer: PeerId, addr: Multiaddr) -> Libp2pConnectInfo {
 fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-            debug!(%peer_id, ?endpoint, "Swarm connection established");
+            debug!("Swarm connection established peer={} endpoint={:?}", peer_id, endpoint);
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
                 peer_book.record_address(peer_id, addr);
             }
         }
         SwarmEvent::ConnectionClosed { peer_id, endpoint, .. } => {
-            debug!(%peer_id, ?endpoint, "Swarm connection closed");
+            debug!("Swarm connection closed peer={} endpoint={:?}", peer_id, endpoint);
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
                 peer_book.remove_address(peer_id, &addr);
             }
         }
         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
-            debug!(?peer_id, %error, "Outgoing connection error");
+            debug!("Outgoing connection error peer_id={:?} error={}", peer_id, error);
         }
         SwarmEvent::IncomingConnectionError { error, .. } => {
-            debug!(%error, "Incoming connection error");
+            debug!("Incoming connection error error={}", error);
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => {
-            debug!(?event, "Identify behaviour event");
+            debug!("Identify behaviour event event={:?}", event);
             if let identify::Event::Received { peer_id, info, .. } = event {
                 for addr in info.listen_addrs {
                     peer_book.record_address(peer_id, addr);
@@ -688,24 +692,24 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
             use libp2p::relay::client::Event;
-            debug!(?event, "Relay client behaviour event");
+            debug!("Relay client behaviour event event={:?}", event);
             #[allow(unreachable_patterns)]
             match event {
                 Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
                     if renewal {
-                        info!(%relay_peer_id, "libp2p relay reservation renewed");
+                        info!("libp2p relay reservation renewed relay_peer_id={}", relay_peer_id);
                     } else {
-                        info!(%relay_peer_id, "libp2p relay reservation accepted");
+                        info!("libp2p relay reservation accepted relay_peer_id={}", relay_peer_id);
                     }
                 }
                 Event::OutboundCircuitEstablished { relay_peer_id, limit } => {
-                    info!(%relay_peer_id, ?limit, "Outbound circuit established via relay");
+                    info!("Outbound circuit established via relay relay_peer_id={} limit={:?}", relay_peer_id, limit);
                 }
                 Event::InboundCircuitEstablished { src_peer_id, limit } => {
-                    info!(%src_peer_id, ?limit, "Inbound circuit established");
+                    info!("Inbound circuit established src_peer_id={} limit={:?}", src_peer_id, limit);
                 }
                 other => {
-                    warn!(?other, "Unhandled relay client event");
+                    warn!("Unhandled relay client event event={:?}", other);
                 }
             }
         }
@@ -714,59 +718,88 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
             match event {
                 Event::ReservationReqAccepted { src_peer_id, renewed } => {
                     if renewed {
-                        info!(%src_peer_id, "Relay server: reservation renewed");
+                        info!("Relay server: reservation renewed src_peer_id={}", src_peer_id);
                     } else {
-                        info!(%src_peer_id, "Relay server: reservation accepted");
+                        info!("Relay server: reservation accepted src_peer_id={}", src_peer_id);
                     }
                 }
                 #[allow(deprecated)]
                 Event::ReservationReqAcceptFailed { src_peer_id, error } => {
-                    warn!(%src_peer_id, ?error, "Relay server: reservation accept failed");
+                    warn!("Relay server: reservation accept failed src_peer_id={} error={:?}", src_peer_id, error);
                 }
                 Event::ReservationReqDenied { src_peer_id, status } => {
-                    warn!(%src_peer_id, ?status, "Relay server: reservation request denied");
+                    warn!("Relay server: reservation request denied src_peer_id={} status={:?}", src_peer_id, status);
                 }
                 #[allow(deprecated)]
                 Event::ReservationReqDenyFailed { src_peer_id, error } => {
-                    debug!(%src_peer_id, ?error, "Relay server: reservation deny failed");
+                    debug!("Relay server: reservation deny failed src_peer_id={} error={:?}", src_peer_id, error);
                 }
                 Event::ReservationClosed { src_peer_id } => {
-                    debug!(%src_peer_id, "Relay server: reservation closed");
+                    warn!("Relay server: reservation closed src_peer_id={}", src_peer_id);
                 }
                 Event::ReservationTimedOut { src_peer_id } => {
-                    debug!(%src_peer_id, "Relay server: reservation timed out");
+                    warn!("Relay server: reservation timed out src_peer_id={}", src_peer_id);
                 }
                 Event::CircuitReqAccepted { src_peer_id, dst_peer_id } => {
-                    info!(%src_peer_id, %dst_peer_id, "Relay server: circuit request accepted");
+                    info!("Relay server: circuit request accepted src_peer_id={} dst_peer_id={}", src_peer_id, dst_peer_id);
                 }
                 Event::CircuitReqDenied { src_peer_id, dst_peer_id, status } => {
-                    debug!(%src_peer_id, %dst_peer_id, ?status, "Relay server: circuit request denied");
+                    warn!(
+                        "Relay server: circuit request denied src_peer_id={} dst_peer_id={} status={:?}",
+                        src_peer_id, dst_peer_id, status
+                    );
                 }
                 #[allow(deprecated)]
                 Event::CircuitReqOutboundConnectFailed { src_peer_id, dst_peer_id, error } => {
-                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit outbound connect failed");
+                    warn!(
+                        "Relay server: circuit outbound connect failed src_peer_id={} dst_peer_id={} error={:?}",
+                        src_peer_id, dst_peer_id, error
+                    );
                 }
                 #[allow(deprecated)]
                 Event::CircuitReqAcceptFailed { src_peer_id, dst_peer_id, error } => {
-                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit accept failed");
+                    debug!(
+                        "Relay server: circuit accept failed src_peer_id={} dst_peer_id={} error={:?}",
+                        src_peer_id, dst_peer_id, error
+                    );
                 }
                 #[allow(deprecated)]
                 Event::CircuitReqDenyFailed { src_peer_id, dst_peer_id, error } => {
-                    debug!(%src_peer_id, %dst_peer_id, ?error, "Relay server: circuit deny failed");
+                    debug!(
+                        "Relay server: circuit deny failed src_peer_id={} dst_peer_id={} error={:?}",
+                        src_peer_id, dst_peer_id, error
+                    );
                 }
                 Event::CircuitClosed { src_peer_id, dst_peer_id, error } => {
                     if let Some(err) = error {
-                        debug!(%src_peer_id, %dst_peer_id, ?err, "Relay server: circuit closed with error");
+                        debug!(
+                            "Relay server: circuit closed with error src_peer_id={} dst_peer_id={} err={:?}",
+                            src_peer_id, dst_peer_id, err
+                        );
                     } else {
-                        debug!(%src_peer_id, %dst_peer_id, "Relay server: circuit closed");
+                        debug!(
+                            "Relay server: circuit closed src_peer_id={} dst_peer_id={}",
+                            src_peer_id, dst_peer_id
+                        );
                     }
                 }
             }
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
-            debug!(?event, "DCUtR behaviour event");
+            debug!("DCUtR behaviour event event={:?}", event);
         }
-        SwarmEvent::Behaviour(_) => {}
+        SwarmEvent::ListenerClosed { addresses, reason, .. } => {
+            warn!("Swarm listener closed addresses={:?} reason={:?}", addresses, reason);
+        }
+        SwarmEvent::ListenerError { error, .. } => {
+            warn!("Swarm listener error error={}", error);
+        }
+        SwarmEvent::NewExternalAddrCandidate { address } => {
+            debug!("New external addr candidate {}", address);
+        }
+        SwarmEvent::ExternalAddrConfirmed { address } => {
+            debug!("External addr confirmed {}", address);
+        }
         _ => {}
     }
 }

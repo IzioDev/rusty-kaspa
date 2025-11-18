@@ -151,7 +151,7 @@ async fn check_node_status() -> Result<()> {
                 println!("Connected relay-capable peers (relay_port present): {}", relay_candidates.len());
                 for peer in relay_candidates.iter().take(5) {
                     println!(
-                        "  {} services={} relayPort={:?} is_libp2p={} relay_used={:?}",
+                        "  {} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
                         peer.address, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
                     );
                 }
@@ -164,7 +164,7 @@ async fn check_node_status() -> Result<()> {
                 } else {
                     for peer in active_circuits {
                         println!(
-                            "  peer={} multiaddr={:?} relay_used={:?}",
+                            "  peer={} multiaddr={:?} libp2p_relay_used={:?}",
                             peer.address, peer.libp2p_multiaddr, peer.libp2p_relay_used
                         );
                         if let Some(ma) = &peer.libp2p_multiaddr {
@@ -176,7 +176,7 @@ async fn check_node_status() -> Result<()> {
                 println!("Sample peer set:");
                 for peer in peer_info.iter().take(5) {
                     println!(
-                        "  {} outbound={} services={} relayPort={:?} is_libp2p={} relay_used={:?}",
+                        "  {} outbound={} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
                         peer.address, peer.is_outbound, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
                     );
                 }

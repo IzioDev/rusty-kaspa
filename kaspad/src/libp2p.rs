@@ -1,7 +1,7 @@
 use std::{
     convert::TryFrom,
     fs,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
@@ -168,6 +168,7 @@ pub struct Libp2pBridgeConfig {
     pub listen_port: u16,
     pub identity_path: PathBuf,
     pub has_public_address: bool,
+    pub advertised_ips: Vec<IpAddr>,
     pub helper_address: Option<SocketAddr>,
     pub reservation_multiaddrs: Vec<Multiaddr>,
 }
@@ -192,7 +193,8 @@ pub struct Libp2pBridgeService {
     reservation_task: Mutex<Option<JoinHandle<()>>>,
 }
 
-const RESERVATION_REFRESH_INTERVAL: Duration = Duration::from_secs(60);
+// Reservations last ~60 seconds on the relay; refresh slightly before expiry to avoid hammering it.
+const RESERVATION_REFRESH_INTERVAL: Duration = Duration::from_secs(55);
 
 impl Libp2pBridgeService {
     pub fn new(flow_context: Arc<FlowContext>, config: Libp2pBridgeConfig, status: Arc<Libp2pStatus>) -> Self {
@@ -217,6 +219,13 @@ impl Libp2pBridgeService {
         if matches!(role, Libp2pRole::PublicRelay) {
             swarm_config.relay_server.enabled = true;
             info!("libp2p relay server enabled for public relay mode");
+            for ip in &self.config.advertised_ips {
+                let addr = match ip {
+                    IpAddr::V4(v4) => Multiaddr::empty().with(Protocol::Ip4(*v4)).with(Protocol::Tcp(self.config.listen_port)),
+                    IpAddr::V6(v6) => Multiaddr::empty().with(Protocol::Ip6(*v6)).with(Protocol::Tcp(self.config.listen_port)),
+                };
+                swarm_config.external_addresses.push(addr);
+            }
         }
 
         // Enable relay client behavior if reservations are configured
@@ -307,7 +316,7 @@ impl Libp2pBridgeService {
 
     async fn start_listeners(&self, handle: &mut SwarmHandle) -> Result<Vec<String>, Libp2pBridgeError> {
         let mut active = Vec::new();
-        for addr in listen_multiaddrs(self.config.listen_port) {
+        for addr in listen_multiaddrs(self.config.listen_port, &self.config.advertised_ips) {
             let addr_string = addr.to_string();
             let (response_tx, response_rx) = oneshot::channel::<Result<(), BridgeError>>();
             handle
@@ -580,11 +589,23 @@ fn load_or_create_identity(path: &Path) -> Result<identity::Keypair, Libp2pBridg
     }
 }
 
-fn listen_multiaddrs(port: u16) -> Vec<Multiaddr> {
-    vec![
+fn listen_multiaddrs(port: u16, advertised_ips: &[IpAddr]) -> Vec<Multiaddr> {
+    let mut addrs = vec![
         Multiaddr::empty().with(Protocol::Ip4(Ipv4Addr::UNSPECIFIED)).with(Protocol::Tcp(port)),
         Multiaddr::empty().with(Protocol::Ip6(Ipv6Addr::UNSPECIFIED)).with(Protocol::Tcp(port)),
-    ]
+    ];
+    for ip in advertised_ips {
+        match ip {
+            IpAddr::V4(v4) if !v4.is_unspecified() => {
+                addrs.push(Multiaddr::empty().with(Protocol::Ip4(*v4)).with(Protocol::Tcp(port)));
+            }
+            IpAddr::V6(v6) if !v6.is_unspecified() => {
+                addrs.push(Multiaddr::empty().with(Protocol::Ip6(*v6)).with(Protocol::Tcp(port)));
+            }
+            _ => {}
+        }
+    }
+    addrs
 }
 
 fn metadata_from_info(info: &BridgeLibp2pInfo) -> ConnectionMetadata {

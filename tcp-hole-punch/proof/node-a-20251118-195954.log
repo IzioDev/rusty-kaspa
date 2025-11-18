@@ -1,0 +1,44 @@
+ENV SNAPSHOT: [("KASPA_WSRPC_URL", "ws://127.0.0.1:17110/"), ("SHELL", "/bin/bash"), ("PWD", "/home/ubuntu/rusty-kaspa"), ("LOGNAME", "ubuntu"), ("XDG_SESSION_TYPE", "tty"), ("HOME", "/home/ubuntu"), ("LANG", "C.UTF-8"), ("SSH_CONNECTION", "10.0.0.150 53676 10.0.3.26 22"), ("XDG_SESSION_CLASS", "user"), ("USER", "ubuntu"), ("SHLVL", "0"), ("XDG_SESSION_ID", "1111"), ("XDG_RUNTIME_DIR", "/run/user/1000"), ("SSH_CLIENT", "10.0.0.150 53676 22"), ("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"), ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus"), ("OLDPWD", "/home/ubuntu"), ("_", "/tmp/kaspa-wrpc-simple-client-example")]
+ENV KASPA_WSRPC_URL=ws://127.0.0.1:17110/
+Connecting to custom wRPC endpoint: ws://127.0.0.1:17110/
+Node version: 1.0.1
+Network: mainnet
+Node is synced: true
+Node is indexing UTXOs: false
+libp2p enabled: true, role: Some("client-only")
+listen addresses: []
+private inbound target: Some(8), relay inbound limit: Some(2)
+Block count: 1273316
+Header count: 1273316
+Tip hashes:
+72902c9de389397fa3fc6f1ff0f8d64a5e911f6c9dafd7fbc23b4d4887fc49e6
+0bf5017cc28497af09afb38aff90e4830973c4525695cdef845768391d672be7
+51540626d74d326170e6f305b95ab730c82fd126074273880445ae97a115acfd
+7d7719ace1d5b08e5619d0983ff8c57f28579741f3a8a69d0b6d7441005a17d5
+b8749b229892486c2db4f705ce0a2242eb2de79086833b614dd159e9f87cc2de
+238a29b85918f326a660263e56bcd94dc9b81c0bbb8e7e18553ea8dd98be6a92
+7e27ee7eada16a92bf54bd074bf7f04ae74e6c2131ea8499762b4626ceb9384b
+947792557016abc6b06c7a28045c24bd58bb98358b84d9d23ae43975e125efaa
+Difficulty: 30808758369452280
+Past median time: 1763456392674
+Virtual parent hashes:
+72902c9de389397fa3fc6f1ff0f8d64a5e911f6c9dafd7fbc23b4d4887fc49e6
+0bf5017cc28497af09afb38aff90e4830973c4525695cdef845768391d672be7
+238a29b85918f326a660263e56bcd94dc9b81c0bbb8e7e18553ea8dd98be6a92
+7e27ee7eada16a92bf54bd074bf7f04ae74e6c2131ea8499762b4626ceb9384b
+51540626d74d326170e6f305b95ab730c82fd126074273880445ae97a115acfd
+947792557016abc6b06c7a28045c24bd58bb98358b84d9d23ae43975e125efaa
+7d7719ace1d5b08e5619d0983ff8c57f28579741f3a8a69d0b6d7441005a17d5
+b8749b229892486c2db4f705ce0a2242eb2de79086833b614dd159e9f87cc2de
+Pruning point hash: abd6e5944cfd125ddbf6c9b98635e05683a05522476794f8bfe201b5a688ed82
+Virtual DAA score: 280357213
+Sink: 947792557016abc6b06c7a28045c24bd58bb98358b84d9d23ae43975e125efaa
+Gossiped relays: ["139.180.172.111:16111 (relayPort=Some(16112))"]
+Total connected peers: 1
+Connected relay-capable peers (relay_port present): 1
+  149.28.164.184:16111 services=1 relayPort=Some(18111) is_libp2p=false relay_used=None
+Active libp2p relay circuits:
+  (none)
+Sample peer set:
+  149.28.164.184:16111 outbound=true services=1 relayPort=Some(18111) is_libp2p=false relay_used=None
+Well done! You successfully completed your first client connection to Kaspa node!
