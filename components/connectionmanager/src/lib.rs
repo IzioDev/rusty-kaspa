@@ -244,8 +244,12 @@ impl ConnectionManager {
                         progressing = true;
                     }
                     Err(ConnectionError::ProtocolError(ProtocolError::PeerAlreadyExists(_))) => {
-                        // We avoid marking the existing connection as connection failure
-                        debug!("Failed connecting to {:?}, peer already exists", net_addr);
+                        // We avoid marking the existing connection as connection failure but emit diagnostics so relay circuits can be correlated with duplicates.
+                        info!(
+                            "Connection attempt skipped: peer already exists addr={:?} relay={}",
+                            net_addr,
+                            net_addr.is_libp2p_relay()
+                        );
                     }
                     Err(err) => {
                         debug!("Failed connecting to {:?}, err: {}", net_addr, err);
