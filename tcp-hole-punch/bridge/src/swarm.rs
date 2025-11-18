@@ -263,7 +263,7 @@ struct BridgeBehaviour {
     ping: libp2p::ping::Behaviour,
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
-    dcutr: Toggle<dcutr::Behaviour>,
+    dcutr: dcutr::Behaviour,
     stream: lpstream::Behaviour,
 }
 
@@ -518,13 +518,10 @@ fn build_behaviour(
     } else {
         Toggle::from(None)
     };
-    let dcutr = if config.hole_punch.enable_dcutr {
-        info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
-        Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())))
-    } else {
-        info!("DCUtR behaviour DISABLED for peer={}", public.to_peer_id());
-        Toggle::from(None)
-    };
+
+    // Always enable DCUtR for hole-punching support
+    info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
+    let dcutr = dcutr::Behaviour::new(public.to_peer_id());
 
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
