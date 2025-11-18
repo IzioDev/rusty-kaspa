@@ -714,11 +714,13 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
             debug!("Incoming connection error error={}", error);
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => {
-            debug!("Identify behaviour event event={:?}", event);
-            if let identify::Event::Received { peer_id, info, .. } = event {
-                for addr in info.listen_addrs {
-                    peer_book.record_address(peer_id, addr);
+            if let identify::Event::Received { peer_id, ref info, .. } = event {
+                info!("Identify received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+                for addr in &info.listen_addrs {
+                    peer_book.record_address(peer_id, addr.clone());
                 }
+            } else {
+                debug!("Identify behaviour event event={:?}", event);
             }
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
