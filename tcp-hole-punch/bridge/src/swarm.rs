@@ -13,6 +13,7 @@ use futures::{
     stream::FuturesUnordered,
     SinkExt, StreamExt,
 };
+use kaspa_core::{debug, error, info, warn};
 use libp2p::{
     core::connection::ConnectedPoint,
     dcutr, identify,
@@ -24,7 +25,6 @@ use libp2p::{
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
 use std::task::{Context, Poll};
 use tokio::task::JoinHandle;
-use kaspa_core::{debug, error, info, warn};
 
 use crate::{
     stream::{Libp2pConnectInfo, Libp2pStreamHandle},
@@ -501,7 +501,7 @@ fn build_behaviour(
     let public = key.public();
 
     let relay_client = Toggle::from(relay_behaviour);
-        let relay_server = if config.relay_server.enabled {
+    let relay_server = if config.relay_server.enabled {
         info!("libp2p relay server behaviour enabled peer={}", public.to_peer_id());
         Toggle::from(Some(relay::Behaviour::new(public.to_peer_id(), Default::default())))
     } else {
@@ -777,10 +777,7 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                             src_peer_id, dst_peer_id, err
                         );
                     } else {
-                        debug!(
-                            "Relay server: circuit closed src_peer_id={} dst_peer_id={}",
-                            src_peer_id, dst_peer_id
-                        );
+                        debug!("Relay server: circuit closed src_peer_id={} dst_peer_id={}", src_peer_id, dst_peer_id);
                     }
                 }
             }
