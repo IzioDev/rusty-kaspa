@@ -40,7 +40,7 @@ use tokio::{
     select,
     sync::Mutex,
     task::JoinHandle,
-    time::{interval, sleep, timeout, MissedTickBehavior},
+    time::{interval, interval_at, sleep, timeout, Instant, MissedTickBehavior},
 };
 
 /// Mode controlling whether we expose a libp2p listener for incoming hole-punched streams.
@@ -374,7 +374,7 @@ impl Libp2pBridgeService {
         }
 
         let service = Arc::clone(self);
-        let mut ticker = interval(RESERVATION_REFRESH_INTERVAL);
+        let mut ticker = interval_at(Instant::now() + RESERVATION_REFRESH_INTERVAL, RESERVATION_REFRESH_INTERVAL);
         ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
         info!("libp2p reservation refresher started ({}s interval)", RESERVATION_REFRESH_INTERVAL.as_secs());
         let shutdown = service.shutdown.listener.clone();
