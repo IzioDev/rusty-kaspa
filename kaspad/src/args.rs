@@ -104,6 +104,8 @@ pub struct Args {
     pub libp2p_helper_address: Option<String>,
     #[serde(rename = "libp2p-reservation")]
     pub libp2p_reservation_multiaddrs: Vec<String>,
+    #[serde(rename = "libp2p-external-address")]
+    pub libp2p_external_addresses: Vec<String>,
 }
 
 impl Default for Args {
@@ -161,6 +163,7 @@ impl Default for Args {
             libp2p_relay_port: None,
             libp2p_helper_address: None,
             libp2p_reservation_multiaddrs: Vec::new(),
+            libp2p_external_addresses: Vec::new(),
         }
     }
 }
@@ -443,6 +446,13 @@ a large RAM (~64GB) can set this value to ~3.0-4.0 and gain superior performance
                 .value_parser(clap::value_parser!(String))
                 .help("Optional <host:port> for the libp2p helper control server (set to 'off' to disable). Defaults to 127.0.0.1:(relay_port+100).")
         )
+        .arg(
+            Arg::new("libp2p-external-address")
+                .long("libp2p-external-address")
+                .require_equals(true)
+                .action(ArgAction::Append)
+                .help("External multiaddr (repeatable) to advertise for DCUtR hole-punching, e.g. /ip4/YOUR_PUBLIC_IP/tcp/16112")
+        )
         ;
 
     #[cfg(feature = "devnet-prealloc")]
@@ -543,6 +553,11 @@ impl Args {
                 &m,
                 "libp2p-reservation",
                 defaults.libp2p_reservation_multiaddrs,
+            ),
+            libp2p_external_addresses: arg_match_many_unwrap_or::<String>(
+                &m,
+                "libp2p-external-address",
+                defaults.libp2p_external_addresses,
             ),
 
             #[cfg(feature = "devnet-prealloc")]

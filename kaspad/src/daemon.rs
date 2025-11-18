@@ -657,6 +657,11 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         .iter()
         .map(|raw| raw.parse().unwrap_or_else(|err| panic!("invalid --libp2p-reservation multiaddr '{raw}': {err}")))
         .collect();
+    let external_addresses: Vec<Multiaddr> = args
+        .libp2p_external_addresses
+        .iter()
+        .map(|raw| raw.parse().unwrap_or_else(|err| panic!("invalid --libp2p-external-address multiaddr '{raw}': {err}")))
+        .collect();
     let mut advertised_ips: Vec<IpAddr> = Vec::new();
     if let Some(external) = args.externalip.as_ref() {
         let normalized = external.normalize(config.default_p2p_port());
@@ -680,6 +685,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         advertised_ips,
         helper_address,
         reservation_multiaddrs,
+        external_addresses,
     };
     let libp2p_service = Arc::new(Libp2pBridgeService::new(flow_context.clone(), libp2p_config, libp2p_status.clone()));
 

@@ -171,6 +171,7 @@ pub struct Libp2pBridgeConfig {
     pub advertised_ips: Vec<IpAddr>,
     pub helper_address: Option<SocketAddr>,
     pub reservation_multiaddrs: Vec<Multiaddr>,
+    pub external_addresses: Vec<Multiaddr>,
 }
 
 impl Libp2pBridgeConfig {
@@ -227,6 +228,12 @@ impl Libp2pBridgeService {
                 };
                 swarm_config.external_addresses.push(addr);
             }
+        }
+
+        // Apply manually configured external addresses (for DCUtR hole-punching)
+        for addr in &self.config.external_addresses {
+            swarm_config.external_addresses.push(addr.clone());
+            info!("libp2p added manual external address for DCUtR: {}", addr);
         }
 
         // Enable relay client behavior if reservations are configured
