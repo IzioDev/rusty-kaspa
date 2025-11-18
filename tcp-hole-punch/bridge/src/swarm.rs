@@ -815,7 +815,7 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
             }
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
-            debug!("DCUtR behaviour event event={:?}", event);
+            info!("DCUtR event: {:?}", event);
         }
         SwarmEvent::ListenerClosed { addresses, reason, .. } => {
             warn!("Swarm listener closed addresses={:?} reason={:?}", addresses, reason);
