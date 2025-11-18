@@ -193,8 +193,9 @@ pub struct Libp2pBridgeService {
     reservation_task: Mutex<Option<JoinHandle<()>>>,
 }
 
-// Reservations last ~60 seconds on the relay; refresh slightly before expiry to avoid hammering it.
-const RESERVATION_REFRESH_INTERVAL: Duration = Duration::from_secs(55);
+// Reservations are rate-limited (~1 request per 2 minutes) on the relay.
+// Refresh slightly beyond that limit so renewals succeed without dropping the existing circuit.
+const RESERVATION_REFRESH_INTERVAL: Duration = Duration::from_secs(150);
 
 impl Libp2pBridgeService {
     pub fn new(flow_context: Arc<FlowContext>, config: Libp2pBridgeConfig, status: Arc<Libp2pStatus>) -> Self {
