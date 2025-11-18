@@ -1,9 +1,12 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    ops::{Deref, DerefMut},
+    pin::Pin,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
 };
 
 use futures::{
@@ -503,7 +506,15 @@ fn build_behaviour(
     let relay_client = Toggle::from(relay_behaviour);
     let relay_server = if config.relay_server.enabled {
         info!("libp2p relay server behaviour enabled peer={}", public.to_peer_id());
-        Toggle::from(Some(relay::Behaviour::new(public.to_peer_id(), Default::default())))
+        let mut relay_server_config = relay::Config::default();
+        relay_server_config.max_reservations = 256;
+        relay_server_config.max_reservations_per_peer = 32;
+        relay_server_config.reservation_duration = Duration::from_secs(10 * 60);
+        relay_server_config.max_circuits = 128;
+        relay_server_config.max_circuits_per_peer = 32;
+        relay_server_config.max_circuit_duration = Duration::from_secs(10 * 60);
+        relay_server_config.max_circuit_bytes = 16 * 1024 * 1024;
+        Toggle::from(Some(relay::Behaviour::new(public.to_peer_id(), relay_server_config)))
     } else {
         Toggle::from(None)
     };
