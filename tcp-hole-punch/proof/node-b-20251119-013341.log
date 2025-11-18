@@ -1,0 +1,39 @@
+ENV SNAPSHOT: [("KASPA_WSRPC_URL", "ws://127.0.0.1:17110/"), ("SHELL", "/bin/bash"), ("PWD", "/root/rusty-kaspa"), ("LOGNAME", "root"), ("XDG_SESSION_TYPE", "tty"), ("HOME", "/root"), ("LANG", "en_US.UTF-8"), ("SSH_CONNECTION", "87.121.72.51 51446 139.180.172.111 22"), ("XDG_SESSION_CLASS", "user"), ("USER", "root"), ("SHLVL", "0"), ("XDG_SESSION_ID", "1872"), ("XDG_RUNTIME_DIR", "/run/user/0"), ("SSH_CLIENT", "87.121.72.51 51446 22"), ("PATH", "/root/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"), ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/0/bus"), ("OLDPWD", "/root"), ("_", "target/debug/kaspa-wrpc-simple-client-example")]
+ENV KASPA_WSRPC_URL=ws://127.0.0.1:17110/
+Connecting to custom wRPC endpoint: ws://127.0.0.1:17110/
+Total connected peers: 11
+Connected relay-capable peers (relay_port present): 1
+  149.28.164.184:16111 services=1 relayPort=Some(18111) is_libp2p=false libp2p_relay_used=None
+Active libp2p relay circuits:
+  peer=149.28.164.184:18111 multiaddr=Some("/ip4/149.28.164.184/tcp/18111/p2p/12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG/p2p-circuit/p2p/12D3KooWQH8UDJtmWgCnwGZDNA1Li14FbNPmDsaoAiNQgduNF8Jk") libp2p_relay_used=Some(true)
+    libp2p_multiaddr=/ip4/149.28.164.184/tcp/18111/p2p/12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG/p2p-circuit/p2p/12D3KooWQH8UDJtmWgCnwGZDNA1Li14FbNPmDsaoAiNQgduNF8Jk
+Sample peer set:
+  149.28.164.184:18111 outbound=false services=0 relayPort=None is_libp2p=true libp2p_relay_used=Some(true)
+  50.72.61.175:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  37.27.99.17:15111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  129.151.245.48:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  149.28.164.184:16111 outbound=true services=1 relayPort=Some(18111) is_libp2p=false libp2p_relay_used=None
+Node version: 1.0.1
+Network: mainnet
+Node is synced: true
+Node is indexing UTXOs: false
+libp2p enabled: true, role: Some("public-relay")
+listen addresses: ["/ip4/0.0.0.0/tcp/16112", "/ip6/::/tcp/16112", "/ip4/139.180.172.111/tcp/16112"]
+private inbound target: None, relay inbound limit: None
+Block count: 1472051
+Header count: 1472051
+Tip hashes:
+9d02f6e11be1849935f8716743f9a056227e1c7e1693e154407e4ca26548efd0
+a41da05f198ea0ee7583d6608469035745751963064aace4f696b8d7d56550d6
+9e780d138e5b3fe87d187c288f4341d33a688f38c81028ef7fcaa1ca3673f53c
+Difficulty: 29810284967677384
+Past median time: 1763476299275
+Virtual parent hashes:
+9d02f6e11be1849935f8716743f9a056227e1c7e1693e154407e4ca26548efd0
+a41da05f198ea0ee7583d6608469035745751963064aace4f696b8d7d56550d6
+9e780d138e5b3fe87d187c288f4341d33a688f38c81028ef7fcaa1ca3673f53c
+Pruning point hash: abd6e5944cfd125ddbf6c9b98635e05683a05522476794f8bfe201b5a688ed82
+Virtual DAA score: 280555948
+Sink: 9e780d138e5b3fe87d187c288f4341d33a688f38c81028ef7fcaa1ca3673f53c
+Gossiped relays: []
+Well done! You successfully completed your first client connection to Kaspa node!

@@ -1,0 +1,42 @@
+ENV SNAPSHOT: [("KASPA_WSRPC_URL", "ws://127.0.0.1:17110/"), ("SHELL", "/bin/bash"), ("PWD", "/home/ubuntu/rusty-kaspa"), ("LOGNAME", "ubuntu"), ("XDG_SESSION_TYPE", "tty"), ("HOME", "/home/ubuntu"), ("LANG", "C.UTF-8"), ("SSH_CONNECTION", "10.0.0.163 51469 10.0.3.26 22"), ("XDG_SESSION_CLASS", "user"), ("USER", "ubuntu"), ("SHLVL", "0"), ("XDG_SESSION_ID", "2663"), ("XDG_RUNTIME_DIR", "/run/user/1000"), ("SSH_CLIENT", "10.0.0.163 51469 22"), ("PATH", "/home/ubuntu/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin"), ("DBUS_SESSION_BUS_ADDRESS", "unix:path=/run/user/1000/bus"), ("OLDPWD", "/home/ubuntu"), ("_", "target/debug/kaspa-wrpc-simple-client-example")]
+ENV KASPA_WSRPC_URL=ws://127.0.0.1:17110/
+Connecting to custom wRPC endpoint: ws://127.0.0.1:17110/
+Total connected peers: 11
+Connected relay-capable peers (relay_port present): 2
+  149.28.164.184:16111 services=1 relayPort=Some(18111) is_libp2p=false libp2p_relay_used=None
+  149.28.164.184:18111 services=1 relayPort=Some(16112) is_libp2p=true libp2p_relay_used=Some(true)
+Active libp2p relay circuits:
+  peer=149.28.164.184:18111 multiaddr=Some("/ip4/149.28.164.184/tcp/18111/p2p/12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG/p2p-circuit/p2p/12D3KooWPF3XdqHvpQ2Yba7paTctNMQbE7dg9ZPwW3PeTpBxZCkt") libp2p_relay_used=Some(true)
+    libp2p_multiaddr=/ip4/149.28.164.184/tcp/18111/p2p/12D3KooWKWQMLKnDg9BizoExsXWiuebcitxtJa3LCHdcWT2jP7yG/p2p-circuit/p2p/12D3KooWPF3XdqHvpQ2Yba7paTctNMQbE7dg9ZPwW3PeTpBxZCkt
+Sample peer set:
+  82.165.188.245:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  75.46.154.168:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  37.120.164.199:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  92.112.177.60:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+  73.85.175.116:16111 outbound=true services=0 relayPort=None is_libp2p=false libp2p_relay_used=None
+Node version: 1.0.1
+Network: mainnet
+Node is synced: true
+Node is indexing UTXOs: false
+libp2p enabled: true, role: Some("client-only")
+listen addresses: []
+private inbound target: Some(8), relay inbound limit: Some(2)
+Block count: 1472416
+Header count: 1472416
+Tip hashes:
+aa8a7d38f5d787a67c44fd13a5abc9fdcafd9a04b9f7b232c2ab841adcfae165
+ba6c2d5b6ccb0c48e93e00d0bafdb8770798efadfe3cb6c34679ceb5c5fb97fd
+bd6737ea091ea601c5cd0c32c80a648b69a2446a81a5ee7588278143594079ef
+2ed180348dd1318b6cbd632215427fda94e3137d502c39cd3996fe645d7aec30
+Difficulty: 29755062648824540
+Past median time: 1763476339473
+Virtual parent hashes:
+bd6737ea091ea601c5cd0c32c80a648b69a2446a81a5ee7588278143594079ef
+2ed180348dd1318b6cbd632215427fda94e3137d502c39cd3996fe645d7aec30
+aa8a7d38f5d787a67c44fd13a5abc9fdcafd9a04b9f7b232c2ab841adcfae165
+ba6c2d5b6ccb0c48e93e00d0bafdb8770798efadfe3cb6c34679ceb5c5fb97fd
+Pruning point hash: abd6e5944cfd125ddbf6c9b98635e05683a05522476794f8bfe201b5a688ed82
+Virtual DAA score: 280556313
+Sink: 2ed180348dd1318b6cbd632215427fda94e3137d502c39cd3996fe645d7aec30
+Gossiped relays: []
+Well done! You successfully completed your first client connection to Kaspa node!
