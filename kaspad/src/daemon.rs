@@ -650,6 +650,7 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
     ));
     let relay_listen_port = args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1);
     let helper_address = derive_helper_address(args.libp2p_helper_address.clone(), relay_listen_port);
+    info!("libp2p helper address cli={:?} resolved={:?}", args.libp2p_helper_address.as_deref(), helper_address);
     let reservation_multiaddrs: Vec<Multiaddr> = args
         .libp2p_reservation_multiaddrs
         .iter()
