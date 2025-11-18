@@ -12,7 +12,7 @@ use futures::{channel::oneshot, SinkExt};
 use hole_punch_bridge::{
     spawn_swarm_with_config,
     stream::Libp2pConnectInfo as BridgeLibp2pInfo,
-    swarm::{SwarmCommand, SwarmHandle},
+    swarm::{SwarmCommand, SwarmCommandSender, SwarmHandle},
     tonic_integration::incoming_from_handle,
     BridgeError, SwarmConfig,
 };
@@ -40,7 +40,7 @@ use tokio::{
     select,
     sync::Mutex,
     task::JoinHandle,
-    time::{sleep, timeout},
+    time::{interval, sleep, timeout, MissedTickBehavior},
 };
 
 /// Mode controlling whether we expose a libp2p listener for incoming hole-punched streams.
@@ -189,7 +189,10 @@ pub struct Libp2pBridgeService {
     shutdown: SingleTrigger,
     swarm_handle: Mutex<Option<SwarmHandle>>,
     helper_task: Mutex<Option<JoinHandle<()>>>,
+    reservation_task: Mutex<Option<JoinHandle<()>>>,
 }
+
+const RESERVATION_REFRESH_INTERVAL: Duration = Duration::from_secs(60);
 
 impl Libp2pBridgeService {
     pub fn new(flow_context: Arc<FlowContext>, config: Libp2pBridgeConfig, status: Arc<Libp2pStatus>) -> Self {
@@ -200,6 +203,7 @@ impl Libp2pBridgeService {
             shutdown: SingleTrigger::default(),
             swarm_handle: Mutex::new(None),
             helper_task: Mutex::new(None),
+            reservation_task: Mutex::new(None),
         }
     }
 
@@ -234,7 +238,11 @@ impl Libp2pBridgeService {
 
         if !self.config.reservation_multiaddrs.is_empty() {
             info!("libp2p reservation targets: {:?}", self.config.reservation_multiaddrs);
+            info!("submitting {} libp2p reservation(s)", self.config.reservation_multiaddrs.len());
             self.start_reservations(&mut handle).await?;
+            info!("libp2p reservation submissions dispatched");
+            let command_tx = handle.command_tx();
+            self.start_reservation_refresher(command_tx).await;
         }
 
         match role {
@@ -287,6 +295,7 @@ impl Libp2pBridgeService {
     }
 
     async fn shutdown_swarm(&self) {
+        self.stop_reservation_refresher().await;
         self.stop_helper_server().await;
         let mut guard = self.swarm_handle.lock().await;
         if let Some(handle) = guard.take() {
@@ -319,28 +328,72 @@ impl Libp2pBridgeService {
     }
 
     async fn start_reservations(&self, handle: &mut SwarmHandle) -> Result<(), Libp2pBridgeError> {
+        let command_tx = handle.command_tx();
+        self.submit_reservations(command_tx).await
+    }
+
+    async fn submit_reservations(&self, mut command_tx: SwarmCommandSender) -> Result<(), Libp2pBridgeError> {
         for addr in &self.config.reservation_multiaddrs {
             let addr_string = addr.to_string();
 
             info!("requesting libp2p reservation via {addr_string}");
 
-            // Create response channel to verify listen_on succeeds
             let (response_tx, response_rx) = futures::channel::oneshot::channel();
-            handle
-                .command_tx()
+            command_tx
                 .send(SwarmCommand::ListenOn { addr: addr.clone(), response: Some(response_tx) })
                 .await
                 .map_err(|_| Libp2pBridgeError::CommandChannelClosed)?;
 
-            // Wait for listen_on to be processed
-            // The actual ReservationReqAccepted event will come through the swarm event loop
-            match response_rx.await {
-                Ok(Ok(())) => info!("libp2p listen_on sent for {addr_string}"),
-                Ok(Err(err)) => warn!("libp2p listen_on failed for {addr_string}: {err}"),
-                Err(_) => warn!("libp2p listen_on response channel dropped for {addr_string}"),
-            }
+            info!("libp2p reservation listen command sent for {addr_string}");
+
+            let addr_for_log = addr_string.clone();
+            tokio::spawn(async move {
+                match response_rx.await {
+                    Ok(Ok(())) => info!("libp2p listen_on acknowledged for {addr_for_log}"),
+                    Ok(Err(err)) => warn!("libp2p listen_on failed for {addr_for_log}: {err}"),
+                    Err(_) => warn!("libp2p listen_on response channel dropped for {addr_for_log}"),
+                }
+            });
         }
         Ok(())
+    }
+
+    async fn start_reservation_refresher(self: &Arc<Self>, command_tx: SwarmCommandSender) {
+        self.stop_reservation_refresher().await;
+        if self.config.reservation_multiaddrs.is_empty() {
+            return;
+        }
+
+        let service = Arc::clone(self);
+        let mut ticker = interval(RESERVATION_REFRESH_INTERVAL);
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        info!("libp2p reservation refresher started ({}s interval)", RESERVATION_REFRESH_INTERVAL.as_secs());
+        let shutdown = service.shutdown.listener.clone();
+        let handle = tokio::spawn(async move {
+            let shutdown = shutdown;
+            loop {
+                tokio::select! {
+                    _ = shutdown.clone() => break,
+                    _ = ticker.tick() => {
+                        if let Err(err) = service.submit_reservations(command_tx.clone()).await {
+                            warn!("libp2p reservation refresh failed: {err}");
+                        } else {
+                            info!("libp2p reservation refresh submissions dispatched");
+                        }
+                    }
+                }
+            }
+            info!("libp2p reservation refresher stopped");
+        });
+        *self.reservation_task.lock().await = Some(handle);
+    }
+
+    async fn stop_reservation_refresher(&self) {
+        let handle = self.reservation_task.lock().await.take();
+        if let Some(handle) = handle {
+            handle.abort();
+            let _ = handle.await;
+        }
     }
 
     async fn wait_for_adaptor(&self) -> Result<Arc<kaspa_p2p_lib::Adaptor>, Libp2pBridgeError> {
