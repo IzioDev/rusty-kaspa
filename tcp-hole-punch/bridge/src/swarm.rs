@@ -683,10 +683,17 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 peer_book.record_address(peer_id, addr);
             }
         }
-        SwarmEvent::ConnectionClosed { peer_id, endpoint, .. } => {
-            debug!("Swarm connection closed peer={} endpoint={:?}", peer_id, endpoint);
+        SwarmEvent::ConnectionClosed { peer_id, endpoint, cause, .. } => {
+            let mut logged = false;
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
+                if addr_uses_relay(&addr) {
+                    info!("Swarm relay connection closed peer={} addr={} cause={:?}", peer_id, addr, cause);
+                    logged = true;
+                }
                 peer_book.remove_address(peer_id, &addr);
+            }
+            if !logged {
+                debug!("Swarm connection closed peer={} endpoint={:?} cause={:?}", peer_id, endpoint, cause);
             }
         }
         SwarmEvent::OutgoingConnectionError { peer_id, error, .. } => {
@@ -786,12 +793,12 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 }
                 Event::CircuitClosed { src_peer_id, dst_peer_id, error } => {
                     if let Some(err) = error {
-                        debug!(
+                        info!(
                             "Relay server: circuit closed with error src_peer_id={} dst_peer_id={} err={:?}",
                             src_peer_id, dst_peer_id, err
                         );
                     } else {
-                        debug!("Relay server: circuit closed src_peer_id={} dst_peer_id={}", src_peer_id, dst_peer_id);
+                        info!("Relay server: circuit closed src_peer_id={} dst_peer_id={}", src_peer_id, dst_peer_id);
                     }
                 }
             }
