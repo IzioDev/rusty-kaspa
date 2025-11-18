@@ -47,6 +47,7 @@ impl ReceivePingsFlow {
 }
 
 pub const PING_INTERVAL: Duration = Duration::from_secs(120); // 2 minutes
+const LIBP2P_FAST_PING_INTERVAL: Duration = Duration::from_secs(5);
 
 /// Flow for managing a loop sending pings and waiting for pongs
 pub struct SendPingsFlow {
@@ -56,6 +57,8 @@ pub struct SendPingsFlow {
     router: Weak<Router>,
     peer: String,
     incoming_route: IncomingRoute,
+    ping_interval: Duration,
+    initial_delay: Duration,
 }
 
 #[async_trait::async_trait]
@@ -72,14 +75,23 @@ impl Flow for SendPingsFlow {
 impl SendPingsFlow {
     pub fn new(ctx: FlowContext, router: Arc<Router>, incoming_route: IncomingRoute) -> Self {
         let peer = router.to_string();
-        Self { ctx, router: Arc::downgrade(&router), peer, incoming_route }
+        let (initial_delay, ping_interval) = determine_ping_schedule(&router);
+        if initial_delay.as_secs() == 0 && ping_interval == LIBP2P_FAST_PING_INTERVAL {
+            debug!("P2P Flows, enabling fast ping cadence for relay-backed peer {peer}");
+        }
+        Self { ctx, router: Arc::downgrade(&router), peer, incoming_route, ping_interval, initial_delay }
     }
 
     async fn start_impl(&mut self) -> Result<(), ProtocolError> {
+        let mut first = true;
         loop {
-            // Wait `PING_INTERVAL` between pings
-            if let TickReason::Shutdown = self.ctx.tick_service.tick(PING_INTERVAL).await {
-                return Ok(());
+            // Wait for the next ping window (first ping may be immediate for relayed libp2p peers)
+            let wait = if first { self.initial_delay } else { self.ping_interval };
+            first = false;
+            if !wait.is_zero() {
+                if let TickReason::Shutdown = self.ctx.tick_service.tick(wait).await {
+                    return Ok(());
+                }
             }
 
             // Create a fresh random nonce for each ping
@@ -98,5 +110,13 @@ impl SendPingsFlow {
             }
             router.set_last_ping_duration(ping_time.elapsed().as_millis() as u64);
         }
+    }
+}
+
+fn determine_ping_schedule(router: &Router) -> (Duration, Duration) {
+    if router.connection_metadata().and_then(|metadata| metadata.libp2p.as_ref()).map_or(false, |info| info.relay_used) {
+        (Duration::from_secs(0), LIBP2P_FAST_PING_INTERVAL)
+    } else {
+        (PING_INTERVAL, PING_INTERVAL)
     }
 }
