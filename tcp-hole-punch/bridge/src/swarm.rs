@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::sync::{
@@ -527,6 +527,7 @@ fn build_behaviour(
 struct PeerBook {
     active: HashMap<PeerId, VecDeque<Multiaddr>>,
     pending: HashMap<PeerId, VecDeque<Multiaddr>>,
+    relay_overrides: HashSet<PeerId>,
 }
 
 impl PeerBook {
@@ -626,15 +627,23 @@ impl PeerBook {
     fn info_for(&self, peer: PeerId) -> Libp2pConnectInfo {
         if let Some(queue) = self.active.get(&peer) {
             if let Some(addr) = queue.back() {
-                return build_connect_info(peer, addr.clone());
+                return build_connect_info_with_override(peer, addr.clone(), self.relay_overrides.contains(&peer));
             }
         }
         if let Some(queue) = self.pending.get(&peer) {
             if let Some(addr) = queue.back() {
-                return build_connect_info(peer, addr.clone());
+                return build_connect_info_with_override(peer, addr.clone(), self.relay_overrides.contains(&peer));
             }
         }
-        Libp2pConnectInfo::new(peer)
+        let mut info = Libp2pConnectInfo::new(peer);
+        if self.relay_overrides.contains(&peer) {
+            info.relay_used = true;
+        }
+        info
+    }
+
+    fn mark_relay_override(&mut self, peer: PeerId) {
+        self.relay_overrides.insert(peer);
     }
 }
 
@@ -656,11 +665,15 @@ fn normalize_multiaddr(mut addr: Multiaddr) -> Option<Multiaddr> {
     }
 }
 
-fn build_connect_info(peer: PeerId, addr: Multiaddr) -> Libp2pConnectInfo {
+fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: bool) -> Libp2pConnectInfo {
     let relay_used = addr_uses_relay(&addr);
     let mut full_addr = addr;
     full_addr.push(Protocol::P2p(peer));
-    Libp2pConnectInfo::with_address(peer, full_addr, relay_used)
+    let mut info = Libp2pConnectInfo::with_address(peer, full_addr, relay_used);
+    if force_relay {
+        info.relay_used = true;
+    }
+    info
 }
 fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
@@ -706,6 +719,7 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                     info!("Outbound circuit established via relay relay_peer_id={} limit={:?}", relay_peer_id, limit);
                 }
                 Event::InboundCircuitEstablished { src_peer_id, limit } => {
+                    peer_book.mark_relay_override(src_peer_id);
                     info!("Inbound circuit established src_peer_id={} limit={:?}", src_peer_id, limit);
                 }
                 other => {
