@@ -291,7 +291,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
         let mut peer_book = PeerBook::default();
         let mut incoming_tx = incoming_tx;
         let mut pending_dials = FuturesUnordered::new();
-        let mut pending_listen_acks = Vec::new();
+        let mut pending_listen_acks: Vec<(String, oneshot::Sender<std::result::Result<(), BridgeError>>)> = Vec::new();
         loop {
             tokio::select! {
                 cmd = command_rx.next() => {
@@ -350,14 +350,16 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             }.boxed());
                         }
                         Some(SwarmCommand::ListenOn { addr, response }) => {
+                            let addr_string = addr.to_string();
+                            info!(%addr_string, has_response = response.is_some(), "Received ListenOn command");
                             match swarm.listen_on(addr) {
                                 Ok(_) => {
                                     if let Some(tx) = response {
-                                        pending_listen_acks.push(tx);
+                                        pending_listen_acks.push((addr_string.clone(), tx));
                                     }
                                 }
                                 Err(err) => {
-                                    error!(%err, "failed to listen");
+                                    error!(%addr_string, %err, "failed to listen");
                                     if let Some(tx) = response {
                                         let _ = tx.send(Err(BridgeError::DialFailed(format!("listen error: {err}"))));
                                     }
@@ -406,7 +408,8 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     match swarm_event {
                         SwarmEvent::NewListenAddr { ref address, .. } => {
                             info!(%address, "Swarm listening");
-                            for ack in pending_listen_acks.drain(..) {
+                            for (requested, ack) in pending_listen_acks.drain(..) {
+                                info!(listen_addr = %address, requested_addr = %requested, "Resolving ListenOn command");
                                 let _ = ack.send(Ok(()));
                             }
                         }
@@ -685,6 +688,8 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
             use libp2p::relay::client::Event;
+            debug!(?event, "Relay client behaviour event");
+            #[allow(unreachable_patterns)]
             match event {
                 Event::ReservationReqAccepted { relay_peer_id, renewal, .. } => {
                     if renewal {
@@ -698,6 +703,9 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 }
                 Event::InboundCircuitEstablished { src_peer_id, limit } => {
                     info!(%src_peer_id, ?limit, "Inbound circuit established");
+                }
+                other => {
+                    warn!(?other, "Unhandled relay client event");
                 }
             }
         }
