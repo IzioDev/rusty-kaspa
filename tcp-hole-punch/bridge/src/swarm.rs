@@ -519,8 +519,10 @@ fn build_behaviour(
         Toggle::from(None)
     };
     let dcutr = if config.hole_punch.enable_dcutr {
+        info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
         Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())))
     } else {
+        info!("DCUtR behaviour DISABLED for peer={}", public.to_peer_id());
         Toggle::from(None)
     };
 
