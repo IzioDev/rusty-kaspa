@@ -261,9 +261,12 @@ impl Libp2pBridgeService {
             *guard = Some(handle);
         }
         if let Some(addr) = self.config.helper_address {
+            info!("libp2p helper control configured at {addr}");
             if let Err(err) = self.start_helper_server(addr).await {
                 warn!("Failed to start libp2p helper server: {err}");
             }
+        } else {
+            info!("libp2p helper control disabled (no address configured)");
         }
 
         self.shutdown.listener.clone().await;
