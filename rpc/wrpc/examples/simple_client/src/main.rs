@@ -88,6 +88,45 @@ async fn check_node_status() -> Result<()> {
         }
     }
 
+    match client.get_connected_peer_info().await {
+        Ok(GetConnectedPeerInfoResponse { peer_info }) => {
+            println!("Total connected peers: {}", peer_info.len());
+            let relay_candidates: Vec<_> = peer_info.iter().filter(|p| p.relay_port.is_some()).collect();
+            println!("Connected relay-capable peers (relay_port present): {}", relay_candidates.len());
+            for peer in relay_candidates.iter().take(5) {
+                println!(
+                    "  {} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
+                    peer.address, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
+                );
+            }
+
+            let active_circuits: Vec<_> = peer_info.iter().filter(|p| p.is_libp2p && p.libp2p_relay_used.unwrap_or(false)).collect();
+            println!("Active libp2p relay circuits:");
+            if active_circuits.is_empty() {
+                println!("  (none)");
+            } else {
+                for peer in active_circuits {
+                    println!(
+                        "  peer={} multiaddr={:?} libp2p_relay_used={:?}",
+                        peer.address, peer.libp2p_multiaddr, peer.libp2p_relay_used
+                    );
+                    if let Some(ma) = &peer.libp2p_multiaddr {
+                        println!("    libp2p_multiaddr={ma}");
+                    }
+                }
+            }
+
+            println!("Sample peer set:");
+            for peer in peer_info.iter().take(5) {
+                println!(
+                    "  {} outbound={} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
+                    peer.address, peer.is_outbound, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
+                );
+            }
+        }
+        Err(err) => println!("get_connected_peer_info RPC failed: {err}"),
+    }
+
     if !circuit_only_mode {
         // Retrieve and show Kaspa node information
         let GetServerInfoResponse { is_synced, server_version, network_id, has_utxo_index, .. } = client.get_server_info().await?;
@@ -157,45 +196,6 @@ async fn check_node_status() -> Result<()> {
             }
             Err(err) => println!("get_connected_peer_info RPC failed: {err}"),
         }
-    }
-
-    match client.get_connected_peer_info().await {
-        Ok(GetConnectedPeerInfoResponse { peer_info }) => {
-            println!("Total connected peers: {}", peer_info.len());
-            let relay_candidates: Vec<_> = peer_info.iter().filter(|p| p.relay_port.is_some()).collect();
-            println!("Connected relay-capable peers (relay_port present): {}", relay_candidates.len());
-            for peer in relay_candidates.iter().take(5) {
-                println!(
-                    "  {} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
-                    peer.address, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
-                );
-            }
-
-            let active_circuits: Vec<_> = peer_info.iter().filter(|p| p.is_libp2p && p.libp2p_relay_used.unwrap_or(false)).collect();
-            println!("Active libp2p relay circuits:");
-            if active_circuits.is_empty() {
-                println!("  (none)");
-            } else {
-                for peer in active_circuits {
-                    println!(
-                        "  peer={} multiaddr={:?} libp2p_relay_used={:?}",
-                        peer.address, peer.libp2p_multiaddr, peer.libp2p_relay_used
-                    );
-                    if let Some(ma) = &peer.libp2p_multiaddr {
-                        println!("    libp2p_multiaddr={ma}");
-                    }
-                }
-            }
-
-            println!("Sample peer set:");
-            for peer in peer_info.iter().take(5) {
-                println!(
-                    "  {} outbound={} services={} relayPort={:?} is_libp2p={} libp2p_relay_used={:?}",
-                    peer.address, peer.is_outbound, peer.services, peer.relay_port, peer.is_libp2p, peer.libp2p_relay_used
-                );
-            }
-        }
-        Err(err) => println!("get_connected_peer_info RPC failed: {err}"),
     }
 
     // Disconnect client from Kaspa node
