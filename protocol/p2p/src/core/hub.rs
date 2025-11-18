@@ -61,6 +61,17 @@ impl Hub {
                         }
                     }
                     HubEvent::PeerClosing(router) => {
+                        if let Some(metadata) = router.connection_metadata() {
+                            if let Some(libp2p) = metadata.libp2p.as_ref() {
+                                info!(
+                                    "P2P, removing libp2p peer {} relay_used={} addr={:?} outbound={}",
+                                    router,
+                                    libp2p.relay_used,
+                                    libp2p.libp2p_multiaddr(),
+                                    router.is_outbound()
+                                );
+                            }
+                        }
                         if let Occupied(entry) = self.peers.write().entry(router.key()) {
                             // We search for the router by identity, but make sure to delete it only if it's actually the same object.
                             // This is extremely important in cases of duplicate connection rejection etc.
