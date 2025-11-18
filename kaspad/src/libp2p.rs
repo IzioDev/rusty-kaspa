@@ -40,7 +40,7 @@ use tokio::{
     select,
     sync::Mutex,
     task::JoinHandle,
-    time::{interval, interval_at, sleep, timeout, Instant, MissedTickBehavior},
+    time::{interval_at, sleep, timeout, Instant, MissedTickBehavior},
 };
 
 /// Mode controlling whether we expose a libp2p listener for incoming hole-punched streams.
