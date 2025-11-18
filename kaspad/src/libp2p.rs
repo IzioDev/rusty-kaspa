@@ -251,11 +251,6 @@ impl Libp2pBridgeService {
             Libp2pRole::Disabled => {}
         }
 
-        let adaptor = self.wait_for_adaptor().await?;
-        let incoming = incoming_from_handle(&mut handle)?;
-        adaptor.serve_incoming_streams(incoming);
-        trace!("libp2p bridge connected to adaptor for incoming streams");
-
         {
             let mut guard = self.swarm_handle.lock().await;
             *guard = Some(handle);
@@ -267,6 +262,21 @@ impl Libp2pBridgeService {
             }
         } else {
             info!("libp2p helper control disabled (no address configured)");
+        }
+
+        let mut handle = {
+            let mut guard = self.swarm_handle.lock().await;
+            guard.take().expect("libp2p swarm handle available")
+        };
+
+        let adaptor = self.wait_for_adaptor().await?;
+        let incoming = incoming_from_handle(&mut handle)?;
+        adaptor.serve_incoming_streams(incoming);
+        trace!("libp2p bridge connected to adaptor for incoming streams");
+
+        {
+            let mut guard = self.swarm_handle.lock().await;
+            *guard = Some(handle);
         }
 
         self.shutdown.listener.clone().await;
