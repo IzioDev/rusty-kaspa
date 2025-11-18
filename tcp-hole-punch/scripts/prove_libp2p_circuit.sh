@@ -75,10 +75,12 @@ poll_for_circuit() {
     local outfile="$5"
     echo "Waiting for libp2p circuit on $label"
     for attempt in $(seq 1 "$POLL_ATTEMPTS"); do
-        if run_cmd "$prefix" "$workdir" "KASPA_WSRPC_URL=$url $PROBE_BIN" >"$outfile"; then
+        if run_cmd "$prefix" "$workdir" "KASPA_WSRPC_QUICK=1 KASPA_WSRPC_URL=$url $PROBE_BIN" >"$outfile"; then
             if grep -q "Active libp2p relay circuits:" "$outfile" && grep -q "libp2p_relay_used=Some(true)" "$outfile"; then
                 if ! (grep -A1 "Active libp2p relay circuits" "$outfile" | grep -q "(none)"); then
                     echo "  ✓ detected active circuit on $label after ${attempt} attempt(s)"
+                    # Re-run without quick mode so the final logs capture the full snapshot
+                    run_cmd "$prefix" "$workdir" "KASPA_WSRPC_URL=$url $PROBE_BIN" >"$outfile"
                     return 0
                 fi
             fi

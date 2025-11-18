@@ -29,6 +29,7 @@ async fn main() -> ExitCode {
 }
 
 async fn check_node_status() -> Result<()> {
+    let quick_mode = std::env::var("KASPA_WSRPC_QUICK").map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "True")).unwrap_or(false);
     // Allow overriding the target URL/encoding via environment variables so we can hit custom nodes during testing.
     let env_snapshot: Vec<_> = std::env::vars().collect();
     println!("ENV SNAPSHOT: {:?}", env_snapshot);
@@ -100,35 +101,37 @@ async fn check_node_status() -> Result<()> {
         Err(err) => println!("get_libp_status RPC failed: {err}"),
     }
 
-    // Retrieve and show Kaspa network information
-    let GetBlockDagInfoResponse {
-        block_count,
-        header_count,
-        tip_hashes,
-        difficulty,
-        past_median_time,
-        virtual_parent_hashes,
-        pruning_point_hash,
-        virtual_daa_score,
-        sink,
-        ..
-    } = client.get_block_dag_info().await?;
+    if !quick_mode {
+        // Retrieve and show Kaspa network information
+        let GetBlockDagInfoResponse {
+            block_count,
+            header_count,
+            tip_hashes,
+            difficulty,
+            past_median_time,
+            virtual_parent_hashes,
+            pruning_point_hash,
+            virtual_daa_score,
+            sink,
+            ..
+        } = client.get_block_dag_info().await?;
 
-    println!("Block count: {block_count}");
-    println!("Header count: {header_count}");
-    println!("Tip hashes:");
-    for tip_hash in tip_hashes {
-        println!("{tip_hash}");
+        println!("Block count: {block_count}");
+        println!("Header count: {header_count}");
+        println!("Tip hashes:");
+        for tip_hash in tip_hashes {
+            println!("{tip_hash}");
+        }
+        println!("Difficulty: {difficulty}");
+        println!("Past median time: {past_median_time}");
+        println!("Virtual parent hashes:");
+        for virtual_parent_hash in virtual_parent_hashes {
+            println!("{virtual_parent_hash}");
+        }
+        println!("Pruning point hash: {pruning_point_hash}");
+        println!("Virtual DAA score: {virtual_daa_score}");
+        println!("Sink: {sink}");
     }
-    println!("Difficulty: {difficulty}");
-    println!("Past median time: {past_median_time}");
-    println!("Virtual parent hashes:");
-    for virtual_parent_hash in virtual_parent_hashes {
-        println!("{virtual_parent_hash}");
-    }
-    println!("Pruning point hash: {pruning_point_hash}");
-    println!("Virtual DAA score: {virtual_daa_score}");
-    println!("Sink: {sink}");
 
     // Inspect peer addresses / connections when running against custom nodes
     if url.is_some() {
