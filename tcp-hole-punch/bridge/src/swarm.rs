@@ -292,7 +292,7 @@ struct BridgeBehaviour {
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
     dcutr: dcutr::Behaviour,  // ✅ NOT wrapped in Toggle - Toggle breaks protocol advertisement!
-    autonat: Toggle<libp2p::autonat::Behaviour>,  // 🧪 Testing Toggle workaround
+    autonat: Toggle<libp2p::autonat::Behaviour>,  // Use Toggle for conditional enabling
     stream: lpstream::Behaviour,
 }
 
@@ -556,27 +556,29 @@ fn build_behaviour(
     // Configure AutoNAT for NAT detection and address discovery
     use libp2p::autonat;
     let peer_id = public.to_peer_id();
-    let mut autonat_config = autonat::Config::default();
 
-    if config.autonat.enable_client {
-        autonat_config.confidence_max = config.autonat.confidence_threshold;
-        info!("AutoNAT client mode ENABLED for peer={}", peer_id);
-    }
+    let autonat = if config.autonat.enable_client || config.autonat.enable_server {
+        let mut autonat_config = autonat::Config::default();
 
-    if config.autonat.enable_server {
-        if config.autonat.server_only_if_public {
-            autonat_config.only_global_ips = true;
+        if config.autonat.enable_client {
+            autonat_config.confidence_max = config.autonat.confidence_threshold;
+            info!("AutoNAT client mode ENABLED for peer={}", peer_id);
         }
-        autonat_config.throttle_server_period = Duration::from_secs(60);
-        autonat_config.throttle_clients_peer_max = config.autonat.max_server_requests_per_peer;
-        info!("AutoNAT server mode ENABLED for peer={}", peer_id);
-    }
 
-    if !config.autonat.enable_client && !config.autonat.enable_server {
+        if config.autonat.enable_server {
+            if config.autonat.server_only_if_public {
+                autonat_config.only_global_ips = true;
+            }
+            autonat_config.throttle_server_period = Duration::from_secs(60);
+            autonat_config.throttle_clients_peer_max = config.autonat.max_server_requests_per_peer;
+            info!("AutoNAT server mode ENABLED for peer={}", peer_id);
+        }
+
+        Toggle::from(Some(autonat::Behaviour::new(peer_id, autonat_config)))
+    } else {
         info!("AutoNAT DISABLED for peer={}", peer_id);
-    }
-
-    let autonat = Toggle::from(Some(autonat::Behaviour::new(peer_id, autonat_config)));
+        Toggle::from(None)
+    };
 
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
