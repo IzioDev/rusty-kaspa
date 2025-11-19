@@ -923,6 +923,7 @@ impl NetworkBehaviour for StaticAddrBehaviour {
 
     fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(addr) = self.pending.pop_front() {
+            debug!("[DCUTR] seeding candidate {}", addr);
             return Poll::Ready(ToSwarm::NewExternalAddrCandidate(addr));
         }
 
