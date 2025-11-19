@@ -285,9 +285,6 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 
     let mut swarm = build_swarm(local_key.clone(), &config)?;
-    for addr in &config.external_addresses {
-        swarm.add_external_address(addr.clone());
-    }
     let config = Arc::new(config);
     let mut control = swarm.behaviour_mut().stream.new_control();
     let mut incoming_streams = control.accept(stream_protocol()).map_err(|e| match e {
@@ -877,12 +874,13 @@ fn addr_uses_relay(addr: &Multiaddr) -> bool {
 
 #[derive(Default)]
 struct StaticAddrBehaviour {
-    pending: VecDeque<Multiaddr>,
+    pending_candidates: VecDeque<Multiaddr>,
+    pending_confirms: VecDeque<Multiaddr>,
 }
 
 impl StaticAddrBehaviour {
     fn new(addrs: Vec<Multiaddr>) -> Self {
-        Self { pending: addrs.into() }
+        Self { pending_candidates: addrs.into(), pending_confirms: VecDeque::new() }
     }
 }
 
@@ -922,9 +920,15 @@ impl NetworkBehaviour for StaticAddrBehaviour {
     fn on_swarm_event(&mut self, _: FromSwarm) {}
 
     fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Some(addr) = self.pending.pop_front() {
+        if let Some(addr) = self.pending_candidates.pop_front() {
             debug!("[DCUTR] seeding candidate {}", addr);
+            self.pending_confirms.push_back(addr.clone());
             return Poll::Ready(ToSwarm::NewExternalAddrCandidate(addr));
+        }
+
+        if let Some(addr) = self.pending_confirms.pop_front() {
+            debug!("[DCUTR] confirming candidate {}", addr);
+            return Poll::Ready(ToSwarm::ExternalAddrConfirmed(addr));
         }
 
         Poll::Pending
