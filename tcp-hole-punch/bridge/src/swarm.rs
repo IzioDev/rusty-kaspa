@@ -292,7 +292,7 @@ struct BridgeBehaviour {
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
     dcutr: dcutr::Behaviour,  // ✅ NOT wrapped in Toggle - Toggle breaks protocol advertisement!
-    autonat: libp2p::autonat::Behaviour,
+    autonat: Toggle<libp2p::autonat::Behaviour>,  // 🧪 Testing Toggle workaround
     stream: lpstream::Behaviour,
 }
 
@@ -576,7 +576,7 @@ fn build_behaviour(
         info!("AutoNAT DISABLED for peer={}", peer_id);
     }
 
-    let autonat = autonat::Behaviour::new(peer_id, autonat_config);
+    let autonat = Toggle::from(Some(autonat::Behaviour::new(peer_id, autonat_config)));
 
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
