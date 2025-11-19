@@ -528,6 +528,9 @@ fn build_behaviour(
     };
 
     // Always enable DCUtR for hole-punching support
+    if !config.external_addresses.is_empty() {
+        info!("Seeding DCUtR external address candidates: {:?}", config.external_addresses);
+    }
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
     let dcutr = dcutr::Behaviour::new(public.to_peer_id());
 
