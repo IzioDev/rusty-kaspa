@@ -19,7 +19,6 @@ libp2p = { version = "0.56", default-features = false, features = [
     "identify",
     "ping",
     "dcutr",
-    "autonat",
     "macros",
     "tokio",
     "quic"

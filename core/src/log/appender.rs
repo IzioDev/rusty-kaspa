@@ -91,11 +91,9 @@ impl CrescendoEncoder {
 impl Encode for CrescendoEncoder {
     fn encode(&self, w: &mut dyn Write, record: &log::Record) -> anyhow::Result<()> {
         if record.target() == self.keyword {
-            // Hack: override log level to debug so that inner encoder does not reset the style
-            // (note that we use the custom pattern with CRND so this change isn't visible)
-            let record = record.to_builder().level(log::Level::Debug).build();
+            // Apply cyan style for crescendo messages
             w.set_style(Style::new().text(Color::Cyan))?;
-            self.crescendo_encoder.encode(w, &record)?;
+            self.crescendo_encoder.encode(w, record)?;
             w.set_style(&Style::new())?;
             Ok(())
         } else {

@@ -92,33 +92,6 @@ impl Default for HolePunchConfig {
     }
 }
 
-/// Configuration for AutoNAT behaviour.
-#[derive(Clone, Debug)]
-pub struct AutoNatConfig {
-    /// Enable AutoNAT client behaviour (address discovery).
-    pub enable_client: bool,
-    /// Enable AutoNAT server behaviour (help others discover addresses).
-    pub enable_server: bool,
-    /// Only allow AutoNAT server for publicly reachable nodes.
-    pub server_only_if_public: bool,
-    /// Maximum AutoNAT server requests per peer (rate limiting).
-    pub max_server_requests_per_peer: usize,
-    /// Confidence threshold for address confirmation (number of confirmations needed).
-    pub confidence_threshold: usize,
-}
-
-impl Default for AutoNatConfig {
-    fn default() -> Self {
-        Self {
-            enable_client: true,
-            enable_server: true,
-            server_only_if_public: true,
-            max_server_requests_per_peer: 1,
-            confidence_threshold: 3,
-        }
-    }
-}
-
 /// Aggregate swarm configuration.
 #[derive(Clone, Debug, Default)]
 pub struct SwarmConfig {
@@ -126,7 +99,6 @@ pub struct SwarmConfig {
     pub relay: RelayConfig,
     pub hole_punch: HolePunchConfig,
     pub relay_server: RelayServerConfig,
-    pub autonat: AutoNatConfig,
     pub external_addresses: Vec<Multiaddr>,
 }
 
@@ -291,8 +263,7 @@ struct BridgeBehaviour {
     ping: libp2p::ping::Behaviour,
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
-    dcutr: dcutr::Behaviour,  // ✅ NOT wrapped in Toggle - Toggle breaks protocol advertisement!
-    autonat: libp2p::autonat::Behaviour,  // ✅ NOT wrapped in Toggle - matches working example pattern
+    dcutr: dcutr::Behaviour,
     stream: lpstream::Behaviour,
 }
 
@@ -553,21 +524,12 @@ fn build_behaviour(
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
     let dcutr = dcutr::Behaviour::new(public.to_peer_id());
 
-    // Configure AutoNAT for NAT detection and address discovery
-    // Using Default::default() config to match working example pattern from libp2p discussion #5252
-    use libp2p::autonat;
-    let peer_id = public.to_peer_id();
-
-    info!("AutoNAT ENABLED for peer={} (using default config to match working libp2p pattern)", peer_id);
-    let autonat = autonat::Behaviour::new(peer_id, Default::default());
-
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
         relay_client,
         relay_server,
         dcutr,
-        autonat,
         stream: lpstream::Behaviour::default(),
     }
 }
@@ -857,32 +819,6 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
             info!("DCUtR event: {:?}", event);
         }
-        SwarmEvent::Behaviour(BridgeBehaviourEvent::Autonat(event)) => {
-            use libp2p::autonat::Event;
-            match event {
-                Event::InboundProbe(probe_event) => {
-                    debug!("AutoNAT inbound probe: {:?}", probe_event);
-                }
-                Event::OutboundProbe(probe_event) => {
-                    debug!("AutoNAT outbound probe: {:?}", probe_event);
-                }
-                Event::StatusChanged { old, new } => {
-                    info!("AutoNAT status changed: {:?} -> {:?}", old, new);
-                    use libp2p::autonat::NatStatus;
-                    match new {
-                        NatStatus::Public(addr) => {
-                            info!("AutoNAT: Node is PUBLIC, reachable at: {}", addr);
-                        }
-                        NatStatus::Private => {
-                            info!("AutoNAT: Node is PRIVATE (behind NAT)");
-                        }
-                        NatStatus::Unknown => {
-                            warn!("AutoNAT: Status UNKNOWN (not enough probes)");
-                        }
-                    }
-                }
-            }
-        }
         SwarmEvent::ListenerClosed { addresses, reason, .. } => {
             warn!("Swarm listener closed addresses={:?} reason={:?}", addresses, reason);
         }
@@ -930,7 +866,6 @@ enum BridgeBehaviourEvent {
     RelayClient(relay::client::Event),
     RelayServer(relay::Event),
     Dcutr(dcutr::Event),
-    Autonat(libp2p::autonat::Event),
 }
 
 impl From<()> for BridgeBehaviourEvent {
@@ -970,8 +905,3 @@ impl From<dcutr::Event> for BridgeBehaviourEvent {
     }
 }
 
-impl From<libp2p::autonat::Event> for BridgeBehaviourEvent {
-    fn from(value: libp2p::autonat::Event) -> Self {
-        Self::Autonat(value)
-    }
-}
