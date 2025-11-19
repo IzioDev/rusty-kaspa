@@ -22,7 +22,10 @@ use libp2p::{
     dcutr, identify,
     multiaddr::Protocol,
     noise, relay,
-    swarm::{behaviour::toggle::Toggle, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent},
+    swarm::{
+        behaviour::toggle::Toggle, dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler,
+        THandlerInEvent, THandlerOutEvent, ToSwarm,
+    },
     yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
@@ -265,6 +268,7 @@ struct BridgeBehaviour {
     relay_server: Toggle<relay::Behaviour>,
     dcutr: dcutr::Behaviour,
     stream: lpstream::Behaviour,
+    static_addrs: StaticAddrBehaviour,
 }
 
 /// Spawn the libp2p swarm actor using the default configuration.
@@ -536,6 +540,7 @@ fn build_behaviour(
         relay_server,
         dcutr,
         stream: lpstream::Behaviour::default(),
+        static_addrs: StaticAddrBehaviour::new(config.external_addresses.clone()),
     }
 }
 
@@ -865,6 +870,61 @@ fn endpoint_multiaddr(endpoint: &ConnectedPoint) -> Option<Multiaddr> {
 
 fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
+}
+
+#[derive(Default)]
+struct StaticAddrBehaviour {
+    pending: VecDeque<Multiaddr>,
+}
+
+impl StaticAddrBehaviour {
+    fn new(addrs: Vec<Multiaddr>) -> Self {
+        Self { pending: addrs.into() }
+    }
+}
+
+impl NetworkBehaviour for StaticAddrBehaviour {
+    type ConnectionHandler = dummy::ConnectionHandler;
+    type ToSwarm = ();
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _peer: PeerId,
+        _local_addr: &Multiaddr,
+        _remote_addr: &Multiaddr,
+    ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        Ok(dummy::ConnectionHandler)
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _peer: PeerId,
+        _addr: &Multiaddr,
+        _endpoint: libp2p::core::Endpoint,
+        _port_use: libp2p::core::transport::PortUse,
+    ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        Ok(dummy::ConnectionHandler)
+    }
+
+    fn on_connection_handler_event(
+        &mut self,
+        _peer_id: PeerId,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _event: THandlerOutEvent<Self>,
+    ) {
+    }
+
+    fn on_swarm_event(&mut self, _: FromSwarm) {}
+
+    fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+        if let Some(addr) = self.pending.pop_front() {
+            return Poll::Ready(ToSwarm::NewExternalAddrCandidate(addr));
+        }
+
+        Poll::Pending
+    }
 }
 
 #[derive(Debug)]
