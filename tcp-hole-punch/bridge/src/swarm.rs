@@ -291,7 +291,7 @@ struct BridgeBehaviour {
     ping: libp2p::ping::Behaviour,
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
-    dcutr: dcutr::Behaviour,
+    dcutr: Toggle<dcutr::Behaviour>,
     autonat: libp2p::autonat::Behaviour,
     stream: lpstream::Behaviour,
 }
@@ -550,7 +550,7 @@ fn build_behaviour(
 
     // Always enable DCUtR for hole-punching support
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
-    let dcutr = dcutr::Behaviour::new(public.to_peer_id());
+    let dcutr = Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())));
 
     // Configure AutoNAT for NAT detection and address discovery
     use libp2p::autonat;
