@@ -289,10 +289,10 @@ impl SwarmHandle {
 struct BridgeBehaviour {
     identify: identify::Behaviour,
     ping: libp2p::ping::Behaviour,
-    relay_client: Toggle<relay::client::Behaviour>,
-    relay_server: Toggle<relay::Behaviour>,
     dcutr: dcutr::Behaviour,
     autonat: libp2p::autonat::Behaviour,
+    relay_client: Toggle<relay::client::Behaviour>,
+    relay_server: Toggle<relay::Behaviour>,
     stream: lpstream::Behaviour,
 }
 
@@ -580,10 +580,10 @@ fn build_behaviour(
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
-        relay_client,
-        relay_server,
         dcutr,
         autonat,
+        relay_client,
+        relay_server,
         stream: lpstream::Behaviour::default(),
     }
 }

@@ -1,0 +1,78 @@
+# Phase 4 DCUtR Investigation - 2025-11-19
+
+## Problem Statement
+After adding AutoNAT behavior (commit 56e09038), the `/libp2p/dcutr` protocol disappeared from Identify messages, even though:
+- DCUtR behavior is correctly initialized (no Toggle wrapper)
+- Logs show "DCUtR behaviour ENABLED"
+- BridgeBehaviourEvent enum has Dcutr variant
+- From<dcutr::Event> trait is implemented
+- dcutr feature enabled in Cargo.toml
+
+## Evidence
+
+### Phase 3 (commit 82e4f3e0) - DCUtR Working
+```
+protocols=["/ipfs/id/1.0.0", "/ipfs/ping/1.0.0", "/libp2p/dcutr", "/ipfs/id/push/1.0.0", "/kaspa/p2p/bridge/1.0"]
+```
+✅ `/libp2p/dcutr` present
+
+### Phase 4 (commit 56e09038) - DCUtR Missing
+```
+protocols=["/ipfs/ping/1.0.0", "/libp2p/autonat/1.0.0", "/kaspa/p2p/bridge/1.0", "/ipfs/id/push/1.0.0", "/ipfs/id/1.0.0"]
+```
+❌ `/libp2p/dcutr` missing
+✅ `/libp2p/autonat/1.0.0` present
+
+## Code Analysis
+
+### BridgeBehaviour Struct (swarm.rs:289-297)
+```rust
+#[derive(NetworkBehaviour)]
+#[behaviour(to_swarm = "BridgeBehaviourEvent")]
+struct BridgeBehaviour {
+    identify: identify::Behaviour,
+    ping: libp2p::ping::Behaviour,
+    relay_client: Toggle<relay::client::Behaviour>,
+    relay_server: Toggle<relay::Behaviour>,
+    dcutr: dcutr::Behaviour,        // ← No Toggle wrapper
+    autonat: libp2p::autonat::Behaviour,  // ← Added in Phase 4
+    stream: lpstream::Behaviour,
+}
+```
+
+### BridgeBehaviourEvent Enum (swarm.rs:942-950)
+```rust
+enum BridgeBehaviourEvent {
+    Stream,
+    Identify(identify::Event),
+    Ping,
+    RelayClient(relay::client::Event),
+    RelayServer(relay::Event),
+    Dcutr(dcutr::Event),           // ← Present
+    Autonat(libp2p::autonat::Event),  // ← Added
+}
+```
+
+### From Implementations (swarm.rs:983-992)
+```rust
+impl From<dcutr::Event> for BridgeBehaviourEvent {
+    fn from(value: dcutr::Event) -> Self {
+        Self::Dcutr(value)
+    }
+}
+
+impl From<libp2p::autonat::Event> for BridgeBehaviourEvent {
+    fn from(value: libp2p::autonat::Event) -> Self {
+        Self::Autonat(value)
+    }
+}
+```
+
+## Hypothesis
+Possible issue with NetworkBehaviour derive macro when combining certain protocols. The order of fields in the struct might affect which protocols get advertised via Identify.
+
+## Next Steps
+1. Try reordering BridgeBehaviour struct fields (move dcutr before autonat or after identify)
+2. Check for libp2p 0.56 known issues with DCUtR + AutoNAT combination
+3. Review libp2p NetworkBehaviour derive macro implementation
+4. Test with minimal reproduction case

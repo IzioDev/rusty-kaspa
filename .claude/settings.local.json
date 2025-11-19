@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh root@139.180.172.111 \"grep ''Swarm listening'' /root/kaspa/logs/kaspad-phase4-autonat.log | head -20\")",
+      "Bash(ssh ubuntu@10.0.3.26:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
