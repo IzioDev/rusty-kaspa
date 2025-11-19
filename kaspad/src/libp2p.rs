@@ -566,12 +566,7 @@ impl Libp2pBridgeService {
         };
         let (response_tx, response_rx) = oneshot::channel();
         let addr_strings: Vec<String> = addrs.iter().map(Multiaddr::to_string).collect();
-        info!(
-            "libp2p dial request target_peer={} addrs={:?} timeout_ms={}",
-            target_peer,
-            addr_strings,
-            timeout_duration.as_millis()
-        );
+        info!("libp2p dial request target_peer={} addrs={:?} timeout_ms={}", target_peer, addr_strings, timeout_duration.as_millis());
         command_tx
             .send(SwarmCommand::Dial { peer: target_peer, addrs, response: response_tx })
             .await
@@ -585,9 +580,7 @@ impl Libp2pBridgeService {
         let info = stream.info.clone();
         info!(
             "libp2p dial succeeded target_peer={} relay_used={} remote_multiaddr={:?}",
-            target_peer,
-            info.relay_used,
-            info.remote_multiaddr
+            target_peer, info.relay_used, info.remote_multiaddr
         );
         let metadata = metadata_from_info(&info);
         let peer_key = adaptor.connect_peer_with_stream(stream, metadata).await?;

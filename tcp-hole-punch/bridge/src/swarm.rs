@@ -412,6 +412,10 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     }
                 }
                 swarm_event = swarm.select_next_some() => {
+                    if let SwarmEvent::ConnectionEstablished { peer_id, .. } = &swarm_event {
+                        swarm.behaviour_mut().identify.push(std::iter::once(*peer_id));
+                        debug!("[IDENTIFY] queued push to peer {}", peer_id);
+                    }
                     match swarm_event {
                         SwarmEvent::NewListenAddr { ref address, .. } => {
                             info!("Swarm listening address={}", address);
@@ -523,8 +527,10 @@ fn build_behaviour(
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
     let dcutr = dcutr::Behaviour::new(public.to_peer_id());
 
+    let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(true);
+
     BridgeBehaviour {
-        identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
+        identify: identify::Behaviour::new(identify_cfg),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
         relay_client,
         relay_server,
@@ -712,16 +718,20 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::IncomingConnectionError { error, .. } => {
             debug!("Incoming connection error error={}", error);
         }
-        SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => {
-            if let identify::Event::Received { peer_id, ref info, .. } = event {
-                info!("Identify received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => match event {
+            identify::Event::Received { peer_id, ref info, .. } => {
+                info!("[IDENTIFY] received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
                 for addr in &info.listen_addrs {
                     peer_book.record_address(peer_id, addr.clone());
                 }
-            } else {
-                debug!("Identify behaviour event event={:?}", event);
             }
-        }
+            identify::Event::Pushed { peer_id, ref info, .. } => {
+                info!("[IDENTIFY] pushed to {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+            }
+            other => {
+                debug!("[IDENTIFY] behaviour event event={:?}", other);
+            }
+        },
         SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
             use libp2p::relay::client::Event;
             debug!("Relay client behaviour event event={:?}", event);
