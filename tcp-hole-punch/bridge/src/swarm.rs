@@ -292,7 +292,8 @@ struct BridgeBehaviour {
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
     dcutr: Toggle<dcutr::Behaviour>,
-    autonat: libp2p::autonat::Behaviour,
+    // TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+    // autonat: libp2p::autonat::Behaviour,
     stream: lpstream::Behaviour,
 }
 
@@ -552,6 +553,8 @@ fn build_behaviour(
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
     let dcutr = Toggle::from(Some(dcutr::Behaviour::new(public.to_peer_id())));
 
+    // TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+    /*
     // Configure AutoNAT for NAT detection and address discovery
     use libp2p::autonat;
     let peer_id = public.to_peer_id();
@@ -576,6 +579,7 @@ fn build_behaviour(
     }
 
     let autonat = autonat::Behaviour::new(peer_id, autonat_config);
+    */
 
     BridgeBehaviour {
         identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
@@ -583,7 +587,8 @@ fn build_behaviour(
         relay_client,
         relay_server,
         dcutr,
-        autonat,
+        // TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+        // autonat,
         stream: lpstream::Behaviour::default(),
     }
 }
@@ -873,6 +878,8 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
             info!("DCUtR event: {:?}", event);
         }
+        // TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+        /*
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Autonat(event)) => {
             use libp2p::autonat::Event;
             match event {
@@ -899,6 +906,7 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 }
             }
         }
+        */
         SwarmEvent::ListenerClosed { addresses, reason, .. } => {
             warn!("Swarm listener closed addresses={:?} reason={:?}", addresses, reason);
         }
@@ -946,7 +954,8 @@ enum BridgeBehaviourEvent {
     RelayClient(relay::client::Event),
     RelayServer(relay::Event),
     Dcutr(dcutr::Event),
-    Autonat(libp2p::autonat::Event),
+    // TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+    // Autonat(libp2p::autonat::Event),
 }
 
 impl From<()> for BridgeBehaviourEvent {
@@ -986,8 +995,11 @@ impl From<dcutr::Event> for BridgeBehaviourEvent {
     }
 }
 
+// TEMPORARILY DISABLED: Testing if AutoNAT breaks DCUtR protocol advertisement
+/*
 impl From<libp2p::autonat::Event> for BridgeBehaviourEvent {
     fn from(value: libp2p::autonat::Event) -> Self {
         Self::Autonat(value)
     }
 }
+*/
