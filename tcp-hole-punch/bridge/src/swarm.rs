@@ -777,18 +777,14 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => match event {
             identify::Event::Received { peer_id, ref info, .. } => {
                 info!("[IDENTIFY] received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+                // Only the observed address tells us how the remote sees *us*; listen_addrs belong to the remote.
                 record_observed_addr(swarm, &info.observed_addr);
                 for addr in &info.listen_addrs {
                     peer_book.record_address(peer_id, addr.clone());
-                    record_observed_addr(swarm, addr);
                 }
             }
             identify::Event::Pushed { peer_id, ref info, .. } => {
                 info!("[IDENTIFY] pushed to {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
-                record_observed_addr(swarm, &info.observed_addr);
-                for addr in &info.listen_addrs {
-                    record_observed_addr(swarm, addr);
-                }
             }
             other => {
                 debug!("[IDENTIFY] behaviour event event={:?}", other);
