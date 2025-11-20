@@ -24,8 +24,10 @@ use libp2p::{
     multiaddr::Protocol,
     noise, relay, tcp,
     swarm::{
-        behaviour::toggle::Toggle, dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler,
-        THandlerInEvent, THandlerOutEvent, ToSwarm,
+        behaviour::toggle::Toggle,
+        dial_opts::DialOpts,
+        dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
     },
     yamux, Multiaddr, PeerId, SwarmBuilder,
 };
@@ -371,14 +373,25 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                         addr
                                     })
                                     .collect();
-                                // Dial using full multiaddrs - this is the most explicit approach
-                                for addr in &full_addrs {
-                                    if let Err(err) = swarm.dial(addr.clone()) {
+                                let opts = DialOpts::peer_id(peer)
+                                    .addresses(full_addrs.clone())
+                                    // Allow behaviours (e.g. DCUtR) to append learnt addresses like observed addrs.
+                                    .extend_addresses_through_behaviour()
+                                    .build();
+                                if let Err(err) = swarm.dial(opts) {
+                                    for addr in &full_addrs {
                                         warn!("Failed to dial address peer={} addr={} err={}", peer, addr, err);
-                                    } else {
-                                        debug!("Dial initiated successfully peer={} addr={}", peer, addr);
-                                        break; // Successfully initiated one dial, that's enough
                                     }
+                                } else {
+                                    debug!("Dial initiated successfully peer={} addrs={:?}", peer, full_addrs);
+                                }
+                            } else {
+                                // No explicit addresses: still allow behaviours to provide candidates.
+                                let opts = DialOpts::peer_id(peer).extend_addresses_through_behaviour().build();
+                                if let Err(err) = swarm.dial(opts) {
+                                    warn!("Failed to dial peer={} with behaviour-provided addrs err={}", peer, err);
+                                } else {
+                                    debug!("Dial initiated successfully using behaviour-provided addrs peer={}", peer);
                                 }
                             }
                             // open_stream will wait for the connection to establish, then open a stream
