@@ -455,7 +455,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                 let _ = ack.send(Ok(()));
                             }
                         }
-                        event => handle_swarm_event(event, &mut peer_book),
+                        event => handle_swarm_event(&mut swarm, event, &mut peer_book),
                     }
                 }
             }
@@ -747,7 +747,7 @@ fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: 
     }
     info
 }
-fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
+fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
             debug!("Swarm connection established peer={} endpoint={:?}", peer_id, endpoint);
