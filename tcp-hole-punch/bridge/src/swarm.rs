@@ -483,8 +483,7 @@ fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Re
     eprintln!("✓ Yamux: receive_window={}MiB, max_buffer={}MiB", receive_window_size / (1024 * 1024), max_buffer_size / (1024 * 1024));
 
     let base_builder = {
-        let mut tcp_config = tcp::Config::default();
-        tcp_config.port_reuse(true);
+        let tcp_config = tcp::Config::default().port_reuse(true);
         SwarmBuilder::with_existing_identity(local_key.clone())
             .with_tokio()
             // Use only Noise for simplicity in tests - TLS negotiation can hang
