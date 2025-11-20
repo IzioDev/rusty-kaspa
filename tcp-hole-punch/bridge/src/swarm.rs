@@ -68,7 +68,7 @@ pub struct RelayConfig {
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self { enabled: true, max_reservations: 8, max_circuits_per_peer: 4 }
+        Self { enabled: true, max_reservations: 8, max_circuits_per_peer: 8 }
     }
 }
 
