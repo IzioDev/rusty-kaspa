@@ -777,12 +777,22 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => match event {
             identify::Event::Received { peer_id, ref info, .. } => {
                 info!("[IDENTIFY] received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+                if let Some(addr) = info.observed_addr.as_ref() {
+                    record_observed_addr(&mut swarm, addr);
+                }
                 for addr in &info.listen_addrs {
                     peer_book.record_address(peer_id, addr.clone());
+                    record_observed_addr(&mut swarm, addr);
                 }
             }
             identify::Event::Pushed { peer_id, ref info, .. } => {
                 info!("[IDENTIFY] pushed to {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+                if let Some(addr) = info.observed_addr.as_ref() {
+                    record_observed_addr(&mut swarm, addr);
+                }
+                for addr in &info.listen_addrs {
+                    record_observed_addr(&mut swarm, addr);
+                }
             }
             other => {
                 debug!("[IDENTIFY] behaviour event event={:?}", other);
@@ -941,6 +951,16 @@ fn endpoint_multiaddr(endpoint: &ConnectedPoint) -> Option<Multiaddr> {
 
 fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
+}
+
+fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
+    if addr_uses_relay(addr) {
+        debug!("[IDENTIFY] skipping relay addr for external advertisement addr={}", addr);
+        return;
+    }
+
+    debug!("[IDENTIFY] adding external addr candidate from identify addr={}", addr);
+    swarm.add_external_address(addr.clone());
 }
 
 #[derive(Default)]
