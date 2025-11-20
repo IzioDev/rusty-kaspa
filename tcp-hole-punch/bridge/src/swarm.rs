@@ -387,7 +387,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                 }
                             } else {
                                 // No explicit addresses: still allow behaviours to provide candidates.
-                                let opts = DialOpts::peer_id(peer).extend_addresses_through_behaviour().build();
+                                let opts = DialOpts::peer_id(peer).build();
                                 if let Err(err) = swarm.dial(opts) {
                                     warn!("Failed to dial peer={} with behaviour-provided addrs err={}", peer, err);
                                 } else {
