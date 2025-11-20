@@ -920,6 +920,12 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
         }
         SwarmEvent::ExternalAddrConfirmed { address } => {
             debug!("External addr confirmed {}", address);
+            // Proactively push updated address info to all connected peers so DCUtR has a candidate.
+            let peers: Vec<_> = swarm.connected_peers().cloned().collect();
+            if !peers.is_empty() {
+                swarm.behaviour_mut().identify.push(peers.clone());
+                info!("[IDENTIFY] pushed updated external addr to peers={:?} addr={}", peers, address);
+            }
         }
         _ => {}
     }
