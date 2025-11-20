@@ -22,7 +22,7 @@ use libp2p::{
     core::connection::ConnectedPoint,
     dcutr, identify,
     multiaddr::Protocol,
-    noise, relay,
+    noise, relay, tcp,
     swarm::{
         behaviour::toggle::Toggle, dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler,
         THandlerInEvent, THandlerOutEvent, ToSwarm,
@@ -482,11 +482,15 @@ fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Re
 
     eprintln!("✓ Yamux: receive_window={}MiB, max_buffer={}MiB", receive_window_size / (1024 * 1024), max_buffer_size / (1024 * 1024));
 
-    let base_builder = SwarmBuilder::with_existing_identity(local_key.clone())
-        .with_tokio()
-        // Use only Noise for simplicity in tests - TLS negotiation can hang
-        .with_tcp(Default::default(), noise::Config::new, || yamux_config.clone())
-        .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?;
+    let base_builder = {
+        let mut tcp_config = tcp::Config::default();
+        tcp_config.port_reuse(true);
+        SwarmBuilder::with_existing_identity(local_key.clone())
+            .with_tokio()
+            // Use only Noise for simplicity in tests - TLS negotiation can hang
+            .with_tcp(tcp_config, noise::Config::new, || yamux_config.clone())
+            .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?
+    };
 
     if config.transport.enable_quic {
         let builder = base_builder.with_quic();
