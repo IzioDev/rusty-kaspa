@@ -998,6 +998,7 @@ fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
 
     debug!("[IDENTIFY] adding external addr candidate from identify addr={}", addr);
     swarm.add_external_address(addr.clone());
+    swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
 }
 
 #[derive(Default)]
@@ -1009,6 +1010,13 @@ struct StaticAddrBehaviour {
 impl StaticAddrBehaviour {
     fn new(addrs: Vec<Multiaddr>) -> Self {
         Self { pending_candidates: addrs.into(), pending_confirms: VecDeque::new() }
+    }
+
+    fn add_candidate(&mut self, addr: Multiaddr) {
+        if self.pending_candidates.contains(&addr) || self.pending_confirms.contains(&addr) {
+            return;
+        }
+        self.pending_candidates.push_back(addr);
     }
 }
 
