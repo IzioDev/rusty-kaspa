@@ -691,7 +691,7 @@ fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: 
     let mut full_addr = addr;
     full_addr.push(Protocol::P2p(peer));
     let mut info = Libp2pConnectInfo::with_address(peer, full_addr, relay_used);
-    if force_relay {
+    if force_relay && relay_used {
         info.relay_used = true;
     }
     info
