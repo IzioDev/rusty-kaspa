@@ -996,7 +996,7 @@ fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
         return;
     }
 
-    debug!("[IDENTIFY] adding external addr candidate from identify addr={}", addr);
+    info!("[IDENTIFY] adding external addr candidate from identify addr={}", addr);
     swarm.add_external_address(addr.clone());
     swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
 }
@@ -1057,13 +1057,13 @@ impl NetworkBehaviour for StaticAddrBehaviour {
 
     fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         if let Some(addr) = self.pending_candidates.pop_front() {
-            debug!("[DCUTR] seeding candidate {}", addr);
+            info!("[DCUTR] seeding candidate {}", addr);
             self.pending_confirms.push_back(addr.clone());
             return Poll::Ready(ToSwarm::NewExternalAddrCandidate(addr));
         }
 
         if let Some(addr) = self.pending_confirms.pop_front() {
-            debug!("[DCUTR] confirming candidate {}", addr);
+            info!("[DCUTR] confirming candidate {}", addr);
             return Poll::Ready(ToSwarm::ExternalAddrConfirmed(addr));
         }
 
