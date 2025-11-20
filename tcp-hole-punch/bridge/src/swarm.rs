@@ -969,9 +969,30 @@ fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
 }
 
+fn is_tcp_dialable(addr: &Multiaddr) -> bool {
+    let mut has_ip = false;
+    let mut has_tcp = false;
+
+    for component in addr.iter() {
+        match component {
+            Protocol::Ip4(_) | Protocol::Ip6(_) => has_ip = true,
+            Protocol::Tcp(_) => has_tcp = true,
+            Protocol::P2p(_) | Protocol::P2pCircuit => return false,
+            _ => {}
+        }
+    }
+
+    has_ip && has_tcp
+}
+
 fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
     if addr_uses_relay(addr) {
         debug!("[IDENTIFY] skipping relay addr for external advertisement addr={}", addr);
+        return;
+    }
+
+    if !is_tcp_dialable(addr) {
+        debug!("[IDENTIFY] skipping non-dialable addr for external advertisement addr={}", addr);
         return;
     }
 
