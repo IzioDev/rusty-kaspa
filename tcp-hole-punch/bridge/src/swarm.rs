@@ -586,7 +586,7 @@ fn build_behaviour(
 
     let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(true);
 
-    BridgeBehaviour {
+    let mut behaviour = BridgeBehaviour {
         identify: identify::Behaviour::new(identify_cfg),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
         relay_client,
@@ -595,7 +595,11 @@ fn build_behaviour(
         autonat,
         stream: lpstream::Behaviour::default(),
         static_addrs: StaticAddrBehaviour::new(config.external_addresses.clone()),
-    }
+    };
+
+    // Surface our current listen addresses so Identify can include them.
+    behaviour.identify.set_agent_version(format!("rusty-kaspa/{}", env!("CARGO_PKG_VERSION")));
+    behaviour
 }
 
 #[derive(Default)]
