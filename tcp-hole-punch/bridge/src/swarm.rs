@@ -978,9 +978,7 @@ fn stream_protocol() -> StreamProtocol {
 fn endpoint_multiaddr(endpoint: &ConnectedPoint) -> Option<Multiaddr> {
     match endpoint {
         ConnectedPoint::Dialer { address, .. } => Some(address.clone()),
-        ConnectedPoint::Listener { send_back_addr, local_addr } => {
-            local_addr.cloned().or_else(|| Some(send_back_addr.clone()))
-        }
+        ConnectedPoint::Listener { send_back_addr, local_addr } => local_addr.clone().or_else(|| Some(send_back_addr.clone())),
     }
 }
 
