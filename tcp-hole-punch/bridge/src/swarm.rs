@@ -778,7 +778,8 @@ fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: 
 fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-            debug!("Swarm connection established peer={} endpoint={:?}", peer_id, endpoint);
+            let local_addr = endpoint_multiaddr(&endpoint);
+            debug!("Swarm connection established peer={} endpoint={:?} local_addr={:?}", peer_id, endpoint, local_addr);
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
                 peer_book.record_address(peer_id, addr);
             }
