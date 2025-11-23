@@ -317,6 +317,14 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 
     let mut swarm = build_swarm(local_key.clone(), &config)?;
+    // Ensure we bind a TCP listener so DCUTR dials can reuse a stable local port behind NAT.
+    // Binding to port 0 lets the OS pick an ephemeral port; DialOpts will reuse it by default.
+    let default_listen: Multiaddr = "/ip4/0.0.0.0/tcp/0".parse().expect("valid multiaddr");
+    match swarm.listen_on(default_listen.clone()) {
+        Ok(_) => info!("libp2p listener started on {}", default_listen),
+        Err(err) => warn!("Failed to start libp2p listener on {} err={}", default_listen, err),
+    }
+
     let config = Arc::new(config);
     let mut control = swarm.behaviour_mut().stream.new_control();
     let mut incoming_streams = control.accept(stream_protocol()).map_err(|e| match e {
@@ -378,6 +386,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                                     // Allow behaviours (e.g. DCUtR) to append learnt addresses like observed addrs.
                                     .extend_addresses_through_behaviour()
                                     .build();
+                                debug!("DialOpts built {:?}", opts);
                                 if let Err(err) = swarm.dial(opts) {
                                     for addr in &full_addrs {
                                         warn!("Failed to dial address peer={} addr={} err={}", peer, addr, err);
@@ -597,6 +606,7 @@ fn build_behaviour(
     }
     let autonat = autonat::Behaviour::new(peer_id, autonat_cfg);
 
+    // Keep identify push enabled so peers learn fresh observed addresses for DCUTR.
     let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(true);
 
     let behaviour = BridgeBehaviour {
@@ -779,6 +789,8 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
                 if addr_uses_relay(&addr) {
                     info!("Swarm relay connection closed peer={} addr={} cause={:?}", peer_id, addr, cause);
                     logged = true;
+                } else {
+                    info!("Swarm connection closed peer={} addr={} cause={:?}", peer_id, addr, cause);
                 }
                 peer_book.remove_address(peer_id, &addr);
             }
@@ -799,6 +811,10 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
                 record_observed_addr(swarm, &info.observed_addr);
                 for addr in &info.listen_addrs {
                     peer_book.record_address(peer_id, addr.clone());
+                    // Treat dialable listen addrs as external candidates so DCUTR has something to punch with behind NAT.
+                    if is_tcp_dialable(addr) && !addr_uses_relay(addr) {
+                        swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
+                    }
                 }
             }
             identify::Event::Pushed { peer_id, ref info, .. } => {
