@@ -22,14 +22,12 @@ use libp2p::{
     core::connection::ConnectedPoint,
     dcutr, identify,
     multiaddr::Protocol,
-    noise, relay, tcp,
+    noise, relay,
     swarm::{
-        behaviour::toggle::Toggle,
-        dial_opts::DialOpts,
-        dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler, THandlerInEvent,
-        THandlerOutEvent, ToSwarm,
+        behaviour::toggle::Toggle, dial_opts::DialOpts, dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm,
+        SwarmEvent, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
-    yamux, Multiaddr, PeerId, SwarmBuilder,
+    tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
 use std::task::{Context, Poll};
@@ -782,7 +780,7 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
             let local_addr = endpoint_multiaddr(&endpoint);
             debug!("Swarm connection established peer={} endpoint={:?} local_addr={:?}", peer_id, endpoint, local_addr);
-            if let Some(addr) = endpoint_multiaddr(&endpoint) {
+            if let Some(addr) = endpoint_multiaddr(&endpoint).filter(is_punchable_addr) {
                 peer_book.record_address(peer_id, addr);
             }
         }
@@ -809,10 +807,16 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
         }
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => match event {
             identify::Event::Received { peer_id, ref info, .. } => {
-                info!("[IDENTIFY] received from {}: protocols={:?} addrs={:?} observed={}", peer_id, info.protocols, info.listen_addrs, info.observed_addr);
+                info!(
+                    "[IDENTIFY] received from {}: protocols={:?} addrs={:?} observed={}",
+                    peer_id, info.protocols, info.listen_addrs, info.observed_addr
+                );
                 // Record remote listen addrs for dialing them, and also add our observed addr so the swarm advertises it.
                 record_observed_addr(swarm, &info.observed_addr);
                 for addr in &info.listen_addrs {
+                    if !is_punchable_addr(addr) {
+                        continue;
+                    }
                     peer_book.record_address(peer_id, addr.clone());
                     // Treat dialable listen addrs as external candidates so DCUTR has something to punch with behind NAT.
                     if is_tcp_dialable(addr) && !addr_uses_relay(addr) {
@@ -821,7 +825,10 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
                 }
             }
             identify::Event::Pushed { peer_id, ref info, .. } => {
-                info!("[IDENTIFY] pushed to {}: protocols={:?} addrs={:?} observed={:?}", peer_id, info.protocols, info.listen_addrs, info.observed_addr);
+                info!(
+                    "[IDENTIFY] pushed to {}: protocols={:?} addrs={:?} observed={:?}",
+                    peer_id, info.protocols, info.listen_addrs, info.observed_addr
+                );
             }
             other => {
                 debug!("[IDENTIFY] behaviour event event={:?}", other);
@@ -1004,13 +1011,40 @@ fn is_tcp_dialable(addr: &Multiaddr) -> bool {
     has_ip && has_tcp
 }
 
+fn is_punchable_addr(addr: &Multiaddr) -> bool {
+    if addr_uses_relay(addr) || !is_tcp_dialable(addr) {
+        return false;
+    }
+    !is_loopback_or_link_local(addr)
+}
+
+fn is_loopback_or_link_local(addr: &Multiaddr) -> bool {
+    for component in addr.iter() {
+        match component {
+            Protocol::Ip4(ip) => {
+                let octets = ip.octets();
+                if octets[0] == 127 || (octets[0] == 169 && octets[1] == 254) {
+                    return true;
+                }
+            }
+            Protocol::Ip6(ip) => {
+                if ip.is_loopback() || ip.is_unicast_link_local() {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
     if addr_uses_relay(addr) {
         debug!("[IDENTIFY] skipping relay addr for external advertisement addr={}", addr);
         return;
     }
 
-    if !is_tcp_dialable(addr) {
+    if !is_punchable_addr(addr) {
         debug!("[IDENTIFY] skipping non-dialable addr for external advertisement addr={}", addr);
         return;
     }
@@ -1035,7 +1069,11 @@ impl StaticAddrBehaviour {
         if self.pending_candidates.contains(&addr) || self.pending_confirms.contains(&addr) {
             return;
         }
-        self.pending_candidates.push_back(addr);
+        if is_punchable_addr(&addr) {
+            self.pending_candidates.push_back(addr);
+        } else {
+            debug!("[DCUTR] ignoring non-punchable candidate {}", addr);
+        }
     }
 }
 
