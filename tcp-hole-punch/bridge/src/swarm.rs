@@ -68,7 +68,9 @@ pub struct RelayConfig {
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self { enabled: true, max_reservations: 8, max_circuits_per_peer: 8 }
+        // Loosen reservation limits for NAT testing so helper-triggered dials are not blocked
+        // by accumulated relay-circuit addresses. These values can be tightened later.
+        Self { enabled: true, max_reservations: 64, max_circuits_per_peer: 64 }
     }
 }
 
