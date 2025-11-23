@@ -15,7 +15,7 @@ use kaspa_consensus_core::{
     mining_rules::MiningRules,
 };
 use kaspa_consensus_notify::{root::ConsensusNotificationRoot, service::NotifyService};
-use kaspa_core::{core::Core, debug, info, trace};
+use kaspa_core::{core::Core, debug, info, trace, warn};
 use kaspa_core::{kaspad_env::version, task::tick::TickService};
 use kaspa_database::{
     prelude::{CachePolicy, DbWriter, DirectDbWriter},
@@ -31,7 +31,7 @@ use kaspa_utils::git;
 use kaspa_utils::networking::ContextualNetAddress;
 use kaspa_utils::sysinfo::SystemInfo;
 use kaspa_utils_tower::counters::TowerConnectionCounters;
-use libp2p::multiaddr::Multiaddr;
+use libp2p::multiaddr::{Multiaddr, Protocol};
 
 use kaspa_addressmanager::AddressManager;
 use kaspa_connectionmanager::Libp2pLimits;
@@ -649,7 +649,37 @@ do you confirm? (answer y/n or pass --yes to the Kaspad command line to confirm 
         p2p_tower_counters.clone(),
         libp2p_limits.clone(),
     ));
-    let relay_listen_port = args.libp2p_relay_port.unwrap_or_else(|| config.default_p2p_port() + 1);
+    let relay_listen_port = {
+        let default_port = config.default_p2p_port() + 1;
+        // If the user provided external addresses with a concrete TCP port, prefer that port
+        // (only when no explicit --libp2p-relay-port override is given) so that the listener
+        // matches the advertised address used for DCUTR.
+        let mut external_port: Option<u16> = None;
+        for raw in &args.libp2p_external_addresses {
+            if let Ok(addr) = raw.parse::<Multiaddr>() {
+                for comp in addr.iter() {
+                    if let Protocol::Tcp(port) = comp {
+                        match external_port {
+                            None => external_port = Some(port),
+                            Some(existing) if existing != port => {
+                                warn!("conflicting TCP ports in --libp2p-external-address values: {} and {}", existing, port);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(port) = args.libp2p_relay_port {
+            port
+        } else if let Some(port) = external_port {
+            info!("derived libp2p relay listen port {} from --libp2p-external-address (override with --libp2p-relay-port)", port);
+            port
+        } else {
+            default_port
+        }
+    };
     let helper_address = derive_helper_address(args.libp2p_helper_address.clone(), relay_listen_port);
     info!("libp2p helper address cli={:?} resolved={:?}", args.libp2p_helper_address.as_deref(), helper_address);
     let reservation_multiaddrs: Vec<Multiaddr> = args

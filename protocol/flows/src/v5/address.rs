@@ -7,7 +7,6 @@ use kaspa_p2p_lib::{
     pb::{kaspad_message::Payload, AddressesMessage, RequestAddressesMessage},
     IncomingRoute, Router,
 };
-use kaspa_utils::networking::IpAddress;
 use rand::seq::SliceRandom;
 use std::sync::Arc;
 

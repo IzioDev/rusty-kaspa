@@ -245,7 +245,12 @@ impl Libp2pBridgeService {
         let mut handle = spawn_swarm_with_config(identity, swarm_config).map_err(Libp2pBridgeError::Bridge)?;
         let peer_id = handle.local_peer_id();
 
-        let listen_addrs = if matches!(role, Libp2pRole::PublicRelay) { self.start_listeners(&mut handle).await? } else { Vec::new() };
+        let should_listen = matches!(role, Libp2pRole::PublicRelay) || !self.config.external_addresses.is_empty();
+        if should_listen && !matches!(role, Libp2pRole::PublicRelay) {
+            info!("libp2p listener enabled to honor manual external addresses (client-only mode)");
+        }
+
+        let listen_addrs = if should_listen { self.start_listeners(&mut handle).await? } else { Vec::new() };
         self.status.update(true, role, Some(peer_id.to_string()), listen_addrs.clone());
         if matches!(role, Libp2pRole::PublicRelay) {
             self.flow_context.set_libp2p_advertisement(Some(Libp2pRelayAdvertisement::new(self.config.listen_port)));
