@@ -24,8 +24,10 @@ use libp2p::{
     multiaddr::Protocol,
     noise, relay,
     swarm::{
-        behaviour::toggle::Toggle, dial_opts::DialOpts, dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm,
-        SwarmEvent, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+        behaviour::toggle::Toggle,
+        dial_opts::{DialOpts, PeerCondition},
+        dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
     },
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
@@ -643,6 +645,8 @@ struct PeerBook {
     active: HashMap<PeerId, VecDeque<Multiaddr>>,
     pending: HashMap<PeerId, VecDeque<Multiaddr>>,
     relay_overrides: HashSet<PeerId>,
+    /// Tracks if a peer supports DCUtR (based on Identify protocols)
+    supports_dcutr: HashSet<PeerId>,
     /// Tracks relay peer ID used for each peer's relay connection
     relay_info: HashMap<PeerId, PeerId>,
     /// Counts active outgoing connections to each peer
@@ -650,6 +654,14 @@ struct PeerBook {
 }
 
 impl PeerBook {
+    fn mark_dcutr_support(&mut self, peer: PeerId) {
+        self.supports_dcutr.insert(peer);
+    }
+
+    fn supports_dcutr(&self, peer: &PeerId) -> bool {
+        self.supports_dcutr.contains(peer)
+    }
+
     fn record_address(&mut self, peer: PeerId, addr: Multiaddr) {
         if let Some(normalized) = normalize_multiaddr(addr) {
             let queue = self.active.entry(peer).or_default();
@@ -885,6 +897,9 @@ fn handle_swarm_event(
                 // If we are connected via a relay and we are the Listener, we must dial back
                 // to establish an outgoing connection where we are the Dialer.
                 let peer_supports_dcutr = info.protocols.iter().any(|p| p.as_ref() == "/libp2p/dcutr");
+                if peer_supports_dcutr {
+                    peer_book.mark_dcutr_support(peer_id);
+                }
                 let peer_connected_via_relay = peer_book.relay_overrides.contains(&peer_id);
                 let already_dialer = peer_book.has_outgoing(&peer_id);
 
@@ -905,7 +920,13 @@ fn handle_swarm_event(
                         );
                         info!("[DCUTR-FIX] Constructed circuit address: {}", circuit_addr);
 
-                        if let Err(e) = swarm.dial(circuit_addr.clone()) {
+                        // Use PeerCondition::Always to force a second connection (outgoing) even if we have an incoming one.
+                        let opts = DialOpts::peer_id(peer_id)
+                            .addresses(vec![circuit_addr.clone()])
+                            .condition(PeerCondition::Always)
+                            .build();
+
+                        if let Err(e) = swarm.dial(opts) {
                             warn!("[DCUTR-FIX] Failed to dial peer via relay: peer={} addr={} error={}", peer_id, circuit_addr, e);
                         } else {
                             info!("[DCUTR-FIX] Successfully initiated bidirectional dial to peer={}", peer_id);
@@ -945,6 +966,37 @@ fn handle_swarm_event(
                 Event::InboundCircuitEstablished { src_peer_id, limit } => {
                     peer_book.mark_relay_override(src_peer_id);
                     info!("Inbound circuit established src_peer_id={} limit={:?}", src_peer_id, limit);
+
+                    // Check if we need to trigger DCUtR bidirectional dial now that we know it's a relay connection.
+                    // (Identify might have happened before this event)
+                    let peer_supports_dcutr = peer_book.supports_dcutr(&src_peer_id);
+                    let already_dialer = peer_book.has_outgoing(&src_peer_id);
+
+                    if peer_supports_dcutr && !already_dialer {
+                        if let Some((relay_peer, relay_base_addr)) = active_relay {
+                            let mut circuit_addr = relay_base_addr.clone();
+                            if let Some(Protocol::P2p(_)) = circuit_addr.iter().last() {
+                                circuit_addr.pop();
+                            }
+                            circuit_addr.push(Protocol::P2p(src_peer_id));
+
+                            info!(
+                                "[DCUTR-FIX] (InboundCircuit) Bidirectional dial required: peer={} supports DCUTR, we are listener. Dialing back via relay={}",
+                                src_peer_id, relay_peer
+                            );
+                            // Force a second connection (outgoing)
+                            let opts = DialOpts::peer_id(src_peer_id)
+                                .addresses(vec![circuit_addr.clone()])
+                                .condition(PeerCondition::Always)
+                                .build();
+
+                            if let Err(e) = swarm.dial(opts) {
+                                warn!("[DCUTR-FIX] (InboundCircuit) Failed to dial peer via relay: peer={} addr={} error={}", src_peer_id, circuit_addr, e);
+                            } else {
+                                info!("[DCUTR-FIX] (InboundCircuit) Successfully initiated bidirectional dial to peer={}", src_peer_id);
+                            }
+                        }
+                    }
                 }
                 other => {
                     warn!("Unhandled relay client event event={:?}", other);
