@@ -72,6 +72,7 @@ Success criteria:
 - **Operational Learnings**:
   - Relay reservation must complete before dial; logs make this visible.
   - Synthesised metadata is necessary for routers but should be clearly logged to avoid confusion.
+  - DCUtR depends on the router/NAT being endpoint-independent (full cone/port-restricted). In our Proxmox lab, stock OpenWrt 23.05 NAT is endpoint-dependent; with WAN ports closed the punch never upgrades to direct. A full-cone-capable build (e.g., OpenWrt with `kmod-nft-fullcone`) or a consumer router that does endpoint-independent mapping is required to match the “no port-forward” home-user scenario.
 
 ## Phase 5 Hardening Highlights
 
