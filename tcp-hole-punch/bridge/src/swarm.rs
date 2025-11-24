@@ -337,6 +337,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let join_handle = tokio::spawn(async move {
         let config = config_for_join;
         let mut peer_book = PeerBook::default();
+        let mut active_relay: Option<(PeerId, Multiaddr)> = None; // Track (relay_peer_id, relay_multiaddr)
         let mut incoming_tx = incoming_tx;
         let mut pending_dials = FuturesUnordered::new();
         let mut pending_listen_acks: Vec<(String, oneshot::Sender<std::result::Result<(), BridgeError>>)> = Vec::new();
@@ -373,11 +374,15 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             let mut control_clone = dial_control.clone();
                             if !addrs.is_empty() {
                                 // Construct full multiaddrs with /p2p/{peer} suffix for dialing
+                                // Skip adding peer suffix if already present (e.g., circuit addresses)
                                 let full_addrs: Vec<_> = addrs
                                     .iter()
                                     .cloned()
                                     .map(|mut addr| {
-                                        addr.push(Protocol::P2p(peer));
+                                        // Only add /p2p/{peer} if not already present
+                                        if !addr.iter().any(|p| matches!(p, Protocol::P2p(id) if id == peer)) {
+                                            addr.push(Protocol::P2p(peer));
+                                        }
                                         addr
                                     })
                                     .collect();
@@ -472,12 +477,19 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     match swarm_event {
                         SwarmEvent::NewListenAddr { ref address, .. } => {
                             info!("Swarm listening address={}", address);
+                            // Track relay circuit listener addresses for DCUTR bidirectional dialing
+                            if addr_uses_relay(address) {
+                                if let Some(relay_peer) = extract_relay_peer(address) {
+                                    info!("Captured relay circuit listener relay_peer={}", relay_peer);
+                                    active_relay = Some((relay_peer, address.clone()));
+                                }
+                            }
                             for (requested, ack) in pending_listen_acks.drain(..) {
                                 info!("Resolving ListenOn command listen_addr={} requested_addr={}", address, requested);
                                 let _ = ack.send(Ok(()));
                             }
                         }
-                        event => handle_swarm_event(&mut swarm, event, &mut peer_book),
+                        event => handle_swarm_event(&mut swarm, event, &mut peer_book, &active_relay),
                     }
                 }
             }
@@ -608,8 +620,9 @@ fn build_behaviour(
     }
     let autonat = autonat::Behaviour::new(peer_id, autonat_cfg);
 
-    // Keep identify push enabled so peers learn fresh observed addresses for DCUTR.
-    let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(true);
+    // Disable identify push to prevent flooding relay connections.
+    // The initial identify exchange still provides addresses for DCUTR.
+    let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(false);
 
     let behaviour = BridgeBehaviour {
         identify: identify::Behaviour::new(identify_cfg),
@@ -630,6 +643,8 @@ struct PeerBook {
     active: HashMap<PeerId, VecDeque<Multiaddr>>,
     pending: HashMap<PeerId, VecDeque<Multiaddr>>,
     relay_overrides: HashSet<PeerId>,
+    /// Tracks relay peer ID used for each peer's relay connection
+    relay_info: HashMap<PeerId, PeerId>,
 }
 
 impl PeerBook {
@@ -747,6 +762,15 @@ impl PeerBook {
     fn mark_relay_override(&mut self, peer: PeerId) {
         self.relay_overrides.insert(peer);
     }
+
+    fn mark_relay_connection(&mut self, peer: PeerId, relay_peer: PeerId) {
+        self.relay_overrides.insert(peer);
+        self.relay_info.insert(peer, relay_peer);
+    }
+
+    fn get_relay_for_peer(&self, peer: &PeerId) -> Option<PeerId> {
+        self.relay_info.get(peer).copied()
+    }
 }
 
 fn push_unique(queue: &mut VecDeque<Multiaddr>, addr: Multiaddr) {
@@ -777,7 +801,12 @@ fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: 
     }
     info
 }
-fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
+fn handle_swarm_event(
+    swarm: &mut Swarm<BridgeBehaviour>,
+    event: SwarmEvent<BridgeBehaviourEvent>,
+    peer_book: &mut PeerBook,
+    active_relay: &Option<(PeerId, Multiaddr)>,
+) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
             let local_addr = endpoint_multiaddr(&endpoint);
@@ -823,6 +852,47 @@ fn handle_swarm_event(swarm: &mut Swarm<BridgeBehaviour>, event: SwarmEvent<Brid
                     // Treat dialable listen addrs as external candidates so DCUTR has something to punch with behind NAT.
                     if is_tcp_dialable(addr) && !addr_uses_relay(addr) {
                         swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
+                    }
+                }
+
+                // DCUTR bidirectional dialing fix: Ensure both peers advertise DCUTR
+                // by having both dial each other via relay (deterministic based on peer ID)
+                let peer_supports_dcutr = info.protocols.iter().any(|p| p.as_ref() == "/libp2p/dcutr");
+                let peer_connected_via_relay = peer_book.relay_overrides.contains(&peer_id);
+
+                if peer_supports_dcutr && peer_connected_via_relay {
+                    let local_peer_id = *swarm.local_peer_id();
+                    // Use lexicographic comparison: if we're "lower", we dial them
+                    if local_peer_id < peer_id {
+                        if let Some((relay_peer, relay_base_addr)) = active_relay {
+                            // Construct circuit address: <relay-base>/p2p-circuit/p2p/<target-peer>
+                            let mut circuit_addr = relay_base_addr.clone();
+                            // Remove the last /p2p/<our-peer-id> component if present
+                            if let Some(Protocol::P2p(_)) = circuit_addr.iter().last() {
+                                circuit_addr.pop();
+                            }
+                            // Add target peer
+                            circuit_addr.push(Protocol::P2p(peer_id));
+
+                            info!(
+                                "[DCUTR-FIX] Bidirectional dial: local_peer={} < remote_peer={}, dialing via relay relay={}",
+                                local_peer_id, peer_id, relay_peer
+                            );
+                            info!("[DCUTR-FIX] Constructed circuit address: {}", circuit_addr);
+
+                            if let Err(e) = swarm.dial(circuit_addr.clone()) {
+                                warn!("[DCUTR-FIX] Failed to dial peer via relay: peer={} addr={} error={}", peer_id, circuit_addr, e);
+                            } else {
+                                info!("[DCUTR-FIX] Successfully initiated bidirectional dial to peer={}", peer_id);
+                            }
+                        } else {
+                            debug!("[DCUTR-FIX] No active relay available for bidirectional dial to peer={}", peer_id);
+                        }
+                    } else {
+                        debug!(
+                            "[DCUTR-FIX] Skipping bidirectional dial: local_peer={} > remote_peer={} (remote should dial us)",
+                            local_peer_id, peer_id
+                        );
                     }
                 }
             }
@@ -995,6 +1065,20 @@ fn endpoint_multiaddr(endpoint: &ConnectedPoint) -> Option<Multiaddr> {
 
 fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
+}
+
+/// Extract the relay peer ID from a circuit address.
+/// Circuit addresses look like: .../p2p/<relay>/p2p-circuit/...
+fn extract_relay_peer(addr: &Multiaddr) -> Option<PeerId> {
+    let components: Vec<_> = addr.iter().collect();
+    for i in 0..components.len() {
+        if matches!(components[i], Protocol::P2pCircuit) && i > 0 {
+            if let Protocol::P2p(peer_id) = components[i - 1] {
+                return Some(peer_id);
+            }
+        }
+    }
+    None
 }
 
 fn is_tcp_dialable(addr: &Multiaddr) -> bool {
