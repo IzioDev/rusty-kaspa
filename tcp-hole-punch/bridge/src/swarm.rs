@@ -18,12 +18,18 @@ use futures::{
 };
 use kaspa_core::{debug, error, info, warn};
 use libp2p::{
+    autonat,
     core::connection::ConnectedPoint,
     dcutr, identify,
     multiaddr::Protocol,
     noise, relay,
-    swarm::{behaviour::toggle::Toggle, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent},
-    yamux, Multiaddr, PeerId, SwarmBuilder,
+    swarm::{
+        behaviour::toggle::Toggle,
+        dial_opts::{DialOpts, PeerCondition},
+        dummy, ConnectionDenied, FromSwarm, NetworkBehaviour, StreamProtocol, Swarm, SwarmEvent, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
+    },
+    tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use libp2p_stream::{self as lpstream, AlreadyRegistered, OpenStreamError};
 use std::task::{Context, Poll};
@@ -62,7 +68,9 @@ pub struct RelayConfig {
 
 impl Default for RelayConfig {
     fn default() -> Self {
-        Self { enabled: true, max_reservations: 8, max_circuits_per_peer: 4 }
+        // Loosen reservation limits for NAT testing so helper-triggered dials are not blocked
+        // by accumulated relay-circuit addresses. These values can be tightened later.
+        Self { enabled: true, max_reservations: 64, max_circuits_per_peer: 64 }
     }
 }
 
@@ -92,6 +100,33 @@ impl Default for HolePunchConfig {
     }
 }
 
+/// Configuration for AutoNAT behaviour.
+#[derive(Clone, Debug)]
+pub struct AutoNatConfig {
+    /// Enable AutoNAT client behaviour (address discovery).
+    pub enable_client: bool,
+    /// Enable AutoNAT server behaviour (help others discover addresses).
+    pub enable_server: bool,
+    /// Only allow AutoNAT server for publicly reachable nodes.
+    pub server_only_if_public: bool,
+    /// Maximum AutoNAT server requests per peer (rate limiting).
+    pub max_server_requests_per_peer: usize,
+    /// Confidence threshold for address confirmation (number of confirmations needed).
+    pub confidence_threshold: usize,
+}
+
+impl Default for AutoNatConfig {
+    fn default() -> Self {
+        Self {
+            enable_client: true,
+            enable_server: true,
+            server_only_if_public: true,
+            max_server_requests_per_peer: 1,
+            confidence_threshold: 3,
+        }
+    }
+}
+
 /// Aggregate swarm configuration.
 #[derive(Clone, Debug, Default)]
 pub struct SwarmConfig {
@@ -99,6 +134,7 @@ pub struct SwarmConfig {
     pub relay: RelayConfig,
     pub hole_punch: HolePunchConfig,
     pub relay_server: RelayServerConfig,
+    pub autonat: AutoNatConfig,
     pub external_addresses: Vec<Multiaddr>,
 }
 
@@ -264,7 +300,9 @@ struct BridgeBehaviour {
     relay_client: Toggle<relay::client::Behaviour>,
     relay_server: Toggle<relay::Behaviour>,
     dcutr: dcutr::Behaviour,
+    autonat: autonat::Behaviour,
     stream: lpstream::Behaviour,
+    static_addrs: StaticAddrBehaviour,
 }
 
 /// Spawn the libp2p swarm actor using the default configuration.
@@ -281,9 +319,14 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let command_tx = SwarmCommandSender::new(format!("swarm-{peer_id_label}"), raw_sender);
 
     let mut swarm = build_swarm(local_key.clone(), &config)?;
-    for addr in &config.external_addresses {
-        swarm.add_external_address(addr.clone());
+    // Ensure we bind a TCP listener so DCUTR dials can reuse a stable local port behind NAT.
+    // Binding to port 0 lets the OS pick an ephemeral port; DialOpts will reuse it by default.
+    let default_listen: Multiaddr = "/ip4/0.0.0.0/tcp/0".parse().expect("valid multiaddr");
+    match swarm.listen_on(default_listen.clone()) {
+        Ok(_) => info!("libp2p listener started on {}", default_listen),
+        Err(err) => warn!("Failed to start libp2p listener on {} err={}", default_listen, err),
     }
+
     let config = Arc::new(config);
     let mut control = swarm.behaviour_mut().stream.new_control();
     let mut incoming_streams = control.accept(stream_protocol()).map_err(|e| match e {
@@ -296,6 +339,7 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
     let join_handle = tokio::spawn(async move {
         let config = config_for_join;
         let mut peer_book = PeerBook::default();
+        let mut active_relay: Option<(PeerId, Multiaddr)> = None; // Track (relay_peer_id, relay_multiaddr)
         let mut incoming_tx = incoming_tx;
         let mut pending_dials = FuturesUnordered::new();
         let mut pending_listen_acks: Vec<(String, oneshot::Sender<std::result::Result<(), BridgeError>>)> = Vec::new();
@@ -332,22 +376,38 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                             let mut control_clone = dial_control.clone();
                             if !addrs.is_empty() {
                                 // Construct full multiaddrs with /p2p/{peer} suffix for dialing
+                                // Skip adding peer suffix if already present (e.g., circuit addresses)
                                 let full_addrs: Vec<_> = addrs
                                     .iter()
                                     .cloned()
                                     .map(|mut addr| {
-                                        addr.push(Protocol::P2p(peer));
+                                        // Only add /p2p/{peer} if not already present
+                                        if !addr.iter().any(|p| matches!(p, Protocol::P2p(id) if id == peer)) {
+                                            addr.push(Protocol::P2p(peer));
+                                        }
                                         addr
                                     })
                                     .collect();
-                                // Dial using full multiaddrs - this is the most explicit approach
-                                for addr in &full_addrs {
-                                    if let Err(err) = swarm.dial(addr.clone()) {
+                                let opts = DialOpts::peer_id(peer)
+                                    .addresses(full_addrs.clone())
+                                    // Allow behaviours (e.g. DCUtR) to append learnt addresses like observed addrs.
+                                    .extend_addresses_through_behaviour()
+                                    .build();
+                                debug!("DialOpts built {:?}", opts);
+                                if let Err(err) = swarm.dial(opts) {
+                                    for addr in &full_addrs {
                                         warn!("Failed to dial address peer={} addr={} err={}", peer, addr, err);
-                                    } else {
-                                        debug!("Dial initiated successfully peer={} addr={}", peer, addr);
-                                        break; // Successfully initiated one dial, that's enough
                                     }
+                                } else {
+                                    debug!("Dial initiated successfully peer={} addrs={:?}", peer, full_addrs);
+                                }
+                            } else {
+                                // No explicit addresses: still allow behaviours to provide candidates.
+                                let opts = DialOpts::peer_id(peer).build();
+                                if let Err(err) = swarm.dial(opts) {
+                                    warn!("Failed to dial peer={} with behaviour-provided addrs err={}", peer, err);
+                                } else {
+                                    debug!("Dial initiated successfully using behaviour-provided addrs peer={}", peer);
                                 }
                             }
                             // open_stream will wait for the connection to establish, then open a stream
@@ -412,15 +472,26 @@ pub fn spawn_swarm_with_config(local_key: libp2p::identity::Keypair, config: Swa
                     }
                 }
                 swarm_event = swarm.select_next_some() => {
+                    if let SwarmEvent::ConnectionEstablished { peer_id, .. } = &swarm_event {
+                        swarm.behaviour_mut().identify.push(std::iter::once(*peer_id));
+                        debug!("[IDENTIFY] queued push to peer {}", peer_id);
+                    }
                     match swarm_event {
                         SwarmEvent::NewListenAddr { ref address, .. } => {
                             info!("Swarm listening address={}", address);
+                            // Track relay circuit listener addresses for DCUTR bidirectional dialing
+                            if addr_uses_relay(address) {
+                                if let Some(relay_peer) = extract_relay_peer(address) {
+                                    info!("Captured relay circuit listener relay_peer={}", relay_peer);
+                                    active_relay = Some((relay_peer, address.clone()));
+                                }
+                            }
                             for (requested, ack) in pending_listen_acks.drain(..) {
                                 info!("Resolving ListenOn command listen_addr={} requested_addr={}", address, requested);
                                 let _ = ack.send(Ok(()));
                             }
                         }
-                        event => handle_swarm_event(event, &mut peer_book),
+                        event => handle_swarm_event(&mut swarm, event, &mut peer_book, &active_relay),
                     }
                 }
             }
@@ -447,11 +518,16 @@ fn build_swarm(local_key: libp2p::identity::Keypair, config: &SwarmConfig) -> Re
 
     eprintln!("✓ Yamux: receive_window={}MiB, max_buffer={}MiB", receive_window_size / (1024 * 1024), max_buffer_size / (1024 * 1024));
 
-    let base_builder = SwarmBuilder::with_existing_identity(local_key.clone())
-        .with_tokio()
-        // Use only Noise for simplicity in tests - TLS negotiation can hang
-        .with_tcp(Default::default(), noise::Config::new, || yamux_config.clone())
-        .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?;
+    let base_builder = {
+        // Port reuse is controlled per-dial via DialOpts (default is reuse); tcp::Config::port_reuse
+        // is deprecated and a no-op in libp2p ≥0.42.
+        let tcp_config = tcp::Config::default();
+        SwarmBuilder::with_existing_identity(local_key.clone())
+            .with_tokio()
+            // Use only Noise for simplicity in tests - TLS negotiation can hang
+            .with_tcp(tcp_config, noise::Config::new, || yamux_config.clone())
+            .map_err(|e| BridgeError::DialFailed(format!("tcp transport init failed: {e}")))?
+    };
 
     if config.transport.enable_quic {
         let builder = base_builder.with_quic();
@@ -520,18 +596,48 @@ fn build_behaviour(
     };
 
     // Always enable DCUtR for hole-punching support
-    // IMPORTANT: DCUtR must NOT be wrapped in Toggle - Toggle breaks protocol advertisement!
+    if !config.external_addresses.is_empty() {
+        info!("Seeding DCUtR external address candidates: {:?}", config.external_addresses);
+    }
     info!("DCUtR behaviour ENABLED for peer={}", public.to_peer_id());
     let dcutr = dcutr::Behaviour::new(public.to_peer_id());
 
-    BridgeBehaviour {
-        identify: identify::Behaviour::new(identify::Config::new("/kaspa/0.1.0".into(), public)),
+    // Configure AutoNAT for NAT detection and address discovery
+    let peer_id = public.to_peer_id();
+    let mut autonat_cfg = autonat::Config::default();
+    if config.autonat.enable_client {
+        autonat_cfg.confidence_max = config.autonat.confidence_threshold;
+        info!("AutoNAT client mode ENABLED for peer={}", peer_id);
+    }
+    if config.autonat.enable_server {
+        if config.autonat.server_only_if_public {
+            autonat_cfg.only_global_ips = true;
+        }
+        autonat_cfg.throttle_server_period = Duration::from_secs(60);
+        autonat_cfg.throttle_clients_peer_max = config.autonat.max_server_requests_per_peer;
+        info!("AutoNAT server mode ENABLED for peer={}", peer_id);
+    }
+    if !config.autonat.enable_client && !config.autonat.enable_server {
+        info!("AutoNAT DISABLED for peer={}", peer_id);
+    }
+    let autonat = autonat::Behaviour::new(peer_id, autonat_cfg);
+
+    // Disable identify push to prevent flooding relay connections.
+    // The initial identify exchange still provides addresses for DCUTR.
+    let identify_cfg = identify::Config::new("/kaspa/0.1.0".into(), public).with_push_listen_addr_updates(false);
+
+    let behaviour = BridgeBehaviour {
+        identify: identify::Behaviour::new(identify_cfg),
         ping: libp2p::ping::Behaviour::new(libp2p::ping::Config::new()),
         relay_client,
         relay_server,
         dcutr,
+        autonat,
         stream: lpstream::Behaviour::default(),
-    }
+        static_addrs: StaticAddrBehaviour::new(config.external_addresses.clone()),
+    };
+
+    behaviour
 }
 
 #[derive(Default)]
@@ -539,9 +645,23 @@ struct PeerBook {
     active: HashMap<PeerId, VecDeque<Multiaddr>>,
     pending: HashMap<PeerId, VecDeque<Multiaddr>>,
     relay_overrides: HashSet<PeerId>,
+    /// Tracks if a peer supports DCUtR (based on Identify protocols)
+    supports_dcutr: HashSet<PeerId>,
+    /// Tracks relay peer ID used for each peer's relay connection
+    relay_info: HashMap<PeerId, PeerId>,
+    /// Counts active outgoing connections to each peer
+    outgoing_connections: HashMap<PeerId, usize>,
 }
 
 impl PeerBook {
+    fn mark_dcutr_support(&mut self, peer: PeerId) {
+        self.supports_dcutr.insert(peer);
+    }
+
+    fn supports_dcutr(&self, peer: &PeerId) -> bool {
+        self.supports_dcutr.contains(peer)
+    }
+
     fn record_address(&mut self, peer: PeerId, addr: Multiaddr) {
         if let Some(normalized) = normalize_multiaddr(addr) {
             let queue = self.active.entry(peer).or_default();
@@ -656,6 +776,32 @@ impl PeerBook {
     fn mark_relay_override(&mut self, peer: PeerId) {
         self.relay_overrides.insert(peer);
     }
+
+    fn mark_relay_connection(&mut self, peer: PeerId, relay_peer: PeerId) {
+        self.relay_overrides.insert(peer);
+        self.relay_info.insert(peer, relay_peer);
+    }
+
+    fn get_relay_for_peer(&self, peer: &PeerId) -> Option<PeerId> {
+        self.relay_info.get(peer).copied()
+    }
+
+    fn add_outgoing(&mut self, peer: PeerId) {
+        *self.outgoing_connections.entry(peer).or_default() += 1;
+    }
+
+    fn remove_outgoing(&mut self, peer: PeerId) {
+        if let Some(count) = self.outgoing_connections.get_mut(&peer) {
+            *count = count.saturating_sub(1);
+            if *count == 0 {
+                self.outgoing_connections.remove(&peer);
+            }
+        }
+    }
+
+    fn has_outgoing(&self, peer: &PeerId) -> bool {
+        self.outgoing_connections.get(peer).map_or(false, |&c| c > 0)
+    }
 }
 
 fn push_unique(queue: &mut VecDeque<Multiaddr>, addr: Multiaddr) {
@@ -681,25 +827,39 @@ fn build_connect_info_with_override(peer: PeerId, addr: Multiaddr, force_relay: 
     let mut full_addr = addr;
     full_addr.push(Protocol::P2p(peer));
     let mut info = Libp2pConnectInfo::with_address(peer, full_addr, relay_used);
-    if force_relay {
+    if force_relay && relay_used {
         info.relay_used = true;
     }
     info
 }
-fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut PeerBook) {
+fn handle_swarm_event(
+    swarm: &mut Swarm<BridgeBehaviour>,
+    event: SwarmEvent<BridgeBehaviourEvent>,
+    peer_book: &mut PeerBook,
+    active_relay: &Option<(PeerId, Multiaddr)>,
+) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, endpoint, .. } => {
-            debug!("Swarm connection established peer={} endpoint={:?}", peer_id, endpoint);
-            if let Some(addr) = endpoint_multiaddr(&endpoint) {
+            let local_addr = endpoint_multiaddr(&endpoint);
+            debug!("Swarm connection established peer={} endpoint={:?} local_addr={:?}", peer_id, endpoint, local_addr);
+            if endpoint.is_dialer() {
+                peer_book.add_outgoing(peer_id);
+            }
+            if let Some(addr) = endpoint_multiaddr(&endpoint).filter(is_punchable_addr) {
                 peer_book.record_address(peer_id, addr);
             }
         }
         SwarmEvent::ConnectionClosed { peer_id, endpoint, cause, .. } => {
             let mut logged = false;
+            if endpoint.is_dialer() {
+                peer_book.remove_outgoing(peer_id);
+            }
             if let Some(addr) = endpoint_multiaddr(&endpoint) {
                 if addr_uses_relay(&addr) {
                     info!("Swarm relay connection closed peer={} addr={} cause={:?}", peer_id, addr, cause);
                     logged = true;
+                } else {
+                    info!("Swarm connection closed peer={} addr={} cause={:?}", peer_id, addr, cause);
                 }
                 peer_book.remove_address(peer_id, &addr);
             }
@@ -713,16 +873,81 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::IncomingConnectionError { error, .. } => {
             debug!("Incoming connection error error={}", error);
         }
-        SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => {
-            if let identify::Event::Received { peer_id, ref info, .. } = event {
-                info!("Identify received from {}: protocols={:?} addrs={:?}", peer_id, info.protocols, info.listen_addrs);
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Identify(event)) => match event {
+            identify::Event::Received { peer_id, ref info, .. } => {
+                info!(
+                    "[IDENTIFY] received from {}: protocols={:?} addrs={:?} observed={}",
+                    peer_id, info.protocols, info.listen_addrs, info.observed_addr
+                );
+                // Record remote listen addrs for dialing them, and also add our observed addr so the swarm advertises it.
+                record_observed_addr(swarm, &info.observed_addr);
                 for addr in &info.listen_addrs {
+                    if !is_punchable_addr(addr) {
+                        continue;
+                    }
                     peer_book.record_address(peer_id, addr.clone());
+                    // Treat dialable listen addrs as external candidates so DCUTR has something to punch with behind NAT.
+                    if is_tcp_dialable(addr) && !addr_uses_relay(addr) {
+                        swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
+                    }
                 }
-            } else {
-                debug!("Identify behaviour event event={:?}", event);
+
+                // DCUTR bidirectional dialing fix: Ensure both peers advertise DCUTR.
+                // The DCUtR protocol only advertises capabilities when acting as a Dialer.
+                // If we are connected via a relay and we are the Listener, we must dial back
+                // to establish an outgoing connection where we are the Dialer.
+                let peer_supports_dcutr = info.protocols.iter().any(|p| p.as_ref() == "/libp2p/dcutr");
+                if peer_supports_dcutr {
+                    peer_book.mark_dcutr_support(peer_id);
+                }
+                let peer_connected_via_relay = peer_book.relay_overrides.contains(&peer_id);
+                let already_dialer = peer_book.has_outgoing(&peer_id);
+
+                if peer_supports_dcutr && peer_connected_via_relay && !already_dialer {
+                    if let Some((relay_peer, relay_base_addr)) = active_relay {
+                        // Construct circuit address: <relay-base>/p2p-circuit/p2p/<target-peer>
+                        let mut circuit_addr = relay_base_addr.clone();
+                        // Remove the last /p2p/<our-peer-id> component if present
+                        if let Some(Protocol::P2p(_)) = circuit_addr.iter().last() {
+                            circuit_addr.pop();
+                        }
+                        // Add target peer
+                        circuit_addr.push(Protocol::P2p(peer_id));
+
+                        info!(
+                            "[DCUTR-FIX] Bidirectional dial required: peer={} supports DCUTR, we are listener. Dialing back via relay={}",
+                            peer_id, relay_peer
+                        );
+                        info!("[DCUTR-FIX] Constructed circuit address: {}", circuit_addr);
+
+                        // Use PeerCondition::Always to force a second connection (outgoing) even if we have an incoming one.
+                        let opts = DialOpts::peer_id(peer_id)
+                            .addresses(vec![circuit_addr.clone()])
+                            .condition(PeerCondition::Always)
+                            .build();
+
+                        if let Err(e) = swarm.dial(opts) {
+                            warn!("[DCUTR-FIX] Failed to dial peer via relay: peer={} addr={} error={}", peer_id, circuit_addr, e);
+                        } else {
+                            info!("[DCUTR-FIX] Successfully initiated bidirectional dial to peer={}", peer_id);
+                        }
+                    } else {
+                        debug!("[DCUTR-FIX] No active relay available for bidirectional dial to peer={}", peer_id);
+                    }
+                } else if peer_supports_dcutr && peer_connected_via_relay && already_dialer {
+                    debug!("[DCUTR-FIX] Skipping bidirectional dial to peer={}: already have outgoing connection", peer_id);
+                }
             }
-        }
+            identify::Event::Pushed { peer_id, ref info, .. } => {
+                info!(
+                    "[IDENTIFY] pushed to {}: protocols={:?} addrs={:?} observed={:?}",
+                    peer_id, info.protocols, info.listen_addrs, info.observed_addr
+                );
+            }
+            other => {
+                debug!("[IDENTIFY] behaviour event event={:?}", other);
+            }
+        },
         SwarmEvent::Behaviour(BridgeBehaviourEvent::RelayClient(event)) => {
             use libp2p::relay::client::Event;
             debug!("Relay client behaviour event event={:?}", event);
@@ -741,6 +966,37 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
                 Event::InboundCircuitEstablished { src_peer_id, limit } => {
                     peer_book.mark_relay_override(src_peer_id);
                     info!("Inbound circuit established src_peer_id={} limit={:?}", src_peer_id, limit);
+
+                    // Check if we need to trigger DCUtR bidirectional dial now that we know it's a relay connection.
+                    // (Identify might have happened before this event)
+                    let peer_supports_dcutr = peer_book.supports_dcutr(&src_peer_id);
+                    let already_dialer = peer_book.has_outgoing(&src_peer_id);
+
+                    if peer_supports_dcutr && !already_dialer {
+                        if let Some((relay_peer, relay_base_addr)) = active_relay {
+                            let mut circuit_addr = relay_base_addr.clone();
+                            if let Some(Protocol::P2p(_)) = circuit_addr.iter().last() {
+                                circuit_addr.pop();
+                            }
+                            circuit_addr.push(Protocol::P2p(src_peer_id));
+
+                            info!(
+                                "[DCUTR-FIX] (InboundCircuit) Bidirectional dial required: peer={} supports DCUTR, we are listener. Dialing back via relay={}",
+                                src_peer_id, relay_peer
+                            );
+                            // Force a second connection (outgoing)
+                            let opts = DialOpts::peer_id(src_peer_id)
+                                .addresses(vec![circuit_addr.clone()])
+                                .condition(PeerCondition::Always)
+                                .build();
+
+                            if let Err(e) = swarm.dial(opts) {
+                                warn!("[DCUTR-FIX] (InboundCircuit) Failed to dial peer via relay: peer={} addr={} error={}", src_peer_id, circuit_addr, e);
+                            } else {
+                                info!("[DCUTR-FIX] (InboundCircuit) Successfully initiated bidirectional dial to peer={}", src_peer_id);
+                            }
+                        }
+                    }
                 }
                 other => {
                     warn!("Unhandled relay client event event={:?}", other);
@@ -819,6 +1075,26 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         SwarmEvent::Behaviour(BridgeBehaviourEvent::Dcutr(event)) => {
             info!("DCUtR event: {:?}", event);
         }
+        SwarmEvent::Behaviour(BridgeBehaviourEvent::Autonat(event)) => {
+            use libp2p::autonat::Event;
+            match event {
+                Event::InboundProbe(probe_event) => {
+                    debug!("AutoNAT inbound probe: {:?}", probe_event);
+                }
+                Event::OutboundProbe(probe_event) => {
+                    debug!("AutoNAT outbound probe: {:?}", probe_event);
+                }
+                Event::StatusChanged { old, new } => {
+                    info!("AutoNAT status changed: {:?} -> {:?}", old, new);
+                    use libp2p::autonat::NatStatus;
+                    match new {
+                        NatStatus::Public(addr) => info!("AutoNAT: Node is PUBLIC, reachable at: {}", addr),
+                        NatStatus::Private => info!("AutoNAT: Node is PRIVATE (behind NAT)"),
+                        NatStatus::Unknown => warn!("AutoNAT: Status UNKNOWN (not enough probes)"),
+                    }
+                }
+            }
+        }
         SwarmEvent::ListenerClosed { addresses, reason, .. } => {
             warn!("Swarm listener closed addresses={:?} reason={:?}", addresses, reason);
         }
@@ -830,6 +1106,12 @@ fn handle_swarm_event(event: SwarmEvent<BridgeBehaviourEvent>, peer_book: &mut P
         }
         SwarmEvent::ExternalAddrConfirmed { address } => {
             debug!("External addr confirmed {}", address);
+            // Proactively push updated address info to all connected peers so DCUtR has a candidate.
+            let peers: Vec<_> = swarm.connected_peers().cloned().collect();
+            if !peers.is_empty() {
+                swarm.behaviour_mut().identify.push(peers.clone());
+                info!("[IDENTIFY] pushed updated external addr to peers={:?} addr={}", peers, address);
+            }
         }
         _ => {}
     }
@@ -850,12 +1132,159 @@ fn stream_protocol() -> StreamProtocol {
 fn endpoint_multiaddr(endpoint: &ConnectedPoint) -> Option<Multiaddr> {
     match endpoint {
         ConnectedPoint::Dialer { address, .. } => Some(address.clone()),
-        ConnectedPoint::Listener { send_back_addr, .. } => Some(send_back_addr.clone()),
+        ConnectedPoint::Listener { local_addr, .. } => Some(local_addr.clone()),
     }
 }
 
 fn addr_uses_relay(addr: &Multiaddr) -> bool {
     addr.iter().any(|component| matches!(component, Protocol::P2pCircuit))
+}
+
+/// Extract the relay peer ID from a circuit address.
+/// Circuit addresses look like: .../p2p/<relay>/p2p-circuit/...
+fn extract_relay_peer(addr: &Multiaddr) -> Option<PeerId> {
+    let components: Vec<_> = addr.iter().collect();
+    for i in 0..components.len() {
+        if matches!(components[i], Protocol::P2pCircuit) && i > 0 {
+            if let Protocol::P2p(peer_id) = components[i - 1] {
+                return Some(peer_id);
+            }
+        }
+    }
+    None
+}
+
+fn is_tcp_dialable(addr: &Multiaddr) -> bool {
+    let mut has_ip = false;
+    let mut has_tcp = false;
+
+    for component in addr.iter() {
+        match component {
+            Protocol::Ip4(_) | Protocol::Ip6(_) => has_ip = true,
+            Protocol::Tcp(_) => has_tcp = true,
+            Protocol::P2p(_) | Protocol::P2pCircuit => return false,
+            _ => {}
+        }
+    }
+
+    has_ip && has_tcp
+}
+
+fn is_punchable_addr(addr: &Multiaddr) -> bool {
+    if addr_uses_relay(addr) || !is_tcp_dialable(addr) {
+        return false;
+    }
+    !is_loopback_or_link_local(addr)
+}
+
+fn is_loopback_or_link_local(addr: &Multiaddr) -> bool {
+    for component in addr.iter() {
+        match component {
+            Protocol::Ip4(ip) => {
+                let octets = ip.octets();
+                if octets[0] == 127 || (octets[0] == 169 && octets[1] == 254) {
+                    return true;
+                }
+            }
+            Protocol::Ip6(ip) => {
+                if ip.is_loopback() || ip.is_unicast_link_local() {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn record_observed_addr(swarm: &mut Swarm<BridgeBehaviour>, addr: &Multiaddr) {
+    if addr_uses_relay(addr) {
+        debug!("[IDENTIFY] skipping relay addr for external advertisement addr={}", addr);
+        return;
+    }
+
+    if !is_punchable_addr(addr) {
+        debug!("[IDENTIFY] skipping non-dialable addr for external advertisement addr={}", addr);
+        return;
+    }
+
+    info!("[IDENTIFY] adding external addr candidate from identify addr={}", addr);
+    swarm.add_external_address(addr.clone());
+    swarm.behaviour_mut().static_addrs.add_candidate(addr.clone());
+}
+
+#[derive(Default)]
+struct StaticAddrBehaviour {
+    pending_candidates: VecDeque<Multiaddr>,
+    pending_confirms: VecDeque<Multiaddr>,
+}
+
+impl StaticAddrBehaviour {
+    fn new(addrs: Vec<Multiaddr>) -> Self {
+        Self { pending_candidates: addrs.into(), pending_confirms: VecDeque::new() }
+    }
+
+    fn add_candidate(&mut self, addr: Multiaddr) {
+        if self.pending_candidates.contains(&addr) || self.pending_confirms.contains(&addr) {
+            return;
+        }
+        if is_punchable_addr(&addr) {
+            self.pending_candidates.push_back(addr);
+        } else {
+            debug!("[DCUTR] ignoring non-punchable candidate {}", addr);
+        }
+    }
+}
+
+impl NetworkBehaviour for StaticAddrBehaviour {
+    type ConnectionHandler = dummy::ConnectionHandler;
+    type ToSwarm = ();
+
+    fn handle_established_inbound_connection(
+        &mut self,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _peer: PeerId,
+        _local_addr: &Multiaddr,
+        _remote_addr: &Multiaddr,
+    ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        Ok(dummy::ConnectionHandler)
+    }
+
+    fn handle_established_outbound_connection(
+        &mut self,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _peer: PeerId,
+        _addr: &Multiaddr,
+        _endpoint: libp2p::core::Endpoint,
+        _port_use: libp2p::core::transport::PortUse,
+    ) -> std::result::Result<THandler<Self>, ConnectionDenied> {
+        Ok(dummy::ConnectionHandler)
+    }
+
+    fn on_connection_handler_event(
+        &mut self,
+        _peer_id: PeerId,
+        _connection_id: libp2p::swarm::ConnectionId,
+        _event: THandlerOutEvent<Self>,
+    ) {
+    }
+
+    fn on_swarm_event(&mut self, _: FromSwarm) {}
+
+    fn poll(&mut self, _: &mut Context<'_>) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+        if let Some(addr) = self.pending_candidates.pop_front() {
+            info!("[DCUTR] seeding candidate {}", addr);
+            self.pending_confirms.push_back(addr.clone());
+            return Poll::Ready(ToSwarm::NewExternalAddrCandidate(addr));
+        }
+
+        if let Some(addr) = self.pending_confirms.pop_front() {
+            info!("[DCUTR] confirming candidate {}", addr);
+            return Poll::Ready(ToSwarm::ExternalAddrConfirmed(addr));
+        }
+
+        Poll::Pending
+    }
 }
 
 #[derive(Debug)]
@@ -866,6 +1295,7 @@ enum BridgeBehaviourEvent {
     RelayClient(relay::client::Event),
     RelayServer(relay::Event),
     Dcutr(dcutr::Event),
+    Autonat(autonat::Event),
 }
 
 impl From<()> for BridgeBehaviourEvent {
@@ -905,3 +1335,8 @@ impl From<dcutr::Event> for BridgeBehaviourEvent {
     }
 }
 
+impl From<autonat::Event> for BridgeBehaviourEvent {
+    fn from(value: autonat::Event) -> Self {
+        Self::Autonat(value)
+    }
+}
