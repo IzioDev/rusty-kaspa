@@ -53,7 +53,7 @@ impl ForkActivation {
     }
 
     /// Checks if the fork is expected to be activated "soon", i.e., in the time frame of the provided range.
-    /// Returns the distance from activation if so, or `None` otherwise.  
+    /// Returns the distance from activation if so, or `None` otherwise.
     pub fn is_within_range_before_activation(self, current_daa_score: u64, range: u64) -> Option<u64> {
         if !self.is_active(current_daa_score) && current_daa_score + range > self.0 {
             Some(self.0 - current_daa_score)
@@ -741,5 +741,5 @@ pub const DEVNET_PARAMS: Params = Params {
     pre_crescendo_target_time_per_block: 1000,
 
     crescendo_activation: ForkActivation::always(),
-    covenants_activation: ForkActivation::never(),
+    covenants_activation: ForkActivation::always(),
 };

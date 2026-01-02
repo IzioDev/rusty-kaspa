@@ -1,0 +1,28 @@
+[package]
+name = "kaspa-wrpc-covenants-counter"
+description = "Kaspa Covenants Counter example"
+publish = false
+rust-version.workspace = true
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+include.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+futures.workspace = true
+kaspa-rpc-core.workspace = true
+kaspa-wallet-core.workspace = true
+kaspa-consensus-core.workspace = true
+kaspa-hashes.workspace = true
+kaspa-wrpc-client.workspace = true
+kaspa-addresses.workspace = true
+kaspa-txscript.workspace = true
+kaspa-txscript-errors.workspace = true
+kaspa-bip32.workspace = true
+kaspa-wallet-keys.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

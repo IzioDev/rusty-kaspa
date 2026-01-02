@@ -44,6 +44,7 @@ members = [
     "rpc/wrpc/examples/subscriber",
     "rpc/wrpc/examples/simple_client",
     "rpc/wrpc/examples/vcc_v2",
+    "rpc/wrpc/examples/covenants_counter",
     "mining",
     "mining/errors",
     "protocol/p2p",
