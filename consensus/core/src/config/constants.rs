@@ -51,13 +51,13 @@ pub mod consensus {
     /// Also used during BPS fork transitions to stabilize the new rate before applying DA (see KIP-14).
     /// With 4 seconds sampling interval, a value of 150 indicates 10 minutes of fixed
     /// difficulty until the window grows large enough.
-    pub const MIN_DIFFICULTY_WINDOW_SIZE: usize = 10;
+    pub const MIN_DIFFICULTY_WINDOW_SIZE: usize = 150;
 
     /// **New** difficulty window duration expressed in time units (seconds).
-    pub const DIFFICULTY_WINDOW_DURATION: u64 = 100;
+    pub const DIFFICULTY_WINDOW_DURATION: u64 = 2641;
 
     /// The desired interval between samples of the difficulty window (seconds).
-    pub const DIFFICULTY_WINDOW_SAMPLE_INTERVAL: u64 = 1;
+    pub const DIFFICULTY_WINDOW_SAMPLE_INTERVAL: u64 = 4;
 
     /// Size of the **sampled** difficulty window (independent of BPS)
     pub const DIFFICULTY_SAMPLED_WINDOW_SIZE: u64 = DIFFICULTY_WINDOW_DURATION.div_ceil(DIFFICULTY_WINDOW_SAMPLE_INTERVAL);
