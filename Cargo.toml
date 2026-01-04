@@ -55,6 +55,7 @@ members = [
     "database",
     "crypto/txscript",
     "crypto/txscript/errors",
+    "crypto/txscript/examples/covenant-native-asset",
     "testing/integration",
     "utils",
     "utils/tower",

@@ -3263,6 +3263,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-txscript-native-asset"
+version = "1.0.1"
+dependencies = [
+ "blake2b_simd",
+ "futures",
+ "kaspa-addresses",
+ "kaspa-bip32",
+ "kaspa-consensus-core",
+ "kaspa-hashes",
+ "kaspa-txscript",
+ "kaspa-txscript-errors",
+ "kaspa-wallet-core",
+ "kaspa-wallet-keys",
+ "tokio",
+]
+
+[[package]]
 name = "kaspa-utils"
 version = "1.0.1"
 dependencies = [

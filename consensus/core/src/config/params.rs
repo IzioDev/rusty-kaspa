@@ -1,7 +1,7 @@
 pub use super::{
     bps::{Bps, TenBps},
     constants::consensus::*,
-    genesis::{GenesisBlock, DEVNET_GENESIS, GENESIS, SIMNET_GENESIS, TESTNET11_GENESIS, TESTNET_GENESIS},
+    genesis::{GenesisBlock, DEVNET_GENESIS, GENESIS, SIMNET_GENESIS, TESTNET12_GENESIS, TESTNET_GENESIS},
 };
 use crate::{
     constants::STORAGE_MASS_PARAMETER,
@@ -530,6 +530,7 @@ impl From<NetworkId> for Params {
             NetworkType::Mainnet => MAINNET_PARAMS,
             NetworkType::Testnet => match value.suffix {
                 Some(10) => TESTNET_PARAMS,
+                Some(12) => TESTNET12_PARAMS,
                 Some(x) => panic!("Testnet suffix {} is not supported", x),
                 None => panic!("Testnet suffix not provided"),
             },
@@ -664,6 +665,17 @@ pub const TESTNET_PARAMS: Params = Params {
     covenants_activation: ForkActivation::never(),
 };
 
+pub const TESTNET12_PARAMS: Params = Params {
+    dns_seeders: &[
+        // This DNS seeder is run by someone235
+        "tn12-dnsseed.kas.pa",
+    ],
+    net: NetworkId::with_suffix(NetworkType::Testnet, 12),
+    genesis: TESTNET12_GENESIS,
+    covenants_activation: ForkActivation::always(),
+    ..TESTNET_PARAMS
+};
+
 pub const SIMNET_PARAMS: Params = Params {
     dns_seeders: &[],
     net: NetworkId::new(NetworkType::Simnet),
@@ -741,5 +753,5 @@ pub const DEVNET_PARAMS: Params = Params {
     pre_crescendo_target_time_per_block: 1000,
 
     crescendo_activation: ForkActivation::always(),
-    covenants_activation: ForkActivation::always(),
+    covenants_activation: ForkActivation::never(),
 };
