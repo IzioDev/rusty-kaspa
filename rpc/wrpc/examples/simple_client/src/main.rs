@@ -31,13 +31,13 @@ async fn check_node_status() -> Result<()> {
     // If you want to connect to your own node, define your node address and wRPC port using let url = Some("ws://0.0.0.0:17110")
     // Verify your Kaspa node is runnning with --rpclisten-borsh=0.0.0.0:17110 parameter
     // In this example we don't use a specific node but we connect through the resolver, which use a pool of public nodes
-    let url = None;
-    let resolver = Some(Resolver::default());
+    let url = Some("tn12-wrpc.kasia.fyi");
+    let resolver = None;
 
     // Define the network your Kaspa node is connected to
     // You can select NetworkType::Mainnet, NetworkType::Testnet, NetworkType::Devnet, NetworkType::Simnet
-    let network_type = NetworkType::Mainnet;
-    let selected_network = Some(NetworkId::new(network_type));
+    let network_type = NetworkType::Testnet;
+    let selected_network = Some(NetworkId::with_suffix(network_type, 12));
 
     // Advanced options
     let subscription_context = None;
