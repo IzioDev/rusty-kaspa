@@ -3594,6 +3594,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "kaspa-wrpc-covenants-native-asset"
+version = "1.0.1"
+dependencies = [
+ "blake2b_simd",
+ "futures",
+ "kaspa-addresses",
+ "kaspa-bip32",
+ "kaspa-consensus-core",
+ "kaspa-hashes",
+ "kaspa-rpc-core",
+ "kaspa-txscript",
+ "kaspa-txscript-errors",
+ "kaspa-wallet-core",
+ "kaspa-wallet-keys",
+ "kaspa-wrpc-client",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
 name = "kaspa-wrpc-example-subscriber"
 version = "1.0.1"
 dependencies = [

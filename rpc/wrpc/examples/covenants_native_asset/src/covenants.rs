@@ -6,18 +6,23 @@ use kaspa_consensus_core::tx::{
     PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
 };
 use kaspa_txscript::opcodes::codes::{
-    Op2Dup, OpBlake2b, OpBlake2bWithKey, OpCat, OpData1, OpDrop, OpDup, OpElse, OpEndIf, OpEqual, OpEqualVerify, OpGreaterThanOrEqual,
-    OpIf, OpOutpointTxId, OpPick, OpSubStr, OpSwap, OpTrue, OpTxInputCount, OpTxInputIndex, OpTxInputSpk, OpTxOutputCount,
-    OpTxOutputSpk, OpTxPayloadLen, OpTxPayloadSubstr, OpVerify,
+    Op1Sub, Op2Dup, OpBlake2b, OpBlake2bWithKey, OpCat, OpData1, OpDrop, OpDup, OpElse, OpEndIf, OpEqual, OpEqualVerify,
+    OpGreaterThanOrEqual, OpIf, OpNumEqualVerify, OpOutpointTxId, OpPick, OpSub, OpSubStr, OpSwap, OpTrue, OpTxInputCount,
+    OpTxInputIndex, OpTxInputSpk, OpTxOutputCount, OpTxOutputSpk, OpTxPayloadLen, OpTxPayloadSubstr, OpVerify,
 };
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderError};
+use kaspa_txscript::scriptnum::{deserialize_i64, serialize_i64};
 use kaspa_txscript::SpkEncoding;
+use kaspa_txscript_errors::TxScriptError;
 use std::convert::TryInto;
-use std::fmt;
+
+pub use crate::errors::CovenantError;
+use crate::result::CovenantResult;
+use crate::scriptnum::{append_scriptnum_padded_u64, decode_scriptnum_padded_u64};
 
 const PAYLOAD_MAGIC: &[u8; 6] = b"KNAT20";
 const PAYLOAD_VERSION: u8 = 1;
-const PAYLOAD_U64_SIZE: usize = 8;
+pub const PAYLOAD_U64_SIZE: usize = 8;
 
 // payload bytes layout
 const OFF_MAGIC_START: usize = 0;
@@ -38,7 +43,15 @@ const OFF_AMOUNT_START: usize = OFF_OP_END;
 const OFF_AMOUNT_END: usize = OFF_AMOUNT_START + PAYLOAD_U64_SIZE;
 const OFF_RECIPIENT_HASH_START: usize = OFF_AMOUNT_END;
 const OFF_RECIPIENT_HASH_END: usize = OFF_RECIPIENT_HASH_START + 32;
-const PAYLOAD_LEN: usize = OFF_RECIPIENT_HASH_END;
+const OFF_REMAINING_SUPPLY_SN_LENP1_START: usize = OFF_RECIPIENT_HASH_END;
+const OFF_REMAINING_SUPPLY_SN_LENP1_END: usize = OFF_REMAINING_SUPPLY_SN_LENP1_START + 1;
+const OFF_REMAINING_SUPPLY_SN_START: usize = OFF_REMAINING_SUPPLY_SN_LENP1_END;
+const OFF_REMAINING_SUPPLY_SN_END: usize = OFF_REMAINING_SUPPLY_SN_START + PAYLOAD_U64_SIZE;
+const OFF_AMOUNT_SN_LENP1_START: usize = OFF_REMAINING_SUPPLY_SN_END;
+const OFF_AMOUNT_SN_LENP1_END: usize = OFF_AMOUNT_SN_LENP1_START + 1;
+const OFF_AMOUNT_SN_START: usize = OFF_AMOUNT_SN_LENP1_END;
+const OFF_AMOUNT_SN_END: usize = OFF_AMOUNT_SN_START + PAYLOAD_U64_SIZE;
+const PAYLOAD_LEN: usize = OFF_AMOUNT_SN_END;
 
 // pre-image bytes layout
 const TX_VERSION_SIZE: usize = 2;
@@ -58,95 +71,27 @@ const PARENT_INPUT0_PREVOUT_TXID_END: usize = PARENT_INPUT0_PREVOUT_TXID_START +
 const PARENT_INPUT0_PREVOUT_INDEX_START: usize = PARENT_INPUT0_PREVOUT_TXID_END;
 const PARENT_INPUT0_PREVOUT_INDEX_END: usize = PARENT_INPUT0_PREVOUT_INDEX_START + OUTPOINT_INDEX_SIZE;
 
-const OP_MINT: u8 = 0;
-const OP_TOKEN_TRANSFER: u8 = 2;
-
-#[derive(Debug)]
-pub enum CovenantError {
-    InvalidPayloadLength { expected: usize, actual: usize },
-    InvalidPayloadMagic,
-    InvalidPayloadVersion { expected: u8, actual: u8 },
-    InvalidPayloadOp { value: u8 },
-    InvalidField(&'static str),
-    PayloadLargerThanPreimage { payload_len: usize, preimage_len: usize },
-    MissingGrandparentOutput0,
-    GrandparentPreimageLengthMismatch { expected_len: usize, actual_len: usize },
-    GrandparentOutputScriptLenMismatch { expected_len: u64, actual_len: u64 },
-    AuthoritySpkTooShort { expected_len: usize, actual_len: usize },
-    AmountExceedsRemainingSupply { remaining: u64, amount: u64 },
-    InsufficientFunds { available: u64, required: u64 },
-    ScriptBuilder(ScriptBuilderError),
-}
-
-impl fmt::Display for CovenantError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CovenantError::InvalidPayloadLength { expected, actual } => {
-                write!(f, "invalid payload length: expected {expected}, got {actual}")
-            }
-            CovenantError::InvalidPayloadMagic => write!(f, "invalid payload magic"),
-            CovenantError::InvalidPayloadVersion { expected, actual } => {
-                write!(f, "unsupported payload version: expected {expected}, got {actual}")
-            }
-            CovenantError::InvalidPayloadOp { value } => write!(f, "unsupported payload op: {value}"),
-            CovenantError::InvalidField(name) => write!(f, "invalid field length for {name}"),
-            CovenantError::PayloadLargerThanPreimage { payload_len, preimage_len } => {
-                write!(f, "payload length {payload_len} exceeds preimage length {preimage_len}")
-            }
-            CovenantError::MissingGrandparentOutput0 => write!(f, "grandparent tx missing output 0"),
-            CovenantError::GrandparentPreimageLengthMismatch { expected_len, actual_len } => {
-                write!(f, "grandparent preimage length mismatch: expected {expected_len}, got {actual_len}")
-            }
-            CovenantError::GrandparentOutputScriptLenMismatch { expected_len, actual_len } => {
-                write!(f, "grandparent output0 script length mismatch: expected {expected_len}, got {actual_len}")
-            }
-            CovenantError::AuthoritySpkTooShort { expected_len, actual_len } => {
-                write!(f, "authority spk too short: expected at least {expected_len}, got {actual_len}")
-            }
-            CovenantError::AmountExceedsRemainingSupply { remaining, amount } => {
-                write!(f, "amount {amount} exceeds remaining supply {remaining}")
-            }
-            CovenantError::InsufficientFunds { available, required } => {
-                write!(f, "insufficient funds: available {available}, required {required}")
-            }
-            CovenantError::ScriptBuilder(err) => write!(f, "script builder error: {err}"),
-        }
-    }
-}
-
-impl std::error::Error for CovenantError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            CovenantError::ScriptBuilder(err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl From<ScriptBuilderError> for CovenantError {
-    fn from(err: ScriptBuilderError) -> Self {
-        CovenantError::ScriptBuilder(err)
-    }
-}
+const TOKEN_OP_MINT: u8 = 0;
+const TOKEN_OP_TRANSFER: u8 = 2;
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeAssetOp {
-    Mint = OP_MINT,
-    TokenTransfer = OP_TOKEN_TRANSFER,
+    Mint = TOKEN_OP_MINT,
+    TokenTransfer = TOKEN_OP_TRANSFER,
 }
 
 impl NativeAssetOp {
     fn from_byte(value: u8) -> Option<Self> {
         match value {
-            OP_MINT => Some(Self::Mint),
-            OP_TOKEN_TRANSFER => Some(Self::TokenTransfer),
+            TOKEN_OP_MINT => Some(Self::Mint),
+            TOKEN_OP_TRANSFER => Some(Self::TokenTransfer),
             _ => None,
         }
     }
 }
 
-/// KNAT20 payload encoded as fixed offsets with little-endian u64 fields.
+/// KNAT20 payload encoded as fixed offsets with little-endian u64 fields plus ScriptNum copies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeAssetPayload {
     /// blake2b(outpoint_txid || outpoint_index_le) of the mint's input 0.
@@ -170,6 +115,7 @@ impl NativeAssetPayload {
             .remaining_supply
             .checked_sub(amount)
             .ok_or(CovenantError::AmountExceedsRemainingSupply { remaining: self.remaining_supply, amount })?;
+
         Ok(Self {
             asset_id: self.asset_id,
             authority_hash: self.authority_hash,
@@ -194,7 +140,7 @@ impl NativeAssetPayload {
         })
     }
 
-    pub fn encode(&self) -> Vec<u8> {
+    pub fn encode(&self) -> Result<Vec<u8>, CovenantError> {
         let mut payload = Vec::with_capacity(PAYLOAD_LEN);
         payload.extend_from_slice(PAYLOAD_MAGIC);
         payload.push(PAYLOAD_VERSION);
@@ -205,7 +151,11 @@ impl NativeAssetPayload {
         payload.push(self.op as u8);
         payload.extend_from_slice(&self.amount.to_le_bytes());
         payload.extend_from_slice(&self.recipient_hash);
-        payload
+
+        append_scriptnum_padded_u64(&mut payload, self.remaining_supply, "remaining_supply")?;
+        append_scriptnum_padded_u64(&mut payload, self.amount, "amount")?;
+
+        Ok(payload)
     }
 
     pub fn decode(payload: &[u8]) -> Result<Self, CovenantError> {
@@ -242,6 +192,28 @@ impl NativeAssetPayload {
             .try_into()
             .map_err(|_| CovenantError::InvalidField("recipient_hash"))?;
 
+        let remaining_supply_sn = decode_scriptnum_padded_u64(
+            payload[OFF_REMAINING_SUPPLY_SN_LENP1_START],
+            &payload[OFF_REMAINING_SUPPLY_SN_START..OFF_REMAINING_SUPPLY_SN_END],
+            "remaining_supply",
+        )?;
+        if remaining_supply_sn != remaining_supply {
+            return Err(CovenantError::ScriptNumMismatch {
+                field: "remaining_supply",
+                encoded: remaining_supply_sn,
+                expected: remaining_supply,
+            });
+        }
+
+        let amount_sn = decode_scriptnum_padded_u64(
+            payload[OFF_AMOUNT_SN_LENP1_START],
+            &payload[OFF_AMOUNT_SN_START..OFF_AMOUNT_SN_END],
+            "amount",
+        )?;
+        if amount_sn != amount {
+            return Err(CovenantError::ScriptNumMismatch { field: "amount", encoded: amount_sn, expected: amount });
+        }
+
         Ok(Self { asset_id, authority_hash, token_spk_hash, remaining_supply, op, amount, recipient_hash })
     }
 }
@@ -261,7 +233,7 @@ impl NativeAssetState {
         utxo_entry: UtxoEntry,
         knat_backtrace: KnatBacktrace,
         output_index: u32,
-    ) -> Result<Self, CovenantError> {
+    ) -> CovenantResult<Self> {
         let payload = NativeAssetPayload::decode(&tx.payload)?;
         let outpoint = TransactionOutpoint::new(tx.id(), output_index);
         Ok(Self { knat_backtrace, utxo_outpoint: outpoint, utxo_entry, payload })
@@ -271,7 +243,7 @@ impl NativeAssetState {
         tx: Transaction,
         utxo_entry: UtxoEntry,
         grandparent_tx: &Transaction,
-    ) -> Result<Self, CovenantError> {
+    ) -> CovenantResult<Self> {
         Self::from_tx_with_entry_and_grandparent_at_index(tx, utxo_entry, grandparent_tx, 0)
     }
 
@@ -280,7 +252,7 @@ impl NativeAssetState {
         utxo_entry: UtxoEntry,
         grandparent_tx: &Transaction,
         output_index: u32,
-    ) -> Result<Self, CovenantError> {
+    ) -> CovenantResult<Self> {
         let knat_backtrace = KnatBacktrace::from_parent_and_grandparent(&tx, grandparent_tx)?;
         Self::from_tx_with_entry_at_index(tx, utxo_entry, knat_backtrace, output_index)
     }
@@ -293,7 +265,7 @@ impl NativeAssetState {
         &self.utxo_outpoint
     }
 
-    fn build_sig_script(&self, covenant_script: &[u8]) -> Result<Vec<u8>, CovenantError> {
+    fn build_sig_script(&self, covenant_script: &[u8]) -> CovenantResult<Vec<u8>> {
         build_sig_script_from_backtrace(&self.knat_backtrace, covenant_script)
     }
 }
@@ -314,7 +286,7 @@ pub struct KnatBacktrace {
 }
 
 impl KnatBacktrace {
-    pub fn from_parent_and_grandparent(parent: &Transaction, grandparent: &Transaction) -> Result<Self, CovenantError> {
+    pub fn from_parent_and_grandparent(parent: &Transaction, grandparent: &Transaction) -> CovenantResult<Self> {
         let (parent_preimage, parent_payload) = split_preimage_payload(parent)?;
         let gp_parts = split_grandparent_preimage_for_knat(grandparent)?;
         Ok(Self {
@@ -327,7 +299,7 @@ impl KnatBacktrace {
     }
 }
 
-fn split_preimage_payload(tx: &Transaction) -> Result<(Vec<u8>, Vec<u8>), CovenantError> {
+fn split_preimage_payload(tx: &Transaction) -> CovenantResult<(Vec<u8>, Vec<u8>)> {
     // transaction_id_preimage returns payload at the end; split to reuse the prefix/payload separately.
     let preimage = transaction_id_preimage(tx);
     let payload_len = tx.payload.len();
@@ -346,7 +318,7 @@ struct GrandparentPreimageParts {
     payload: Vec<u8>,
 }
 
-fn split_grandparent_preimage_for_knat(tx: &Transaction) -> Result<GrandparentPreimageParts, CovenantError> {
+fn split_grandparent_preimage_for_knat(tx: &Transaction) -> CovenantResult<GrandparentPreimageParts> {
     let (preimage_without_payload, payload_bytes) = split_preimage_payload(tx)?;
     let output0 = tx.outputs.get(0).ok_or(CovenantError::MissingGrandparentOutput0)?;
     let out0_spk = output0.script_public_key.to_bytes();
@@ -383,7 +355,7 @@ fn split_grandparent_preimage_for_knat(tx: &Transaction) -> Result<GrandparentPr
 }
 
 /// Build a signature script from KNAT backtrace fragments.
-pub fn build_sig_script_from_backtrace(backtrace: &KnatBacktrace, covenant_script: &[u8]) -> Result<Vec<u8>, CovenantError> {
+pub fn build_sig_script_from_backtrace(backtrace: &KnatBacktrace, covenant_script: &[u8]) -> CovenantResult<Vec<u8>> {
     // Stack order (top -> bottom) inside the covenant script after redeem: parent_payload, parent_preimage, gp_payload,
     // gp_output0_script, gp_preimage.
     let mut sb = ScriptBuilder::new();
@@ -516,7 +488,7 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
 
     // --- Current payload op = mint ---
     sb.add_i64(OFF_OP_START as i64)?.add_i64(OFF_OP_END as i64)?.add_op(OpTxPayloadSubstr)?;
-    sb.add_ops(&[OpData1, OP_MINT])?;
+    sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Parent payload op = mint (mint chain can only follow mint) ---
@@ -525,7 +497,7 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     // for the sake of simplicity and readability, i suggest we keep it as is
     sb.add_op(OpDup)?;
     sb.add_i64(OFF_OP_START as i64)?.add_i64(OFF_OP_END as i64)?.add_op(OpSubStr)?;
-    sb.add_ops(&[OpData1, OP_MINT])?;
+    sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Fields that must be inherited from parent payload ---
@@ -553,6 +525,68 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
         .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
+
+    // --- State transition verification: remaining_supply = parent_remaining_supply - amount ---
+    // ScriptNum values are stored as len+1 plus 8-byte padded bytes to keep zero-length encodings minimal.
+
+    // parent remaining supply (scriptnum) from parent payload.
+    sb.add_op(OpDup)?
+        .add_i64(OFF_REMAINING_SUPPLY_SN_LENP1_START as i64)?
+        .add_i64(OFF_REMAINING_SUPPLY_SN_LENP1_END as i64)?
+        .add_op(OpSubStr)?
+        .add_op(Op1Sub)?;
+    sb.add_i64(1)?
+        .add_op(OpPick)?
+        .add_i64(OFF_REMAINING_SUPPLY_SN_START as i64)?
+        .add_i64(OFF_REMAINING_SUPPLY_SN_END as i64)?
+        .add_op(OpSubStr)?;
+    sb.add_op(OpSwap)?;
+    sb.add_i64(0)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpSubStr)?;
+
+    // current amount (scriptnum) from current payload.
+    sb.add_i64(OFF_AMOUNT_SN_LENP1_START as i64)?
+        .add_i64(OFF_AMOUNT_SN_LENP1_END as i64)?
+        .add_op(OpTxPayloadSubstr)?
+        .add_op(Op1Sub)?;
+    sb.add_i64(OFF_AMOUNT_SN_START as i64)?.add_i64(OFF_AMOUNT_SN_END as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_op(OpSwap)?;
+    sb.add_i64(0)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpSubStr)?;
+
+    // current remaining supply (scriptnum) from current payload.
+    sb.add_i64(OFF_REMAINING_SUPPLY_SN_LENP1_START as i64)?
+        .add_i64(OFF_REMAINING_SUPPLY_SN_LENP1_END as i64)?
+        .add_op(OpTxPayloadSubstr)?
+        .add_op(Op1Sub)?;
+    sb.add_i64(OFF_REMAINING_SUPPLY_SN_START as i64)?.add_i64(OFF_REMAINING_SUPPLY_SN_END as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_op(OpSwap)?;
+    sb.add_i64(0)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpSubStr)?;
+
+    // Stack now has (top to bottom):
+    // current_remaining_supply, current_amount, parent_remaining_supply, parent_payload
+
+    // Verify that parent_remaining_supply >= current_amount (amount doesn't exceed supply).
+    sb.add_i64(2)?.add_op(OpPick)?; // parent_remaining_supply
+    sb.add_i64(2)?.add_op(OpPick)?; // current_amount
+    sb.add_op(OpGreaterThanOrEqual)?;
+    sb.add_op(OpVerify)?;
+
+    // Verify that current_remaining_supply == parent_remaining_supply - current_amount.
+    sb.add_i64(2)?.add_op(OpPick)?; // parent_remaining_supply
+    sb.add_i64(2)?.add_op(OpPick)?; // current_amount
+    sb.add_op(OpSub)?;
+    sb.add_i64(1)?.add_op(OpPick)?; // current_remaining_supply
+    sb.add_op(OpNumEqualVerify)?;
+
+    // Clean up stack - drop the supply check verification values.
+    sb.add_op(OpDrop)?;
+    sb.add_op(OpDrop)?;
+    sb.add_op(OpDrop)?;
 
     // Authority hash must match provided authority spk.
     // note: authorithy isn't transferable as of now, it could be the role of a future covenant OP
@@ -623,7 +657,7 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
         .add_i64(OFF_OP_START as i64)?
         .add_i64(OFF_OP_END as i64)?
         .add_op(OpSubStr)?;
-    sb.add_data(&[OP_TOKEN_TRANSFER])?;
+    sb.add_data(&[TOKEN_OP_TRANSFER])?;
     sb.add_op(OpEqualVerify)?;
 
     sb.add_op(OpDrop)?;
@@ -637,7 +671,7 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
         .add_i64(OFF_OP_START as i64)?
         .add_i64(OFF_OP_END as i64)?
         .add_op(OpSubStr)?;
-    sb.add_ops(&[OpData1, OP_MINT])?;
+    sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
 
     // verify gp out script is the minter covenant tied to this token covenant
@@ -668,7 +702,7 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
 
     // --- Current payload op = token-transfer ---
     sb.add_i64(OFF_OP_START as i64)?.add_i64(OFF_OP_END as i64)?.add_op(OpTxPayloadSubstr)?;
-    sb.add_data(&[OP_TOKEN_TRANSFER])?;
+    sb.add_data(&[TOKEN_OP_TRANSFER])?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Fields that must be inherited from parent payload ---
@@ -772,8 +806,8 @@ pub fn build_mint_tx(
     auth_entry: UtxoEntry,
     minter_covenant_script: &[u8],
     mass_calculator: &MassCalculator,
-) -> Result<Transaction, CovenantError> {
-    let payload = next_payload.encode();
+) -> CovenantResult<Transaction> {
+    let payload = next_payload.encode()?;
     let minter_sig_script = state.build_sig_script(minter_covenant_script)?;
 
     let minter_input = TransactionInput::new(*state.utxo_outpoint(), minter_sig_script, 0, 0);
@@ -813,8 +847,8 @@ pub fn build_token_transfer_tx(
     auth_entry: UtxoEntry,
     token_covenant_script: &[u8],
     mass_calculator: &MassCalculator,
-) -> Result<Transaction, CovenantError> {
-    let payload = next_payload.encode();
+) -> CovenantResult<Transaction> {
+    let payload = next_payload.encode()?;
     let token_sig_script = state.build_sig_script(token_covenant_script)?;
 
     let token_input = TransactionInput::new(*state.utxo_outpoint(), token_sig_script, 0, 0);
@@ -847,7 +881,7 @@ fn estimate_mass(calculator: &MassCalculator, tx: &PopulatedTransaction<'_>) -> 
     storage_mass.max(compute_mass).max(transient_mass)
 }
 
-fn checked_sub_or_err(available: u64, required: u64) -> Result<u64, CovenantError> {
+fn checked_sub_or_err(available: u64, required: u64) -> CovenantResult<u64> {
     available.checked_sub(required).ok_or(CovenantError::InsufficientFunds { available, required })
 }
 

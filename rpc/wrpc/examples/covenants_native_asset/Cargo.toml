@@ -24,6 +24,7 @@ kaspa-txscript-errors.workspace = true
 kaspa-bip32.workspace = true
 kaspa-wallet-keys.workspace = true
 tokio.workspace = true
+thiserror.workspace = true
 
 [lints]
 workspace = true

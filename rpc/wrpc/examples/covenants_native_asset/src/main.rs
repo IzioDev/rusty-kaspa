@@ -1,4 +1,7 @@
 mod covenants;
+mod errors;
+mod result;
+mod scriptnum;
 
 use covenants::{
     asset_id_for_outpoint, build_mint_tx, build_minter_covenant_script_knat20, build_token_covenant_script_knat20,
@@ -37,7 +40,7 @@ const AUTHORITY_INDEX: u32 = 2;
 const NEW_OWNER_INDEX: u32 = 3;
 
 const MINT_COUNT: usize = 3;
-const TOKEN_AMOUNT: u64 = 1;
+const TOKEN_AMOUNT: u64 = 4;
 const TOTAL_SUPPLY: u64 = 10;
 const GENESIS_KAS: &str = "5";
 const TOKEN_KAS: &str = "0.5";
@@ -264,16 +267,23 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
         0,
         SUBNETWORK_ID_NATIVE,
         0,
-        genesis_payload.encode(),
+        genesis_payload.encode().unwrap(),
     );
     let temp_genesis_tx = PopulatedTransaction::new(&temp_genesis_tx, vec![genesis_entry.clone()]);
     let genesis_mass = calc_mass(&mass_calculator, temp_genesis_tx);
 
     let minter_value = genesis_entry.amount.saturating_sub(genesis_mass);
-    let minter_output = TransactionOutput::new(minter_value, minter_spk.clone());
-    let minter_genesis_tx =
-        Transaction::new(TX_VERSION, vec![genesis_input], vec![minter_output], 0, SUBNETWORK_ID_NATIVE, 0, genesis_payload.encode());
-    let genesis_prvkey = wallet_ctx.get_prvkey_at_index(GENESIS_INDEX, AddressType::Receive).to_bytes();
+    let minter_output = kaspa_consensus_core::tx::TransactionOutput::new(minter_value, minter_spk.clone());
+    let minter_genesis_tx = kaspa_consensus_core::tx::Transaction::new(
+        kaspa_consensus_core::constants::TX_VERSION,
+        vec![genesis_input],
+        vec![minter_output],
+        0,
+        kaspa_consensus_core::subnets::SUBNETWORK_ID_NATIVE,
+        0,
+        genesis_payload.encode().unwrap(),
+    );
+    let genesis_prvkey = wallet_ctx.get_prvkey_at_index(1, kaspa_bip32::AddressType::Receive).to_bytes();
     let minter_genesis_tx = sign_and_finalize(minter_genesis_tx, vec![genesis_entry.clone()], &[genesis_prvkey]);
     let minter_genesis_tx_id = client.submit_transaction((&minter_genesis_tx).into(), true).await?;
 

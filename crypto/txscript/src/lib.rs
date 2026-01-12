@@ -8,6 +8,7 @@ pub mod opcodes;
 pub mod result;
 pub mod script_builder;
 pub mod script_class;
+pub mod scriptnum;
 pub mod standard;
 #[cfg(feature = "wasm32-sdk")]
 pub mod wasm;
@@ -626,7 +627,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
     }
 }
 
-trait SpkEncoding {
+pub trait SpkEncoding {
     fn to_bytes(&self) -> Vec<u8>;
 }
 
