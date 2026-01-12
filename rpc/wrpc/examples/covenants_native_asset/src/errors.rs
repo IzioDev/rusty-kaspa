@@ -27,12 +27,12 @@ pub enum CovenantError {
     GrandparentPreimageLengthMismatch { expected_len: usize, actual_len: usize },
     #[error("grandparent output0 script length mismatch: expected {expected_len}, got {actual_len}")]
     GrandparentOutputScriptLenMismatch { expected_len: u64, actual_len: u64 },
-    #[error("authority spk too short: expected at least {expected_len}, got {actual_len}")]
-    AuthoritySpkTooShort { expected_len: usize, actual_len: usize },
+    #[error("spk length out of range for {field}: expected {min}-{max}, got {actual}")]
+    SpkBytesLengthOutOfRange { field: &'static str, min: usize, max: usize, actual: usize },
     #[error("amount {amount} exceeds remaining supply {remaining}")]
     AmountExceedsRemainingSupply { remaining: u64, amount: u64 },
     #[error("insufficient funds: available {available}, required {required}")]
     InsufficientFunds { available: u64, required: u64 },
-    #[error("script builder error: {0}")]
+    #[error(transparent)]
     ScriptBuilder(#[from] ScriptBuilderError),
 }

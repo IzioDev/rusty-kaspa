@@ -1,4 +1,3 @@
-use blake2b_simd::Params;
 use kaspa_consensus_core::hashing::tx::transaction_id_preimage;
 use kaspa_consensus_core::mass::{MassCalculator, NonContextualMasses};
 use kaspa_consensus_core::subnets::SubnetworkId;
@@ -6,14 +5,12 @@ use kaspa_consensus_core::tx::{
     PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
 };
 use kaspa_txscript::opcodes::codes::{
-    Op1Sub, Op2Dup, OpBlake2b, OpBlake2bWithKey, OpCat, OpData1, OpDrop, OpDup, OpElse, OpEndIf, OpEqual, OpEqualVerify,
-    OpGreaterThanOrEqual, OpIf, OpNumEqualVerify, OpOutpointTxId, OpPick, OpSub, OpSubStr, OpSwap, OpTrue, OpTxInputCount,
-    OpTxInputIndex, OpTxInputSpk, OpTxOutputCount, OpTxOutputSpk, OpTxPayloadLen, OpTxPayloadSubstr, OpVerify,
+    Op1Sub, Op2Dup, OpBlake2bWithKey, OpCat, OpData1, OpDrop, OpDup, OpElse, OpEndIf, OpEqual, OpEqualVerify, OpGreaterThanOrEqual,
+    OpIf, OpNumEqualVerify, OpOutpointTxId, OpPick, OpSize, OpSub, OpSubStr, OpSwap, OpTrue, OpTxInputCount, OpTxInputIndex,
+    OpTxInputSpk, OpTxOutputCount, OpTxOutputSpk, OpTxPayloadLen, OpTxPayloadSubstr, OpVerify,
 };
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderError};
-use kaspa_txscript::scriptnum::{deserialize_i64, serialize_i64};
 use kaspa_txscript::SpkEncoding;
-use kaspa_txscript_errors::TxScriptError;
 use std::convert::TryInto;
 
 pub use crate::errors::CovenantError;
@@ -24,26 +21,37 @@ const PAYLOAD_MAGIC: &[u8; 6] = b"KNAT20";
 const PAYLOAD_VERSION: u8 = 1;
 pub const PAYLOAD_U64_SIZE: usize = 8;
 
+// runtime validation purpose
+const SPK_BYTES_MIN: usize = 36; // version (2) + script (34)
+const ASSET_ID_SIZE: usize = 36; // txid (32) + index (4)
+const SPK_BYTES_MAX: usize = 37; // version (2) + script (35)
+
 // payload bytes layout
 const OFF_MAGIC_START: usize = 0;
 const OFF_MAGIC_END: usize = OFF_MAGIC_START + PAYLOAD_MAGIC.len();
 const OFF_VERSION_START: usize = OFF_MAGIC_END;
 const OFF_VERSION_END: usize = OFF_VERSION_START + 1;
 const OFF_ASSET_ID_START: usize = OFF_VERSION_END;
-const OFF_ASSET_ID_END: usize = OFF_ASSET_ID_START + 32;
-const OFF_AUTHORITY_HASH_START: usize = OFF_ASSET_ID_END;
-const OFF_AUTHORITY_HASH_END: usize = OFF_AUTHORITY_HASH_START + 32;
-const OFF_TOKEN_SPK_HASH_START: usize = OFF_AUTHORITY_HASH_END;
-const OFF_TOKEN_SPK_HASH_END: usize = OFF_TOKEN_SPK_HASH_START + 32;
-const OFF_REMAINING_SUPPLY_START: usize = OFF_TOKEN_SPK_HASH_END;
+const OFF_ASSET_ID_END: usize = OFF_ASSET_ID_START + ASSET_ID_SIZE;
+const OFF_AUTHORITY_SPK_LEN_START: usize = OFF_ASSET_ID_END;
+const OFF_AUTHORITY_SPK_LEN_END: usize = OFF_AUTHORITY_SPK_LEN_START + 1;
+const OFF_AUTHORITY_SPK_START: usize = OFF_AUTHORITY_SPK_LEN_END;
+const OFF_AUTHORITY_SPK_END: usize = OFF_AUTHORITY_SPK_START + SPK_BYTES_MAX;
+const OFF_TOKEN_SPK_LEN_START: usize = OFF_AUTHORITY_SPK_END;
+const OFF_TOKEN_SPK_LEN_END: usize = OFF_TOKEN_SPK_LEN_START + 1;
+const OFF_TOKEN_SPK_START: usize = OFF_TOKEN_SPK_LEN_END;
+const OFF_TOKEN_SPK_END: usize = OFF_TOKEN_SPK_START + SPK_BYTES_MAX;
+const OFF_REMAINING_SUPPLY_START: usize = OFF_TOKEN_SPK_END;
 const OFF_REMAINING_SUPPLY_END: usize = OFF_REMAINING_SUPPLY_START + PAYLOAD_U64_SIZE;
 const OFF_OP_START: usize = OFF_REMAINING_SUPPLY_END;
 const OFF_OP_END: usize = OFF_OP_START + 1;
 const OFF_AMOUNT_START: usize = OFF_OP_END;
 const OFF_AMOUNT_END: usize = OFF_AMOUNT_START + PAYLOAD_U64_SIZE;
-const OFF_RECIPIENT_HASH_START: usize = OFF_AMOUNT_END;
-const OFF_RECIPIENT_HASH_END: usize = OFF_RECIPIENT_HASH_START + 32;
-const OFF_REMAINING_SUPPLY_SN_LENP1_START: usize = OFF_RECIPIENT_HASH_END;
+const OFF_RECIPIENT_SPK_LEN_START: usize = OFF_AMOUNT_END;
+const OFF_RECIPIENT_SPK_LEN_END: usize = OFF_RECIPIENT_SPK_LEN_START + 1;
+const OFF_RECIPIENT_SPK_START: usize = OFF_RECIPIENT_SPK_LEN_END;
+const OFF_RECIPIENT_SPK_END: usize = OFF_RECIPIENT_SPK_START + SPK_BYTES_MAX;
+const OFF_REMAINING_SUPPLY_SN_LENP1_START: usize = OFF_RECIPIENT_SPK_END;
 const OFF_REMAINING_SUPPLY_SN_LENP1_END: usize = OFF_REMAINING_SUPPLY_SN_LENP1_START + 1;
 const OFF_REMAINING_SUPPLY_SN_START: usize = OFF_REMAINING_SUPPLY_SN_LENP1_END;
 const OFF_REMAINING_SUPPLY_SN_END: usize = OFF_REMAINING_SUPPLY_SN_START + PAYLOAD_U64_SIZE;
@@ -94,23 +102,24 @@ impl NativeAssetOp {
 /// KNAT20 payload encoded as fixed offsets with little-endian u64 fields plus ScriptNum copies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeAssetPayload {
-    /// blake2b(outpoint_txid || outpoint_index_le) of the mint's input 0.
-    pub asset_id: [u8; 32],
-    /// blake2b(spk.to_bytes()) - contains version and script
-    pub authority_hash: [u8; 32],
-    /// blake2b(spk.to_bytes()) - contains version and script
-    pub token_spk_hash: [u8; 32],
+    /// outpoint_txid || outpoint_index_le of the mint's input 0.
+    pub asset_id: [u8; ASSET_ID_SIZE],
+    /// spk.to_bytes() (version + script)
+    pub authority_spk_bytes: Vec<u8>,
+    /// spk.to_bytes() (version + script)
+    pub token_spk_bytes: Vec<u8>,
     pub remaining_supply: u64,
     pub op: NativeAssetOp,
     pub amount: u64,
-    /// blake2b(spk.to_bytes()) - contains version and script
-    pub recipient_hash: [u8; 32],
+    /// spk.to_bytes() (version + script)
+    pub recipient_spk_bytes: Vec<u8>,
 }
 
 impl NativeAssetPayload {
     /// Returns the new payload after minting.
     /// Errors if the amount exceeds the remaining supply.
-    pub fn mint_next(&self, amount: u64, recipient_hash: [u8; 32]) -> Result<Self, CovenantError> {
+    pub fn mint_next(&self, amount: u64, recipient_spk_bytes: &[u8]) -> Result<Self, CovenantError> {
+        validate_spk_bytes(recipient_spk_bytes, "recipient_spk_bytes")?;
         let remaining = self
             .remaining_supply
             .checked_sub(amount)
@@ -118,25 +127,26 @@ impl NativeAssetPayload {
 
         Ok(Self {
             asset_id: self.asset_id,
-            authority_hash: self.authority_hash,
-            token_spk_hash: self.token_spk_hash,
+            authority_spk_bytes: self.authority_spk_bytes.clone(),
+            token_spk_bytes: self.token_spk_bytes.clone(),
             remaining_supply: remaining,
             op: NativeAssetOp::Mint,
             amount,
-            recipient_hash,
+            recipient_spk_bytes: recipient_spk_bytes.to_vec(),
         })
     }
 
     /// Returns the new payload after transferring.
-    pub fn token_transfer_next(&self, new_recipient_hash: [u8; 32]) -> Result<Self, CovenantError> {
+    pub fn token_transfer_next(&self, new_recipient_spk_bytes: &[u8]) -> Result<Self, CovenantError> {
+        validate_spk_bytes(new_recipient_spk_bytes, "recipient_spk_bytes")?;
         Ok(Self {
             asset_id: self.asset_id,
-            authority_hash: self.authority_hash,
-            token_spk_hash: self.token_spk_hash,
+            authority_spk_bytes: self.authority_spk_bytes.clone(),
+            token_spk_bytes: self.token_spk_bytes.clone(),
             remaining_supply: self.remaining_supply,
             op: NativeAssetOp::TokenTransfer,
             amount: self.amount,
-            recipient_hash: new_recipient_hash,
+            recipient_spk_bytes: new_recipient_spk_bytes.to_vec(),
         })
     }
 
@@ -145,12 +155,12 @@ impl NativeAssetPayload {
         payload.extend_from_slice(PAYLOAD_MAGIC);
         payload.push(PAYLOAD_VERSION);
         payload.extend_from_slice(&self.asset_id);
-        payload.extend_from_slice(&self.authority_hash);
-        payload.extend_from_slice(&self.token_spk_hash);
+        append_spk_bytes(&mut payload, &self.authority_spk_bytes, "authority_spk_bytes")?;
+        append_spk_bytes(&mut payload, &self.token_spk_bytes, "token_spk_bytes")?;
         payload.extend_from_slice(&self.remaining_supply.to_le_bytes());
         payload.push(self.op as u8);
         payload.extend_from_slice(&self.amount.to_le_bytes());
-        payload.extend_from_slice(&self.recipient_hash);
+        append_spk_bytes(&mut payload, &self.recipient_spk_bytes, "recipient_spk_bytes")?;
 
         append_scriptnum_padded_u64(&mut payload, self.remaining_supply, "remaining_supply")?;
         append_scriptnum_padded_u64(&mut payload, self.amount, "amount")?;
@@ -172,12 +182,15 @@ impl NativeAssetPayload {
 
         let asset_id =
             payload[OFF_ASSET_ID_START..OFF_ASSET_ID_END].try_into().map_err(|_| CovenantError::InvalidField("asset_id"))?;
-        let authority_hash = payload[OFF_AUTHORITY_HASH_START..OFF_AUTHORITY_HASH_END]
-            .try_into()
-            .map_err(|_| CovenantError::InvalidField("authority_hash"))?;
-        let token_spk_hash = payload[OFF_TOKEN_SPK_HASH_START..OFF_TOKEN_SPK_HASH_END]
-            .try_into()
-            .map_err(|_| CovenantError::InvalidField("token_spk_hash"))?;
+        let authority_spk_bytes = decode_spk_bytes(
+            payload,
+            OFF_AUTHORITY_SPK_LEN_START,
+            OFF_AUTHORITY_SPK_START,
+            OFF_AUTHORITY_SPK_END,
+            "authority_spk_bytes",
+        )?;
+        let token_spk_bytes =
+            decode_spk_bytes(payload, OFF_TOKEN_SPK_LEN_START, OFF_TOKEN_SPK_START, OFF_TOKEN_SPK_END, "token_spk_bytes")?;
         let remaining_supply = u64::from_le_bytes(
             payload[OFF_REMAINING_SUPPLY_START..OFF_REMAINING_SUPPLY_END]
                 .try_into()
@@ -188,9 +201,13 @@ impl NativeAssetPayload {
         let amount = u64::from_le_bytes(
             payload[OFF_AMOUNT_START..OFF_AMOUNT_END].try_into().map_err(|_| CovenantError::InvalidField("amount"))?,
         );
-        let recipient_hash = payload[OFF_RECIPIENT_HASH_START..OFF_RECIPIENT_HASH_END]
-            .try_into()
-            .map_err(|_| CovenantError::InvalidField("recipient_hash"))?;
+        let recipient_spk_bytes = decode_spk_bytes(
+            payload,
+            OFF_RECIPIENT_SPK_LEN_START,
+            OFF_RECIPIENT_SPK_START,
+            OFF_RECIPIENT_SPK_END,
+            "recipient_spk_bytes",
+        )?;
 
         let remaining_supply_sn = decode_scriptnum_padded_u64(
             payload[OFF_REMAINING_SUPPLY_SN_LENP1_START],
@@ -214,8 +231,47 @@ impl NativeAssetPayload {
             return Err(CovenantError::ScriptNumMismatch { field: "amount", encoded: amount_sn, expected: amount });
         }
 
-        Ok(Self { asset_id, authority_hash, token_spk_hash, remaining_supply, op, amount, recipient_hash })
+        Ok(Self { asset_id, authority_spk_bytes, token_spk_bytes, remaining_supply, op, amount, recipient_spk_bytes })
     }
+}
+
+/// spk bytes length is 36 or 37
+fn validate_spk_len(len: usize, field: &'static str) -> Result<(), CovenantError> {
+    if !(SPK_BYTES_MIN..=SPK_BYTES_MAX).contains(&len) {
+        return Err(CovenantError::SpkBytesLengthOutOfRange { field, min: SPK_BYTES_MIN, max: SPK_BYTES_MAX, actual: len });
+    }
+    Ok(())
+}
+
+fn validate_spk_bytes(spk_bytes: &[u8], field: &'static str) -> Result<(), CovenantError> {
+    validate_spk_len(spk_bytes.len(), field)
+}
+
+fn append_spk_bytes(payload: &mut Vec<u8>, spk_bytes: &[u8], field: &'static str) -> Result<(), CovenantError> {
+    validate_spk_len(spk_bytes.len(), field)?;
+    payload.push(spk_bytes.len() as u8);
+    payload.extend_from_slice(spk_bytes);
+    // fill with 0 if not = SPK_BYTES_MAX (static layout)
+    payload.resize(payload.len() + (SPK_BYTES_MAX - spk_bytes.len()), 0);
+    Ok(())
+}
+
+fn decode_spk_bytes(
+    payload: &[u8],
+    len_start: usize,
+    bytes_start: usize,
+    bytes_end: usize,
+    field: &'static str,
+) -> Result<Vec<u8>, CovenantError> {
+    let len = *payload.get(len_start).ok_or(CovenantError::InvalidField(field))? as usize;
+    validate_spk_len(len, field)?;
+    let bytes = payload.get(bytes_start..bytes_end).ok_or(CovenantError::InvalidField(field))?;
+
+    // non 0 detected after supposedly finished spk bytes
+    if bytes[len..].iter().any(|&b| b != 0) {
+        return Err(CovenantError::InvalidField(field));
+    }
+    Ok(bytes[..len].to_vec())
 }
 
 /// Holds the current covenant UTXO state.
@@ -399,7 +455,7 @@ pub fn knat_verify_parent_and_grandparent(sb: &mut ScriptBuilder) -> Result<(), 
     // --- 2) Extract parent input0 prevout (txid + index) from parent_preimage ---
     // Leaves prevout_txid and prevout_index on stack for:
     // - binding grandparent txid, and
-    // - genesis asset_id derivation (hash(prevout_txid || prevout_index)).
+    // - genesis asset_id derivation (prevout_txid || prevout_index).
     sb.add_i64(DEPTH_PARENT_PREIMAGE)?
         .add_op(OpPick)?
         .add_i64(PARENT_INPUT0_PREVOUT_TXID_START as i64)?
@@ -441,14 +497,68 @@ pub fn knat_verify_parent_and_grandparent(sb: &mut ScriptBuilder) -> Result<(), 
     Ok(())
 }
 
+// Verifies that the provided spk bytes match the current payload field (len byte + bytes prefix).
+// Stack in: spk_bytes, ...
+// Stack out: ... (consumes spk_bytes)
+fn verify_spk_matches_current_payload(
+    sb: &mut ScriptBuilder,
+    len_start: usize,
+    len_end: usize,
+    bytes_start: usize,
+    bytes_end: usize,
+) -> Result<(), ScriptBuilderError> {
+    sb.add_op(OpDup)?
+        .add_op(OpSize)?
+        .add_i64(len_start as i64)?
+        .add_i64(len_end as i64)?
+        .add_op(OpTxPayloadSubstr)?
+        .add_op(OpSwap)?
+        .add_op(OpEqualVerify)?;
+    sb.add_op(OpDrop)?;
+    sb.add_i64(len_start as i64)?.add_i64(len_end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_i64(bytes_start as i64)?.add_i64(bytes_end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_op(OpSwap)?;
+    sb.add_i64(0)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpSubStr)?;
+    sb.add_op(OpEqualVerify)?;
+    Ok(())
+}
+
+// Verifies that the provided spk bytes match the parent payload field (len byte + bytes prefix).
+// Stack in: spk_bytes, parent_payload, ...
+// Stack out: parent_payload, ... (consumes spk_bytes)
+fn verify_spk_matches_parent_payload(
+    sb: &mut ScriptBuilder,
+    len_start: usize,
+    len_end: usize,
+    bytes_start: usize,
+    bytes_end: usize,
+) -> Result<(), ScriptBuilderError> {
+    sb.add_op(OpDup)?
+        .add_op(OpSize)?
+        .add_i64(3)?
+        .add_op(OpPick)?
+        .add_i64(len_start as i64)?
+        .add_i64(len_end as i64)?
+        .add_op(OpSubStr)?
+        .add_op(OpSwap)?
+        .add_op(OpEqualVerify)?;
+    sb.add_op(OpDrop)?;
+    sb.add_i64(1)?.add_op(OpPick)?.add_i64(bytes_start as i64)?.add_i64(bytes_end as i64)?.add_op(OpSubStr)?;
+    sb.add_i64(2)?.add_op(OpPick)?.add_i64(len_start as i64)?.add_i64(len_end as i64)?.add_op(OpSubStr)?;
+    sb.add_i64(0)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpSubStr)?;
+    sb.add_op(OpEqualVerify)?;
+    Ok(())
+}
+
 /// minter covenant enforcing mint payloads and covenant output checks.
-/// Output1 is bound to the token covenant hash carried in the payload (in the payload: to avoid circular deps minter<-->token covenants).
+/// Output1 is bound to the token covenant spk bytes carried in the payload (in the payload: to avoid circular deps minter<-->token covenants).
 pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u8>, CovenantError> {
     let mut sb = ScriptBuilder::new();
-    if authority_spk.len() <= SPK_VERSION_SIZE {
-        return Err(CovenantError::AuthoritySpkTooShort { expected_len: SPK_VERSION_SIZE + 1, actual_len: authority_spk.len() });
-    }
-    let authority_spk_hash = blake2b_32(authority_spk);
+    validate_spk_bytes(authority_spk, "authority_spk_bytes")?;
 
     knat_verify_parent_and_grandparent(&mut sb)?;
 
@@ -457,14 +567,13 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     //
     // KNAT gate result drives asset_id logic:
     // - continuation: drop prevout data and keep the asset_id from payload,
-    // - genesis: recompute asset_id = blake2b(prevout_txid || prevout_index) and compare to payload.
+    // - genesis: recompute asset_id = prevout_txid || prevout_index and compare to payload.
     sb.add_op(OpIf)?;
     sb.add_op(OpDrop)?;
     sb.add_op(OpDrop)?;
     sb.add_op(OpElse)?;
 
     sb.add_op(OpCat)?;
-    sb.add_op(OpBlake2b)?;
     sb.add_i64(1)?
         .add_op(OpPick)?
         .add_i64(OFF_ASSET_ID_START as i64)?
@@ -510,19 +619,19 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpDup)?
-        .add_i64(OFF_AUTHORITY_HASH_START as i64)?
-        .add_i64(OFF_AUTHORITY_HASH_END as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_LEN_START as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_END as i64)?
         .add_op(OpSubStr)?
-        .add_i64(OFF_AUTHORITY_HASH_START as i64)?
-        .add_i64(OFF_AUTHORITY_HASH_END as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_LEN_START as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_END as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpDup)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
+        .add_i64(OFF_TOKEN_SPK_LEN_START as i64)?
+        .add_i64(OFF_TOKEN_SPK_END as i64)?
         .add_op(OpSubStr)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
+        .add_i64(OFF_TOKEN_SPK_LEN_START as i64)?
+        .add_i64(OFF_TOKEN_SPK_END as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
 
@@ -588,16 +697,21 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_op(OpDrop)?;
     sb.add_op(OpDrop)?;
 
-    // Authority hash must match provided authority spk.
+    // Authority spk bytes must match provided authority spk.
     // note: authorithy isn't transferable as of now, it could be the role of a future covenant OP
-    sb.add_i64(OFF_AUTHORITY_HASH_START as i64)?.add_i64(OFF_AUTHORITY_HASH_END as i64)?.add_op(OpTxPayloadSubstr)?;
-    sb.add_data(&authority_spk_hash)?;
-    sb.add_op(OpEqualVerify)?;
+    sb.add_data(authority_spk)?;
+    verify_spk_matches_current_payload(
+        &mut sb,
+        OFF_AUTHORITY_SPK_LEN_START,
+        OFF_AUTHORITY_SPK_LEN_END,
+        OFF_AUTHORITY_SPK_START,
+        OFF_AUTHORITY_SPK_END,
+    )?;
 
     // Authorization input and covenant outputs:
     // - input[1] must spend the authority_spk,
     // - output[0] must loop back to this covenant,
-    // - output[1] must be a token covenant whose script hash matches payload.token_spk_hash.
+    // - output[1] must be a token covenant whose script bytes match payload.token_spk_bytes.
     sb.add_op(OpTxInputCount)?;
     sb.add_i64(2)?;
     sb.add_op(OpGreaterThanOrEqual)?;
@@ -610,14 +724,14 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
 
     sb.add_op(OpTxInputIndex)?.add_op(OpTxInputSpk)?.add_i64(0)?.add_op(OpTxOutputSpk)?.add_op(OpEqualVerify)?;
 
-    sb.add_i64(1)?
-        .add_op(OpTxOutputSpk)?
-        .add_op(OpBlake2b)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
-        .add_op(OpTxPayloadSubstr)?
-        // output_spk_bytes == token_covenant_spk
-        .add_op(OpEqualVerify)?;
+    sb.add_i64(1)?.add_op(OpTxOutputSpk)?;
+    verify_spk_matches_current_payload(
+        &mut sb,
+        OFF_TOKEN_SPK_LEN_START,
+        OFF_TOKEN_SPK_LEN_END,
+        OFF_TOKEN_SPK_START,
+        OFF_TOKEN_SPK_END,
+    )?;
 
     sb.add_op(OpTxOutputCount)?.add_i64(2)?.add_op(OpGreaterThanOrEqual)?;
     sb.add_op(OpVerify)?;
@@ -633,9 +747,10 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     Ok(sb.drain())
 }
 
-/// Token covenant script. `minter_covenant_spk_hash` binds mint-origin to the minter covenant.
-pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) -> Result<Vec<u8>, CovenantError> {
+/// Token covenant script. `minter_covenant_spk` binds mint-origin to the minter covenant.
+pub fn build_token_covenant_script_knat20(minter_covenant_spk: &[u8]) -> Result<Vec<u8>, CovenantError> {
     let mut sb = ScriptBuilder::new();
+    validate_spk_bytes(minter_covenant_spk, "minter_covenant_spk")?;
 
     knat_verify_parent_and_grandparent(&mut sb)?;
 
@@ -648,7 +763,7 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
 
     // Genesis vs continuation:
     // - continuation: parent op must be token-transfer,
-    // - genesis: parent op must be mint and gp_output0_script must match the minter covenant hash.
+    // - genesis: parent op must be mint and gp_output0_script must match the minter covenant spk bytes.
     sb.add_op(OpIf)?;
 
     // verify its op is a token transfer
@@ -675,11 +790,7 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
     sb.add_op(OpEqualVerify)?;
 
     // verify gp out script is the minter covenant tied to this token covenant
-    sb.add_i64(DEPTH_GP_OUT0_SCRIPT_WITH_PREVOUT)?
-        .add_op(OpPick)?
-        .add_op(OpBlake2b)?
-        .add_data(&minter_covenant_spk_hash)?
-        .add_op(OpEqualVerify)?;
+    sb.add_i64(DEPTH_GP_OUT0_SCRIPT_WITH_PREVOUT)?.add_op(OpPick)?.add_data(minter_covenant_spk)?.add_op(OpEqualVerify)?;
     sb.add_op(OpDrop)?;
     sb.add_op(OpDrop)?;
     sb.add_op(OpEndIf)?;
@@ -715,19 +826,19 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpDup)?
-        .add_i64(OFF_AUTHORITY_HASH_START as i64)?
-        .add_i64(OFF_AUTHORITY_HASH_END as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_LEN_START as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_END as i64)?
         .add_op(OpSubStr)?
-        .add_i64(OFF_AUTHORITY_HASH_START as i64)?
-        .add_i64(OFF_AUTHORITY_HASH_END as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_LEN_START as i64)?
+        .add_i64(OFF_AUTHORITY_SPK_END as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpDup)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
+        .add_i64(OFF_TOKEN_SPK_LEN_START as i64)?
+        .add_i64(OFF_TOKEN_SPK_END as i64)?
         .add_op(OpSubStr)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
+        .add_i64(OFF_TOKEN_SPK_LEN_START as i64)?
+        .add_i64(OFF_TOKEN_SPK_END as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpDup)?
@@ -748,14 +859,15 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
 
-    // Current input spk hash must match payload token_spk_hash.
-    sb.add_op(OpTxInputIndex)?
-        .add_op(OpTxInputSpk)?
-        .add_op(OpBlake2b)?
-        .add_i64(OFF_TOKEN_SPK_HASH_START as i64)?
-        .add_i64(OFF_TOKEN_SPK_HASH_END as i64)?
-        .add_op(OpTxPayloadSubstr)?
-        .add_op(OpEqualVerify)?;
+    // Current input spk bytes must match payload token_spk_bytes.
+    sb.add_op(OpTxInputIndex)?.add_op(OpTxInputSpk)?;
+    verify_spk_matches_current_payload(
+        &mut sb,
+        OFF_TOKEN_SPK_LEN_START,
+        OFF_TOKEN_SPK_LEN_END,
+        OFF_TOKEN_SPK_START,
+        OFF_TOKEN_SPK_END,
+    )?;
 
     // number of input >= 2
     sb.add_op(OpTxInputCount)?;
@@ -763,16 +875,15 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk_hash: [u8; 32]) ->
     sb.add_op(OpGreaterThanOrEqual)?;
     sb.add_op(OpVerify)?;
 
-    // Authorization input spk hash must match parent recipient_hash
-    sb.add_i64(1)?
-        .add_op(OpTxInputSpk)?
-        .add_op(OpBlake2b)?
-        .add_i64(1)?
-        .add_op(OpPick)?
-        .add_i64(OFF_RECIPIENT_HASH_START as i64)?
-        .add_i64(OFF_RECIPIENT_HASH_END as i64)?
-        .add_op(OpSubStr)?
-        .add_op(OpEqualVerify)?;
+    // Authorization input spk bytes must match parent recipient_spk_bytes
+    sb.add_i64(1)?.add_op(OpTxInputSpk)?;
+    verify_spk_matches_parent_payload(
+        &mut sb,
+        OFF_RECIPIENT_SPK_LEN_START,
+        OFF_RECIPIENT_SPK_LEN_END,
+        OFF_RECIPIENT_SPK_START,
+        OFF_RECIPIENT_SPK_END,
+    )?;
 
     // this input[n] == output[n]
     sb.add_op(OpTxInputIndex)?.add_op(OpTxInputSpk)?.add_op(OpTxInputIndex)?.add_op(OpTxOutputSpk)?.add_op(OpEqualVerify)?;
@@ -885,23 +996,18 @@ fn checked_sub_or_err(available: u64, required: u64) -> CovenantResult<u64> {
     available.checked_sub(required).ok_or(CovenantError::InsufficientFunds { available, required })
 }
 
-/// blake2b(hash | u32_le)
+/// outpoint_txid || outpoint_index_le
 /// returns the asset_id for the outpoint
-pub fn asset_id_for_outpoint(outpoint: &TransactionOutpoint) -> [u8; 32] {
-    let mut data = Vec::with_capacity(36);
-    data.extend_from_slice(outpoint.transaction_id.as_ref());
-    data.extend_from_slice(&outpoint.index.to_le_bytes());
-    blake2b_32(&data)
-}
-
-pub fn spk_script_hash(spk: &ScriptPublicKey) -> [u8; 32] {
-    let spk_bytes = spk.to_bytes();
-    blake2b_32(&spk_bytes)
-}
-
-fn blake2b_32(data: &[u8]) -> [u8; 32] {
-    let hash = Params::new().hash_length(32).to_state().update(data).finalize();
-    let mut out = [0u8; 32];
-    out.copy_from_slice(hash.as_bytes());
+pub fn asset_id_for_outpoint(outpoint: &TransactionOutpoint) -> [u8; ASSET_ID_SIZE] {
+    let mut out = [0u8; ASSET_ID_SIZE];
+    out[..OUTPOINT_TXID_SIZE].copy_from_slice(outpoint.transaction_id.as_ref());
+    out[OUTPOINT_TXID_SIZE..].copy_from_slice(&outpoint.index.to_le_bytes());
     out
+}
+
+/// spk.to_bytes() (version + script)
+pub fn try_spk_bytes(spk: &ScriptPublicKey) -> CovenantResult<Vec<u8>> {
+    let spk_bytes = spk.to_bytes();
+    validate_spk_bytes(&spk_bytes, "spk_bytes")?;
+    Ok(spk_bytes)
 }

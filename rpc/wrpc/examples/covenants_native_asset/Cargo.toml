@@ -11,7 +11,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-blake2b_simd.workspace = true
 futures.workspace = true
 kaspa-rpc-core.workspace = true
 kaspa-wallet-core.workspace = true

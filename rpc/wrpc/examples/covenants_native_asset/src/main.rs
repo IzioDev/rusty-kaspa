@@ -5,7 +5,7 @@ mod scriptnum;
 
 use covenants::{
     asset_id_for_outpoint, build_mint_tx, build_minter_covenant_script_knat20, build_token_covenant_script_knat20,
-    build_token_transfer_tx, spk_script_hash, CovenantError, NativeAssetOp, NativeAssetPayload, NativeAssetState,
+    build_token_transfer_tx, try_spk_bytes, CovenantError, NativeAssetOp, NativeAssetPayload, NativeAssetState,
 };
 use kaspa_addresses::Prefix;
 use kaspa_bip32::{secp256k1::PublicKey, AddressType, ChildNumber, ExtendedPrivateKey, Prefix as KeyPrefix, PrivateKey, SecretKey};
@@ -17,7 +17,7 @@ use kaspa_consensus_core::tx::{
     PopulatedTransaction, SignableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
 };
 use kaspa_rpc_core::{api::rpc::RpcApi, RpcAddress};
-use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script, pay_to_script_hash_script, SpkEncoding};
+use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script, pay_to_script_hash_script};
 use kaspa_wallet_core::{
     derivation::WalletDerivationManagerTrait,
     prelude::{Language, Mnemonic},
@@ -40,7 +40,7 @@ const AUTHORITY_INDEX: u32 = 2;
 const NEW_OWNER_INDEX: u32 = 3;
 
 const MINT_COUNT: usize = 3;
-const TOKEN_AMOUNT: u64 = 4;
+const TOKEN_AMOUNT: u64 = 2;
 const TOTAL_SUPPLY: u64 = 10;
 const GENESIS_KAS: &str = "5";
 const TOKEN_KAS: &str = "0.5";
@@ -175,22 +175,21 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
     let authority_spk = pay_to_address_script(&authority_address);
     let new_owner_spk = pay_to_address_script(&new_owner_address);
 
-    let authority_spk_bytes = authority_spk.to_bytes();
-    let authority_hash = spk_script_hash(&authority_spk);
-    let owner_hash = authority_hash;
-    let new_owner_hash = spk_script_hash(&new_owner_spk);
+    let authority_spk_bytes = try_spk_bytes(&authority_spk).map_err(map_covenant_err)?;
+    let owner_spk_bytes = authority_spk_bytes.clone();
+    let new_owner_spk_bytes = try_spk_bytes(&new_owner_spk).map_err(map_covenant_err)?;
 
     let total_minted = TOKEN_AMOUNT.checked_mul(MINT_COUNT as u64).expect("Mint count exceeds token amount range");
     assert!(total_minted <= TOTAL_SUPPLY, "Minted supply exceeds total supply");
 
-    // Build minter first, then derive the token covenant and carry its hash in the payload.
+    // Build minter first, then derive the token covenant and carry its spk bytes in the payload.
     let minter_covenant_script = build_minter_covenant_script_knat20(&authority_spk_bytes).map_err(map_covenant_err)?;
     let minter_spk = pay_to_script_hash_script(&minter_covenant_script);
-    let minter_spk_hash = spk_script_hash(&minter_spk);
+    let minter_spk_bytes = try_spk_bytes(&minter_spk).map_err(map_covenant_err)?;
 
-    let token_covenant_script = build_token_covenant_script_knat20(minter_spk_hash).map_err(map_covenant_err)?;
+    let token_covenant_script = build_token_covenant_script_knat20(&minter_spk_bytes).map_err(map_covenant_err)?;
     let token_spk = pay_to_script_hash_script(&token_covenant_script);
-    let token_spk_hash = spk_script_hash(&token_spk);
+    let token_spk_bytes = try_spk_bytes(&token_spk).map_err(map_covenant_err)?;
 
     let minter_address =
         extract_script_pub_key_address(&minter_spk, Prefix::Testnet).expect("Cannot get address from minter covenant spk");
@@ -250,12 +249,12 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
 
     let genesis_payload = NativeAssetPayload {
         asset_id: asset_id_for_outpoint(&genesis_outpoint),
-        authority_hash,
-        token_spk_hash,
+        authority_spk_bytes,
+        token_spk_bytes,
         remaining_supply: TOTAL_SUPPLY,
         op: NativeAssetOp::Mint,
         amount: TOKEN_AMOUNT,
-        recipient_hash: owner_hash,
+        recipient_spk_bytes: owner_spk_bytes.clone(),
     };
 
     let genesis_input = TransactionInput::new(genesis_outpoint, vec![], 0, 1);
@@ -309,7 +308,7 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
     for (idx, auth_utxo) in authority_utxos.iter().take(MINT_COUNT).enumerate() {
         let auth_input = TransactionInput::new(auth_utxo.outpoint, vec![], 0, 1);
         let auth_entry = auth_utxo.entry.clone();
-        let next_payload = minter_state.payload.mint_next(TOKEN_AMOUNT, owner_hash).map_err(map_covenant_err)?;
+        let next_payload = minter_state.payload.mint_next(TOKEN_AMOUNT, &owner_spk_bytes).map_err(map_covenant_err)?;
 
         let mint_tx = build_mint_tx(
             &minter_state,
@@ -344,7 +343,7 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
     let owner_utxo = &authority_utxos[MINT_COUNT];
     let owner_input = TransactionInput::new(owner_utxo.outpoint, vec![], 0, 1);
     let owner_entry = owner_utxo.entry.clone();
-    let transfer_payload = token_state.payload.token_transfer_next(new_owner_hash).map_err(map_covenant_err)?;
+    let transfer_payload = token_state.payload.token_transfer_next(&new_owner_spk_bytes).map_err(map_covenant_err)?;
 
     let transfer_tx = build_token_transfer_tx(
         &token_state,
