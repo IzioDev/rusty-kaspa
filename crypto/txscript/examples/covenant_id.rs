@@ -1,5 +1,3 @@
-use core::panic;
-
 use kaspa_consensus_core::hashing;
 use kaspa_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
 use kaspa_consensus_core::subnets::SubnetworkId;

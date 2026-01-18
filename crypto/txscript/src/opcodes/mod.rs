@@ -1355,13 +1355,9 @@ opcode_list! {
         if vm.flags.covenants_enabled {
             match vm.script_source {
                 ScriptSource::TxInput{tx, ..} => {
-                    // // TODO: Add optimization
-                    // let count = tx.outputs().iter()
-                    //     .filter(|output| output.cov_out_info.is_some_and(|x| x.authorizing_input as usize == idx))
-                    //     .count();
                     let [input_idx]: [i32; 1] = vm.dstack.pop_items()?;
                     let input_idx = i32_to_usize(input_idx)?;
-                    let count = vm.cov_out_count(input_idx)?;
+                    let count = vm.covenants_ctx.num_auth_outputs(input_idx)?;
                     push_number(count as i64, vm)
                 },
                 _ => Err(TxScriptError::InvalidSource("OpCovOutCount only applies to transaction inputs".to_string()))
@@ -1375,18 +1371,9 @@ opcode_list! {
         if vm.flags.covenants_enabled {
             match vm.script_source {
                 ScriptSource::TxInput{tx, ..} => {
-                    let [input_idx, authorized_idx]: [i32; 2] = vm.dstack.pop_items()?;
-                    let input_idx = i32_to_usize(input_idx)?;
-                    let authorized_idx = i32_to_usize(authorized_idx)?;
-
-                    // // TODO: Add optimization
-                    // let output_idx = tx.outputs().iter().enumerate()
-                    //     .filter(|(i,output)| output.cov_out_info.is_some_and(|x| x.authorizing_input as usize == idx))
-                    //     .map(|(i, _)| i)
-                    //     .nth(cov_out_idx)
-                    //     .ok_or(TxScriptError::InvalidIndex(cov_out_idx as i32))?;
-
-                    let output_idx = vm.cov_out_idx(input_idx, authorized_idx)?;
+                    let [input_idx, k]: [i32; 2] = vm.dstack.pop_items()?;
+                    let (input_idx, k) = (i32_to_usize(input_idx)?, i32_to_usize(k)?);
+                    let output_idx = vm.covenants_ctx.auth_output_index(input_idx, k)?;
                     push_number(output_idx as i64, vm)
                 },
                 _ => Err(TxScriptError::InvalidSource("OpCovOutIdx only applies to transaction inputs".to_string()))

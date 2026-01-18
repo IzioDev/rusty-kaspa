@@ -4,7 +4,9 @@ use kaspa_consensus_core::{
     tx::{TransactionInput, VerifiableTransaction},
 };
 use kaspa_txscript::{
-    caches::Cache, get_sig_op_count_upper_bound, CovenantLocalContext, CovenantsContext, EngineFlags, SigCacheKey, TxScriptEngine,
+    caches::Cache,
+    covenants::{CovenantGlobalContext, CovenantLocalContext, CovenantsContext},
+    get_sig_op_count_upper_bound, EngineFlags, SigCacheKey, TxScriptEngine,
 };
 use kaspa_txscript_errors::TxScriptError;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -199,6 +201,19 @@ impl TransactionValidator {
 
         let mut ctx = CovenantsContext::default();
 
+        for (i, (_, entry)) in tx.populated_inputs().enumerate() {
+            if let Some(covenant_id) = entry.covenant_id {
+                match ctx.covenant_ctxs.entry(covenant_id) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().input_indices.push(i);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(CovenantGlobalContext { input_indices: vec![i], output_indices: Default::default() });
+                    }
+                }
+            }
+        }
+
         for (i, output) in tx.outputs().iter().enumerate() {
             if let Some(cov_out_info) = &output.cov_out_info {
                 let auth_input = cov_out_info.authorizing_input as usize;
@@ -221,12 +236,21 @@ impl TransactionValidator {
 
                 match ctx.local_ctxs.entry(auth_input) {
                     Entry::Occupied(mut e) => {
-                        e.get_mut().authorized_outputs.push(i);
+                        e.get_mut().auth_outputs.push(i);
                     }
                     Entry::Vacant(e) => {
-                        e.insert(CovenantLocalContext { covenant_id: cov_out_info.covenant_id, authorized_outputs: vec![i] });
+                        e.insert(CovenantLocalContext { covenant_id: cov_out_info.covenant_id, auth_outputs: vec![i] });
                     }
-                };
+                }
+
+                match ctx.covenant_ctxs.entry(cov_out_info.covenant_id) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().output_indices.push(i);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(CovenantGlobalContext { input_indices: Default::default(), output_indices: vec![i] });
+                    }
+                }
             }
         }
 

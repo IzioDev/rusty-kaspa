@@ -2,6 +2,7 @@ extern crate alloc;
 extern crate core;
 
 pub mod caches;
+pub mod covenants;
 mod data_stack;
 pub mod error;
 pub mod opcodes;
@@ -14,10 +15,8 @@ pub mod wasm;
 
 pub mod runtime_sig_op_counter;
 
-use std::collections::HashMap;
-use std::sync::LazyLock;
-
 use crate::caches::Cache;
+use crate::covenants::{CovenantsContext, EMPTY_COV_CONTEXT};
 use crate::data_stack::Stack;
 use crate::opcodes::{deserialize_next_opcode, OpCodeImplementation};
 use itertools::Itertools;
@@ -26,10 +25,8 @@ use kaspa_consensus_core::hashing::sighash::{
 };
 use kaspa_consensus_core::hashing::sighash_type::SigHashType;
 use kaspa_consensus_core::tx::{ScriptPublicKey, TransactionInput, UtxoEntry, VerifiableTransaction};
-use kaspa_hashes::Hash;
 use kaspa_txscript_errors::TxScriptError;
 use log::trace;
-use once_cell::unsync::Lazy;
 use opcodes::codes::OpReturn;
 use opcodes::{codes, to_small_int, OpCond};
 use script_class::ScriptClass;
@@ -149,12 +146,13 @@ pub fn get_sig_op_count<T: VerifiableTransaction>(
 ) -> Result<u8, TxScriptError> {
     let sig_cache = Cache::new(0);
     let reused_values = SigHashReusedValuesUnsync::new();
-    let mut vm = TxScriptEngine::from_transaction_input(
+    let mut vm = TxScriptEngine::from_transaction_input_with_covenants(
         tx,
         &tx.inputs()[input_idx],
         input_idx,
         tx.utxo(input_idx).ok_or_else(|| TxScriptError::InvalidInputIndex(input_idx as i32, tx.inputs().len()))?,
         &reused_values,
+        &covenants_ctx,
         &sig_cache,
         Default::default(),
     );
@@ -238,46 +236,6 @@ pub fn is_unspendable<T: VerifiableTransaction, Reused: SigHashReusedValues>(scr
     parse_script::<T, Reused>(script).enumerate().any(|(index, op)| op.is_err() || (index == 0 && op.unwrap().value() == OpReturn))
 }
 
-/// Context for an input's specific authority over a subset of outputs.
-///
-/// Used by scripts to verify the state transitions they directly authorized
-/// (e.g., 1-to-N splits) without scanning unrelated outputs.
-pub struct CovenantLocalContext {
-    /// The covenant ID shared by this input and its authorized outputs.
-    pub covenant_id: Hash,
-
-    /// Indices of outputs that explicitly declare this input as their `authorizing_input`.
-    ///
-    /// This defines the input's direct "children" in the transaction.
-    pub authorized_outputs: Vec<usize>,
-}
-
-/// Context for the transaction-wide state of a specific Covenant ID.
-///
-/// Used for verifying global invariants across all participants of the same covenant
-/// (e.g., merges, batching, or conservation of amounts).
-pub struct CovenantGlobalContext {
-    /// Indices of *all* inputs in the transaction carrying this `covenant_id`.
-    pub input_indices: Vec<usize>,
-
-    /// Indices of *all* outputs in the transaction carrying this `covenant_id`.
-    pub output_indices: Vec<usize>,
-}
-
-/// Pre-computed cache mapping inputs and covenant IDs to their execution contexts.
-///
-/// Enables O(1) access for covenant introspection opcodes.
-#[derive(Default)]
-pub struct CovenantsContext {
-    /// Maps an input index to its local authority context.
-    pub local_ctxs: HashMap<usize, CovenantLocalContext>,
-
-    /// Maps a covenant id to its global context.
-    pub covenant_ctxs: HashMap<Hash, CovenantGlobalContext>,
-}
-
-static EMPTY_CONTEXT: LazyLock<CovenantsContext> = LazyLock::new(|| CovenantsContext::default());
-
 impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'a, T, Reused> {
     pub fn new(reused_values: &'a Reused, sig_cache: &'a Cache<SigCacheKey, bool>, flags: EngineFlags) -> Self {
         Self {
@@ -285,7 +243,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             astack: Self::new_stack(flags),
             script_source: ScriptSource::StandAloneScripts(vec![]),
             reused_values,
-            covenants_ctx: &EMPTY_CONTEXT,
+            covenants_ctx: &EMPTY_COV_CONTEXT,
             sig_cache,
             cond_stack: vec![],
             num_ops: 0,
@@ -367,7 +325,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             astack: Self::new_stack(flags),
             script_source: ScriptSource::TxInput { tx, input, idx: input_idx, utxo_entry, is_p2sh },
             reused_values,
-            covenants_ctx: &EMPTY_CONTEXT,
+            covenants_ctx: &EMPTY_COV_CONTEXT,
             sig_cache,
             cond_stack: Default::default(),
             num_ops: 0,
@@ -375,47 +333,6 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             flags,
         }
     }
-
-    pub(crate) fn cov_out_idx(&self, input_idx: usize, authorized_idx: usize) -> Result<usize, TxScriptError> {
-        // let map = self.cov_out_indices.as_ref().expect("shouldn't be called for standalone scripts");
-        // let index_vec = map.get(input_idx).ok_or(TxScriptError::InvalidInputIndex(input_idx as i32, map.len()))?;
-        // index_vec.get(authorized_idx).copied().ok_or(TxScriptError::InvalidCovOutIndex(authorized_idx, input_idx, index_vec.len()))
-
-        let output_indices = &self
-            .covenants_ctx
-            .local_ctxs
-            .get(&input_idx)
-            .ok_or(TxScriptError::InvalidCovInputIndex(input_idx as i32))?
-            .authorized_outputs;
-        output_indices.get(authorized_idx).copied().ok_or(TxScriptError::InvalidCovOutIndex(
-            authorized_idx,
-            input_idx,
-            output_indices.len(),
-        ))
-    }
-
-    pub(crate) fn cov_out_count(&self, input_idx: usize) -> Result<usize, TxScriptError> {
-        // let map = self.cov_out_indices.as_ref().expect("shouldn't be called for standalone scripts");
-        // map.get(input_idx).ok_or(TxScriptError::InvalidInputIndex(input_idx as i32, map.len())).map(|v| v.len())
-
-        Ok(self
-            .covenants_ctx
-            .local_ctxs
-            .get(&input_idx)
-            .ok_or(TxScriptError::InvalidCovInputIndex(input_idx as i32))?
-            .authorized_outputs
-            .len())
-    }
-
-    // fn calc_cov_out_indices(tx: &'a T) -> Vec<Vec<usize>> {
-    //     let mut map = vec![Vec::with_capacity(tx.outputs().len()); tx.tx().inputs.len()];
-    //     for (out_idx, output) in tx.tx().outputs.iter().enumerate() {
-    //         if let Some(cov_out_info) = output.cov_out_info {
-    //             map[cov_out_info.authorizing_input as usize].push(out_idx);
-    //         }
-    //     }
-    //     map
-    // }
 
     pub fn from_script(
         script: &'a [u8],
@@ -428,7 +345,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             astack: Self::new_stack(flags),
             script_source: ScriptSource::StandAloneScripts(vec![script]),
             reused_values,
-            covenants_ctx: &EMPTY_CONTEXT,
+            covenants_ctx: &EMPTY_COV_CONTEXT,
             sig_cache,
             cond_stack: Default::default(),
             num_ops: 0,
