@@ -6,7 +6,7 @@ use kaspa_consensus_core::{
 use kaspa_txscript::{
     caches::Cache,
     covenants::{CovenantGlobalContext, CovenantLocalContext, CovenantsContext},
-    get_sig_op_count_upper_bound, EngineFlags, SigCacheKey, TxScriptEngine,
+    get_sig_op_count_upper_bound, EngineContext, EngineFlags, SigCacheKey, TxScriptEngine,
 };
 use kaspa_txscript_errors::TxScriptError;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -278,10 +278,9 @@ pub fn check_scripts_sequential(
     flags: EngineFlags,
 ) -> TxResult<()> {
     let reused_values = SigHashReusedValuesUnsync::new();
+    let ctx = EngineContext::with_covenants_ctx(&reused_values, sig_cache, &covenants_ctx);
     for (i, (input, entry)) in tx.populated_inputs().enumerate() {
-        TxScriptEngine::from_transaction_input_with_covenants(tx, input, i, entry, &reused_values, &covenants_ctx, sig_cache, flags)
-            .execute()
-            .map_err(|err| map_script_err(err, input))?;
+        TxScriptEngine::from_transaction_input(tx, input, i, entry, ctx, flags).execute().map_err(|err| map_script_err(err, input))?;
     }
     Ok(())
 }
@@ -293,11 +292,10 @@ pub fn check_scripts_par_iter(
     flags: EngineFlags,
 ) -> TxResult<()> {
     let reused_values = SigHashReusedValuesSync::new();
+    let ctx = EngineContext::with_covenants_ctx(&reused_values, sig_cache, &covenants_ctx);
     (0..tx.inputs().len()).into_par_iter().try_for_each(|idx| {
         let (input, utxo) = tx.populated_input(idx);
-        TxScriptEngine::from_transaction_input_with_covenants(tx, input, idx, utxo, &reused_values, &covenants_ctx, sig_cache, flags)
-            .execute()
-            .map_err(|err| map_script_err(err, input))
+        TxScriptEngine::from_transaction_input(tx, input, idx, utxo, ctx, flags).execute().map_err(|err| map_script_err(err, input))
     })
 }
 

@@ -4,8 +4,6 @@
 
 #![allow(non_snake_case)]
 
-use kaspa_consensus_core::tx::CovOutInfo;
-
 use crate::imports::*;
 
 #[wasm_bindgen(typescript_custom_section)]

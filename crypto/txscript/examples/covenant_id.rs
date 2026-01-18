@@ -12,8 +12,8 @@ use kaspa_txscript::opcodes::codes::{
     OpEqual, OpEqualVerify, OpNum2Bin, OpSub, OpSwap, OpTrue, OpTxInputIndex, OpTxInputScriptSigLen, OpTxInputScriptSigSubstr,
     OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin,
 };
-use kaspa_txscript::pay_to_script_hash_script;
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderResult};
+use kaspa_txscript::{pay_to_script_hash_script, EngineContext};
 use kaspa_txscript::{EngineFlags, TxScriptEngine};
 use kaspa_txscript_errors::TxScriptError;
 use rand::{seq::SliceRandom, Rng, RngCore, SeedableRng};
@@ -226,7 +226,14 @@ fn run_vm(
     flags: EngineFlags,
 ) -> Result<(), TxScriptError> {
     let populated = PopulatedTransaction::new(tx, vec![utxo_entry.clone()]);
-    let mut vm = TxScriptEngine::from_transaction_input(&populated, &tx.inputs[0], 0, utxo_entry, reused_values, sig_cache, flags);
+    let mut vm = TxScriptEngine::from_transaction_input(
+        &populated,
+        &tx.inputs[0],
+        0,
+        utxo_entry,
+        EngineContext::new(reused_values, sig_cache),
+        flags,
+    );
     vm.execute()
 }
 

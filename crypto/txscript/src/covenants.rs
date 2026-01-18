@@ -28,7 +28,7 @@ pub struct CovenantGlobalContext {
     pub output_indices: Vec<usize>,
 }
 
-/// Pre-computed cache mapping inputs and covenant IDs to their execution contexts.
+/// Pre-computed cache mapping inputs and covenant ids to their execution contexts.
 ///
 /// Enables O(1) access for covenant introspection opcodes.
 #[derive(Default)]

@@ -15,6 +15,8 @@ pub mod wasm;
 
 pub mod runtime_sig_op_counter;
 
+use std::ops::Deref;
+
 use crate::caches::Cache;
 use crate::covenants::{CovenantsContext, EMPTY_COV_CONTEXT};
 use crate::data_stack::Stack;
@@ -84,16 +86,49 @@ pub struct EngineFlags {
     pub covenants_enabled: bool,
 }
 
+pub struct EngineContext<'a, Reused: SigHashReusedValues> {
+    reused_values: &'a Reused,
+    sig_cache: &'a Cache<SigCacheKey, bool>,
+    covenants_ctx: &'a CovenantsContext,
+}
+
+impl<'a, Reused: SigHashReusedValues> EngineContext<'a, Reused> {
+    pub fn new(reused_values: &'a Reused, sig_cache: &'a Cache<SigCacheKey, bool>) -> Self {
+        Self { reused_values, sig_cache, covenants_ctx: &EMPTY_COV_CONTEXT }
+    }
+
+    pub fn with_covenants_ctx(
+        reused_values: &'a Reused,
+        sig_cache: &'a Cache<SigCacheKey, bool>,
+        covenants_ctx: &'a CovenantsContext,
+    ) -> Self {
+        Self { reused_values, sig_cache, covenants_ctx }
+    }
+}
+
+impl<'a, Reused: SigHashReusedValues> Clone for EngineContext<'a, Reused> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<'a, Reused: SigHashReusedValues> Copy for EngineContext<'a, Reused> {}
+
+impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> Deref for TxScriptEngine<'a, T, Reused> {
+    type Target = EngineContext<'a, Reused>;
+    fn deref(&self) -> &Self::Target {
+        &self.ctx
+    }
+}
+
 pub struct TxScriptEngine<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> {
     dstack: Stack,
     astack: Stack,
 
     script_source: ScriptSource<'a, T>,
 
-    // Outer caches for quicker calculation
-    reused_values: &'a Reused,
-    covenants_ctx: &'a CovenantsContext,
-    sig_cache: &'a Cache<SigCacheKey, bool>,
+    // Engine context for outer caches and various inner contexts
+    ctx: EngineContext<'a, Reused>,
 
     cond_stack: Vec<OpCond>, // Following if stacks, and whether it is running
 
@@ -141,19 +176,18 @@ fn parse_script<T: VerifiableTransaction, Reused: SigHashReusedValues>(
 /// * `Err(TxScriptError)` - If script execution fails or input index is invalid
 pub fn get_sig_op_count<T: VerifiableTransaction>(
     tx: &T,
-    covenants_ctx: &CovenantsContext,
     input_idx: usize,
+    covenants_ctx: &CovenantsContext,
 ) -> Result<u8, TxScriptError> {
     let sig_cache = Cache::new(0);
     let reused_values = SigHashReusedValuesUnsync::new();
-    let mut vm = TxScriptEngine::from_transaction_input_with_covenants(
+    let ctx = EngineContext::with_covenants_ctx(&reused_values, &sig_cache, covenants_ctx);
+    let mut vm = TxScriptEngine::from_transaction_input(
         tx,
         &tx.inputs()[input_idx],
         input_idx,
         tx.utxo(input_idx).ok_or_else(|| TxScriptError::InvalidInputIndex(input_idx as i32, tx.inputs().len()))?,
-        &reused_values,
-        &covenants_ctx,
-        &sig_cache,
+        ctx,
         Default::default(),
     );
     vm.execute()?;
@@ -237,14 +271,12 @@ pub fn is_unspendable<T: VerifiableTransaction, Reused: SigHashReusedValues>(scr
 }
 
 impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'a, T, Reused> {
-    pub fn new(reused_values: &'a Reused, sig_cache: &'a Cache<SigCacheKey, bool>, flags: EngineFlags) -> Self {
+    pub fn new(ctx: EngineContext<'a, Reused>, flags: EngineFlags) -> Self {
         Self {
             dstack: Self::new_stack(flags),
             astack: Self::new_stack(flags),
             script_source: ScriptSource::StandAloneScripts(vec![]),
-            reused_values,
-            covenants_ctx: &EMPTY_COV_CONTEXT,
-            sig_cache,
+            ctx,
             cond_stack: vec![],
             num_ops: 0,
             runtime_sig_op_counter: RuntimeSigOpCounter::new(u8::MAX),
@@ -277,42 +309,12 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
     ///
     /// # Returns
     /// Script engine instance configured for the given input
-    pub fn from_transaction_input_with_covenants(
-        tx: &'a T,
-        input: &'a TransactionInput,
-        input_idx: usize,
-        utxo_entry: &'a UtxoEntry,
-        reused_values: &'a Reused,
-        covenants_ctx: &'a CovenantsContext,
-        sig_cache: &'a Cache<SigCacheKey, bool>,
-        flags: EngineFlags,
-    ) -> Self {
-        let script_public_key = utxo_entry.script_public_key.script();
-        // The script_public_key in P2SH is just validating the hash on the OpMultiSig script
-        // the user provides
-        let is_p2sh = ScriptClass::is_pay_to_script_hash(script_public_key);
-        assert!(input_idx < tx.tx().inputs.len());
-        Self {
-            dstack: Self::new_stack(flags),
-            astack: Self::new_stack(flags),
-            script_source: ScriptSource::TxInput { tx, input, idx: input_idx, utxo_entry, is_p2sh },
-            reused_values,
-            covenants_ctx,
-            sig_cache,
-            cond_stack: Default::default(),
-            num_ops: 0,
-            runtime_sig_op_counter: RuntimeSigOpCounter::new(input.sig_op_count),
-            flags,
-        }
-    }
-
     pub fn from_transaction_input(
         tx: &'a T,
         input: &'a TransactionInput,
         input_idx: usize,
         utxo_entry: &'a UtxoEntry,
-        reused_values: &'a Reused,
-        sig_cache: &'a Cache<SigCacheKey, bool>,
+        ctx: EngineContext<'a, Reused>,
         flags: EngineFlags,
     ) -> Self {
         let script_public_key = utxo_entry.script_public_key.script();
@@ -324,9 +326,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             dstack: Self::new_stack(flags),
             astack: Self::new_stack(flags),
             script_source: ScriptSource::TxInput { tx, input, idx: input_idx, utxo_entry, is_p2sh },
-            reused_values,
-            covenants_ctx: &EMPTY_COV_CONTEXT,
-            sig_cache,
+            ctx,
             cond_stack: Default::default(),
             num_ops: 0,
             runtime_sig_op_counter: RuntimeSigOpCounter::new(input.sig_op_count),
@@ -344,9 +344,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             dstack: Self::new_stack(flags),
             astack: Self::new_stack(flags),
             script_source: ScriptSource::StandAloneScripts(vec![script]),
-            reused_values,
-            covenants_ctx: &EMPTY_COV_CONTEXT,
-            sig_cache,
+            ctx: EngineContext::new(reused_values, sig_cache),
             cond_stack: Default::default(),
             num_ops: 0,
             // Runtime sig op counting is not needed for standalone scripts, only inputs have sig op count value
@@ -754,8 +752,7 @@ mod tests {
                 &input,
                 0,
                 &utxo_entry,
-                &reused_values,
-                &sig_cache,
+                EngineContext::new(&reused_values, &sig_cache),
                 Default::default(),
             );
             assert_eq!(vm.execute(), test.expected_result);
@@ -1321,8 +1318,7 @@ mod tests {
                 &tx.inputs()[0],
                 0,
                 &utxo_entry,
-                &reused_values,
-                &sig_cache,
+                EngineContext::new(&reused_values, &sig_cache),
                 Default::default(),
             );
 
@@ -1466,8 +1462,7 @@ mod bitcoind_tests {
                 &populated_tx.tx().inputs[0],
                 0,
                 &populated_tx.entries[0],
-                &reused_values,
-                &sig_cache,
+                EngineContext::new(&reused_values, &sig_cache),
                 flags,
             );
             vm.execute().map_err(UnifiedError::TxScriptError)
