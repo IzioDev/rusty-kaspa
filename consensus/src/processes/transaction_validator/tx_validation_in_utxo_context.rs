@@ -4,7 +4,7 @@ use kaspa_consensus_core::{
     tx::{TransactionInput, VerifiableTransaction},
 };
 use kaspa_txscript::{
-    caches::Cache, get_sig_op_count_upper_bound, CovenantInputContext, CovenantsContext, EngineFlags, SigCacheKey, TxScriptEngine,
+    caches::Cache, get_sig_op_count_upper_bound, CovenantLocalContext, CovenantsContext, EngineFlags, SigCacheKey, TxScriptEngine,
 };
 use kaspa_txscript_errors::TxScriptError;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
@@ -219,12 +219,12 @@ impl TransactionValidator {
                     }
                 }
 
-                match ctx.per_input_ctx.entry(auth_input) {
+                match ctx.local_ctxs.entry(auth_input) {
                     Entry::Occupied(mut e) => {
-                        e.get_mut().output_indices.push(i);
+                        e.get_mut().authorized_outputs.push(i);
                     }
                     Entry::Vacant(e) => {
-                        e.insert(CovenantInputContext { covenant_id: cov_out_info.covenant_id, output_indices: vec![i] });
+                        e.insert(CovenantLocalContext { covenant_id: cov_out_info.covenant_id, authorized_outputs: vec![i] });
                     }
                 };
             }

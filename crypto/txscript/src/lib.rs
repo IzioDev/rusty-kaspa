@@ -238,15 +238,42 @@ pub fn is_unspendable<T: VerifiableTransaction, Reused: SigHashReusedValues>(scr
     parse_script::<T, Reused>(script).enumerate().any(|(index, op)| op.is_err() || (index == 0 && op.unwrap().value() == OpReturn))
 }
 
-pub struct CovenantInputContext {
+/// Context for an input's specific authority over a subset of outputs.
+///
+/// Used by scripts to verify the state transitions they directly authorized
+/// (e.g., 1-to-N splits) without scanning unrelated outputs.
+pub struct CovenantLocalContext {
+    /// The covenant ID shared by this input and its authorized outputs.
     pub covenant_id: Hash,
+
+    /// Indices of outputs that explicitly declare this input as their `authorizing_input`.
+    ///
+    /// This defines the input's direct "children" in the transaction.
+    pub authorized_outputs: Vec<usize>,
+}
+
+/// Context for the transaction-wide state of a specific Covenant ID.
+///
+/// Used for verifying global invariants across all participants of the same covenant
+/// (e.g., merges, batching, or conservation of amounts).
+pub struct CovenantGlobalContext {
+    /// Indices of *all* inputs in the transaction carrying this `covenant_id`.
+    pub input_indices: Vec<usize>,
+
+    /// Indices of *all* outputs in the transaction carrying this `covenant_id`.
     pub output_indices: Vec<usize>,
 }
 
+/// Pre-computed cache mapping inputs and covenant IDs to their execution contexts.
+///
+/// Enables O(1) access for covenant introspection opcodes.
 #[derive(Default)]
 pub struct CovenantsContext {
-    pub per_input_ctx: HashMap<usize, CovenantInputContext>,
-    // TODO: per covenant map to both ins and outs
+    /// Maps an input index to its local authority context.
+    pub local_ctxs: HashMap<usize, CovenantLocalContext>,
+
+    /// Maps a covenant id to its global context.
+    pub covenant_ctxs: HashMap<Hash, CovenantGlobalContext>,
 }
 
 static EMPTY_CONTEXT: LazyLock<CovenantsContext> = LazyLock::new(|| CovenantsContext::default());
@@ -356,10 +383,10 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
 
         let output_indices = &self
             .covenants_ctx
-            .per_input_ctx
+            .local_ctxs
             .get(&input_idx)
             .ok_or(TxScriptError::InvalidCovInputIndex(input_idx as i32))?
-            .output_indices;
+            .authorized_outputs;
         output_indices.get(authorized_idx).copied().ok_or(TxScriptError::InvalidCovOutIndex(
             authorized_idx,
             input_idx,
@@ -373,10 +400,10 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
 
         Ok(self
             .covenants_ctx
-            .per_input_ctx
+            .local_ctxs
             .get(&input_idx)
             .ok_or(TxScriptError::InvalidCovInputIndex(input_idx as i32))?
-            .output_indices
+            .authorized_outputs
             .len())
     }
 
