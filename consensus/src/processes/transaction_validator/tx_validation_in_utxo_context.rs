@@ -3,11 +3,13 @@ use kaspa_consensus_core::{
     hashing::sighash::{SigHashReusedValuesSync, SigHashReusedValuesUnsync},
     tx::{TransactionInput, VerifiableTransaction},
 };
-use kaspa_txscript::{caches::Cache, get_sig_op_count_upper_bound, EngineFlags, SigCacheKey, TxScriptEngine};
+use kaspa_txscript::{
+    caches::Cache, get_sig_op_count_upper_bound, CovenantInputContext, CovenantsContext, EngineFlags, SigCacheKey, TxScriptEngine,
+};
 use kaspa_txscript_errors::TxScriptError;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rayon::ThreadPool;
-use std::marker::Sync;
+use std::{collections::hash_map::Entry, marker::Sync};
 
 use super::{
     errors::{TxResult, TxRuleError},
@@ -51,11 +53,11 @@ impl TransactionValidator {
         // The following call is not a consensus check (it could not be one in the first place since it uses a floating number)
         // but rather a mempool Replace by Fee validation rule. It is placed here purposely for avoiding unneeded script checks.
         Self::check_feerate_threshold(fee, mass_and_feerate_threshold)?;
-        self.check_covenant_info(tx, block_daa_score)?;
+        let covenants_ctx = self.check_covenant_info(tx, block_daa_score)?;
 
         match flags {
             TxValidationFlags::Full | TxValidationFlags::SkipMassCheck => {
-                self.check_scripts(tx, block_daa_score)?;
+                self.check_scripts_with_covenants(tx, covenants_ctx, block_daa_score)?;
             }
             TxValidationFlags::SkipScriptChecks => {}
         }
@@ -168,17 +170,39 @@ impl TransactionValidator {
     }
 
     pub fn check_scripts(&self, tx: &(impl VerifiableTransaction + Sync), block_daa_score: u64) -> TxResult<()> {
-        check_scripts(&self.sig_cache, tx, EngineFlags { covenants_enabled: self.covenants_activation.is_active(block_daa_score) })
+        check_scripts(
+            &self.sig_cache,
+            tx,
+            Default::default(),
+            EngineFlags { covenants_enabled: self.covenants_activation.is_active(block_daa_score) },
+        )
     }
 
-    fn check_covenant_info(&self, tx: &impl VerifiableTransaction, block_daa_score: u64) -> TxResult<()> {
+    pub fn check_scripts_with_covenants(
+        &self,
+        tx: &(impl VerifiableTransaction + Sync),
+        covenants_ctx: CovenantsContext,
+        block_daa_score: u64,
+    ) -> TxResult<()> {
+        check_scripts(
+            &self.sig_cache,
+            tx,
+            covenants_ctx,
+            EngineFlags { covenants_enabled: self.covenants_activation.is_active(block_daa_score) },
+        )
+    }
+
+    fn check_covenant_info(&self, tx: &impl VerifiableTransaction, block_daa_score: u64) -> TxResult<CovenantsContext> {
         if !self.covenants_activation.is_active(block_daa_score) {
-            return Ok(());
+            return Ok(Default::default());
         }
+
+        let mut ctx = CovenantsContext::default();
 
         for (i, output) in tx.outputs().iter().enumerate() {
             if let Some(cov_out_info) = &output.cov_out_info {
-                let Some(utxo_entry) = tx.utxo(cov_out_info.authorizing_input as usize) else {
+                let auth_input = cov_out_info.authorizing_input as usize;
+                let Some(utxo_entry) = tx.utxo(auth_input) else {
                     // TODO: Change to another error
                     return Err(TxRuleError::MissingTxOutpoints);
                 };
@@ -187,39 +211,51 @@ impl TransactionValidator {
                         return Err(TxRuleError::WrongCovenantId(i));
                     }
                 } else {
-                    let authorizing_input = &tx.inputs()[cov_out_info.authorizing_input as usize]; // It's guaranteed to exist from the earlier check on the UTXO entry.
+                    let authorizing_input = &tx.inputs()[auth_input]; // Guaranteed to exist from the earlier check on the UTXO entry.
                     if kaspa_consensus_core::hashing::covenant_id::covenant_id(authorizing_input.previous_outpoint)
                         != cov_out_info.covenant_id
                     {
                         return Err(TxRuleError::WrongCovenantId(i));
                     }
                 }
+
+                match ctx.per_input_ctx.entry(auth_input) {
+                    Entry::Occupied(mut e) => {
+                        e.get_mut().output_indices.push(i);
+                    }
+                    Entry::Vacant(e) => {
+                        e.insert(CovenantInputContext { covenant_id: cov_out_info.covenant_id, output_indices: vec![i] });
+                    }
+                };
             }
         }
-        Ok(())
+
+        Ok(ctx)
     }
 }
 
 pub fn check_scripts(
     sig_cache: &Cache<SigCacheKey, bool>,
     tx: &(impl VerifiableTransaction + Sync),
+    covenants_ctx: CovenantsContext,
     flags: EngineFlags,
 ) -> TxResult<()> {
     if tx.inputs().len() > CHECK_SCRIPTS_PARALLELISM_THRESHOLD {
-        check_scripts_par_iter(sig_cache, tx, flags)
+        check_scripts_par_iter(sig_cache, tx, covenants_ctx, flags)
     } else {
-        check_scripts_sequential(sig_cache, tx, flags)
+        check_scripts_sequential(sig_cache, tx, covenants_ctx, flags)
     }
 }
 
 pub fn check_scripts_sequential(
     sig_cache: &Cache<SigCacheKey, bool>,
     tx: &impl VerifiableTransaction,
+    covenants_ctx: CovenantsContext,
     flags: EngineFlags,
 ) -> TxResult<()> {
     let reused_values = SigHashReusedValuesUnsync::new();
     for (i, (input, entry)) in tx.populated_inputs().enumerate() {
-        TxScriptEngine::from_transaction_input(tx, input, i, entry, &reused_values, sig_cache, flags)
+        TxScriptEngine::from_transaction_input_with_covenants(tx, input, i, entry, &reused_values, &covenants_ctx, sig_cache, flags)
             .execute()
             .map_err(|err| map_script_err(err, input))?;
     }
@@ -229,12 +265,13 @@ pub fn check_scripts_sequential(
 pub fn check_scripts_par_iter(
     sig_cache: &Cache<SigCacheKey, bool>,
     tx: &(impl VerifiableTransaction + Sync),
+    covenants_ctx: CovenantsContext,
     flags: EngineFlags,
 ) -> TxResult<()> {
     let reused_values = SigHashReusedValuesSync::new();
     (0..tx.inputs().len()).into_par_iter().try_for_each(|idx| {
         let (input, utxo) = tx.populated_input(idx);
-        TxScriptEngine::from_transaction_input(tx, input, idx, utxo, &reused_values, sig_cache, flags)
+        TxScriptEngine::from_transaction_input_with_covenants(tx, input, idx, utxo, &reused_values, &covenants_ctx, sig_cache, flags)
             .execute()
             .map_err(|err| map_script_err(err, input))
     })
@@ -243,10 +280,11 @@ pub fn check_scripts_par_iter(
 pub fn check_scripts_par_iter_pool(
     sig_cache: &Cache<SigCacheKey, bool>,
     tx: &(impl VerifiableTransaction + Sync),
+    covenants_ctx: CovenantsContext,
     pool: &ThreadPool,
     flags: EngineFlags,
 ) -> TxResult<()> {
-    pool.install(|| check_scripts_par_iter(sig_cache, tx, flags))
+    pool.install(|| check_scripts_par_iter(sig_cache, tx, covenants_ctx, flags))
 }
 
 fn map_script_err(script_err: TxScriptError, input: &TransactionInput) -> TxRuleError {

@@ -4,18 +4,21 @@ use kaspa_consensus_core::hashing;
 use kaspa_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::tx::{
-    CovOutInfo, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry
+    CovOutInfo, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
+    UtxoEntry,
 };
 use kaspa_hashes::Hash;
 use kaspa_txscript::caches::Cache;
 use kaspa_txscript::opcodes::codes::{
-    Op1, Op1Add, OpBin2Num, OpBlake2b, OpCat, OpCovOutputCount, OpCovOutputIdx, OpData8, OpData60, OpData61, OpData62, OpDrop, OpDup, OpEqual, OpEqualVerify, OpNum2Bin, OpSub, OpSwap, OpTrue, OpTxInputIndex, OpTxInputScriptSigLen, OpTxInputScriptSigSubstr, OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin
+    Op1, Op1Add, OpBin2Num, OpBlake2b, OpCat, OpCovOutputCount, OpCovOutputIdx, OpData60, OpData61, OpData62, OpData8, OpDrop, OpDup,
+    OpEqual, OpEqualVerify, OpNum2Bin, OpSub, OpSwap, OpTrue, OpTxInputIndex, OpTxInputScriptSigLen, OpTxInputScriptSigSubstr,
+    OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin,
 };
 use kaspa_txscript::pay_to_script_hash_script;
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderResult};
 use kaspa_txscript::{EngineFlags, TxScriptEngine};
 use kaspa_txscript_errors::TxScriptError;
-use rand::{RngCore, Rng,seq::SliceRandom, SeedableRng};
+use rand::{seq::SliceRandom, Rng, RngCore, SeedableRng};
 
 fn main() -> ScriptBuilderResult<()> {
     counter_state_in_spk()
@@ -59,8 +62,12 @@ fn counter_state_in_spk() -> ScriptBuilderResult<()> {
 
     println!("[COVENANT P2SH-WS] Attempting invalid spend (reuse previous state)");
     // We try to spend the last UTXO but provide the previous state with counter=2
-    let bad_tx =
-        build_spend_tx(&CovenantState { utxo_outpoint: state.utxo_outpoint, ..counter_2_state }, state.counter, &covenant_script, &mut rng);
+    let bad_tx = build_spend_tx(
+        &CovenantState { utxo_outpoint: state.utxo_outpoint, ..counter_2_state },
+        state.counter,
+        &covenant_script,
+        &mut rng,
+    );
     let err = run_vm(&bad_tx, &state.utxo_entry, &sig_cache, &reused_values, flags).expect_err("non-incrementing spend must fail");
     println!("[COVENANT P2SH-WS] Expected failure: {err:?}");
 
@@ -101,9 +108,11 @@ impl CovenantState {
 /// 2) The spend has exactly one authorized output.
 /// 3) The output script public key matches the same redeem script suffix and embeds the hash of (state+1) in the state slot.
 fn build_covenant_script() -> ScriptBuilderResult<Vec<u8>> {
-    let p2sh_prefix = [0,0, // Script version 0
-     kaspa_txscript::opcodes::codes::OpBlake2b,
-     kaspa_txscript::opcodes::codes::OpData32,
+    let p2sh_prefix = [
+        0,
+        0, // Script version 0
+        kaspa_txscript::opcodes::codes::OpBlake2b,
+        kaspa_txscript::opcodes::codes::OpData32,
     ];
     let p2sh_suffix = [kaspa_txscript::opcodes::codes::OpEqual];
 
@@ -147,19 +156,19 @@ fn build_covenant_script() -> ScriptBuilderResult<Vec<u8>> {
         // Add OpData8 prefix
         .add_data(&[OpData8])?
         .add_op(OpSwap)?
-        .add_op(OpCat)? 
+        .add_op(OpCat)?
 
 
         // Fetch the redeem script suffix (after the counter)
         .add_i64(0)? // Input index
         .add_i64(10)? // Start
-        .add_i64(0)? 
+        .add_i64(0)?
         .add_op(OpTxInputScriptSigLen)? // End
         .add_op(OpTxInputScriptSigSubstr)?
 
         // Reconstruct the expected redeem script with incremented counter
         .add_op(OpCat)?
-        
+
         // Hash the redeem script
         .add_op(OpBlake2b)?
 
@@ -175,9 +184,9 @@ fn build_covenant_script() -> ScriptBuilderResult<Vec<u8>> {
         .add_i64(0)?
         .add_op(OpCovOutputIdx)? // Output index
         .add_i64(0)? // Start
-        .add_i64(0)? 
-        .add_i64(0)? 
-        .add_op(OpCovOutputIdx)? 
+        .add_i64(0)?
+        .add_i64(0)?
+        .add_op(OpCovOutputIdx)?
         .add_op(OpTxOutputSpkLen)? // End
         .add_op(OpTxOutputSpkSubstr)?
         .add_op(OpEqual)?
@@ -190,11 +199,8 @@ fn build_spend_tx(state: &CovenantState, next_counter: u8, covenant_script: &[u8
     let sig_script = ScriptBuilder::new().add_data(&build_redeem_script(state.counter, covenant_script)).unwrap().drain();
 
     let input = TransactionInput::new(state.utxo_outpoint, sig_script, 0, 0);
-    let mut output = TransactionOutput::new(state.utxo_entry.amount-10, build_spk(next_counter, covenant_script));
-    output.cov_out_info = Some(CovOutInfo{
-        covenant_id: state.covenant_id,
-        authorizing_input: 0,
-    });
+    let mut output = TransactionOutput::new(state.utxo_entry.amount - 10, build_spk(next_counter, covenant_script));
+    output.cov_out_info = Some(CovOutInfo { covenant_id: state.covenant_id, authorizing_input: 0 });
 
     let mut outputs = vec![output];
 

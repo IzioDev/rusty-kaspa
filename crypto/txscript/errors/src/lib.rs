@@ -8,6 +8,8 @@ pub enum TxScriptError {
     MalformedPush(usize, usize),
     #[error("transaction input {0} is out of bounds, should be non-negative below {1}")]
     InvalidInputIndex(i32, usize),
+    #[error("transaction input {0} is either out of bounds or has no associated covenant outputs")]
+    InvalidCovInputIndex(i32),
     #[error("combined stack size {0} > max allowed {1}")]
     StackSizeExceeded(usize, usize),
     #[error("attempt to execute invalid opcode {0}")]
