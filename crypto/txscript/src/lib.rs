@@ -246,6 +246,7 @@ pub struct CovenantInputContext {
 #[derive(Default)]
 pub struct CovenantsContext {
     pub per_input_ctx: HashMap<usize, CovenantInputContext>,
+    // TODO: per covenant map to both ins and outs
 }
 
 static EMPTY_CONTEXT: LazyLock<CovenantsContext> = LazyLock::new(|| CovenantsContext::default());
