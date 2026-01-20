@@ -19,7 +19,7 @@ pub struct SpkEntry {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-pub struct PayloadHeader {
+pub struct MintPayloadHeader {
     magic: [u8; 6],
     asset_id: [u8; ASSET_ID_SIZE],
     authority_spk: SpkEntry,
@@ -31,8 +31,19 @@ pub struct PayloadHeader {
 
 #[repr(C)]
 #[derive(Clone, Copy)]
+pub struct TransferPayloadHeader {
+    magic: [u8; 6],
+    asset_id: [u8; ASSET_ID_SIZE],
+    authority_spk: SpkEntry,
+    token_spk: SpkEntry,
+    op: u8,
+    total_amount: [u8; 8], // u64 LE
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
 pub struct MintPayloadLayout {
-    header: PayloadHeader,
+    header: MintPayloadHeader,
     output0_amount: [u8; 8], // u64 LE
     output0_recipient: SpkEntry,
 }
@@ -40,7 +51,7 @@ pub struct MintPayloadLayout {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct TransferPayloadLayout {
-    header: PayloadHeader,
+    header: TransferPayloadHeader,
     input_amounts: [[u8; 8]; MAX_INPUTS_COUNT],   // u64 LE
     output_amounts: [[u8; 8]; MAX_OUTPUTS_COUNT], // u64 LE
     output_recipients: [SpkEntry; MAX_OUTPUTS_COUNT],
@@ -50,20 +61,34 @@ pub const MINT_PAYLOAD_LEN: usize = size_of::<MintPayloadLayout>();
 pub const TRANSFER_PAYLOAD_LEN: usize = size_of::<TransferPayloadLayout>();
 
 // consts for re-use in covenants
-impl PayloadHeader {
-    pub const MAGIC: ByteRange = ByteRange::new(offset_of!(PayloadHeader, magic), 6);
+impl MintPayloadHeader {
+    pub const MAGIC: ByteRange = ByteRange::new(offset_of!(MintPayloadHeader, magic), 6);
 
-    pub const ASSET_ID: ByteRange = ByteRange::new(offset_of!(PayloadHeader, asset_id), ASSET_ID_SIZE);
+    pub const ASSET_ID: ByteRange = ByteRange::new(offset_of!(MintPayloadHeader, asset_id), ASSET_ID_SIZE);
 
-    pub const AUTHORITY_SPK: SpkRanges = spk_ranges(offset_of!(PayloadHeader, authority_spk));
+    pub const AUTHORITY_SPK: SpkRanges = spk_ranges(offset_of!(MintPayloadHeader, authority_spk));
 
-    pub const TOKEN_SPK: SpkRanges = spk_ranges(offset_of!(PayloadHeader, token_spk));
+    pub const TOKEN_SPK: SpkRanges = spk_ranges(offset_of!(MintPayloadHeader, token_spk));
 
-    pub const REMAINING_SUPPLY: ByteRange = ByteRange::new(offset_of!(PayloadHeader, remaining_supply), 8);
+    pub const REMAINING_SUPPLY: ByteRange = ByteRange::new(offset_of!(MintPayloadHeader, remaining_supply), 8);
 
-    pub const OP: ByteRange = ByteRange::new(offset_of!(PayloadHeader, op), 1);
+    pub const OP: ByteRange = ByteRange::new(offset_of!(MintPayloadHeader, op), 1);
 
-    pub const TOTAL_AMOUNT: ByteRange = ByteRange::new(offset_of!(PayloadHeader, total_amount), 8);
+    pub const TOTAL_AMOUNT: ByteRange = ByteRange::new(offset_of!(MintPayloadHeader, total_amount), 8);
+}
+
+impl TransferPayloadHeader {
+    pub const MAGIC: ByteRange = ByteRange::new(offset_of!(TransferPayloadHeader, magic), 6);
+
+    pub const ASSET_ID: ByteRange = ByteRange::new(offset_of!(TransferPayloadHeader, asset_id), ASSET_ID_SIZE);
+
+    pub const AUTHORITY_SPK: SpkRanges = spk_ranges(offset_of!(TransferPayloadHeader, authority_spk));
+
+    pub const TOKEN_SPK: SpkRanges = spk_ranges(offset_of!(TransferPayloadHeader, token_spk));
+
+    pub const OP: ByteRange = ByteRange::new(offset_of!(TransferPayloadHeader, op), 1);
+
+    pub const TOTAL_AMOUNT: ByteRange = ByteRange::new(offset_of!(TransferPayloadHeader, total_amount), 8);
 }
 
 impl MintPayloadLayout {

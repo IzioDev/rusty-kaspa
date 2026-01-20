@@ -17,8 +17,8 @@ use std::convert::TryInto;
 
 pub use crate::errors::CovenantError;
 use crate::payload_layout::{
-    MintPayloadLayout, PayloadHeader, TransferPayloadLayout, ASSET_ID_SIZE, MAX_INPUTS_COUNT, MAX_OUTPUTS_COUNT, MINT_PAYLOAD_LEN,
-    PAYLOAD_MAGIC, SPK_BYTES_MAX, SPK_BYTES_MIN, TRANSFER_PAYLOAD_LEN,
+    MintPayloadHeader, MintPayloadLayout, TransferPayloadHeader, TransferPayloadLayout, ASSET_ID_SIZE, MAX_INPUTS_COUNT,
+    MAX_OUTPUTS_COUNT, MINT_PAYLOAD_LEN, PAYLOAD_MAGIC, SPK_BYTES_MAX, SPK_BYTES_MIN, TRANSFER_PAYLOAD_LEN,
 };
 use crate::result::CovenantResult;
 use crate::scriptnum::{append_u64_le, decode_u64_le};
@@ -141,7 +141,7 @@ impl NativeAssetPayload {
             asset_id: self.asset_id,
             authority_spk_bytes: self.authority_spk_bytes.clone(),
             token_spk_bytes: self.token_spk_bytes.clone(),
-            remaining_supply: self.remaining_supply,
+            remaining_supply: 0,
             op: NativeAssetOp::SplitMerge,
             total_amount: total_out,
             input_amounts: input_amounts.to_vec(),
@@ -218,7 +218,6 @@ impl NativeAssetPayload {
                 payload.extend_from_slice(&self.asset_id);
                 append_spk_bytes(&mut payload, &self.authority_spk_bytes, "authority_spk_bytes")?;
                 append_spk_bytes(&mut payload, &self.token_spk_bytes, "token_spk_bytes")?;
-                append_u64_le(&mut payload, self.remaining_supply, "remaining_supply")?;
                 payload.push(self.op as u8);
                 append_u64_le(&mut payload, self.total_amount, "total_amount")?;
 
@@ -248,34 +247,38 @@ impl NativeAssetPayload {
         if !is_mint_payload && !is_transfer_payload {
             return Err(CovenantError::InvalidPayloadLength { expected: TRANSFER_PAYLOAD_LEN, actual: payload.len() });
         }
-        if &payload[PayloadHeader::MAGIC.start..PayloadHeader::MAGIC.end] != PAYLOAD_MAGIC {
+        if &payload[MintPayloadHeader::MAGIC.start..MintPayloadHeader::MAGIC.end] != PAYLOAD_MAGIC {
             return Err(CovenantError::InvalidPayloadMagic);
         }
 
-        let asset_id = payload[PayloadHeader::ASSET_ID.start..PayloadHeader::ASSET_ID.end]
-            .try_into()
-            .map_err(|_| CovenantError::InvalidField("asset_id"))?;
-        let authority_spk_bytes = decode_spk_bytes(
-            payload,
-            PayloadHeader::AUTHORITY_SPK.len.start,
-            PayloadHeader::AUTHORITY_SPK.bytes.start,
-            PayloadHeader::AUTHORITY_SPK.bytes.end,
-            "authority_spk_bytes",
-        )?;
-        let token_spk_bytes = decode_spk_bytes(
-            payload,
-            PayloadHeader::TOKEN_SPK.len.start,
-            PayloadHeader::TOKEN_SPK.bytes.start,
-            PayloadHeader::TOKEN_SPK.bytes.end,
-            "token_spk_bytes",
-        )?;
-        let remaining_supply =
-            decode_u64_field(payload, PayloadHeader::REMAINING_SUPPLY.start, PayloadHeader::REMAINING_SUPPLY.end, "remaining_supply")?;
-        let op_byte = payload[PayloadHeader::OP.start];
-        let op = NativeAssetOp::from_byte(op_byte).ok_or(CovenantError::InvalidPayloadOp { value: op_byte })?;
-        let total_amount =
-            decode_u64_field(payload, PayloadHeader::TOTAL_AMOUNT.start, PayloadHeader::TOTAL_AMOUNT.end, "total_amount")?;
         if is_mint_payload {
+            let asset_id = payload[MintPayloadHeader::ASSET_ID.start..MintPayloadHeader::ASSET_ID.end]
+                .try_into()
+                .map_err(|_| CovenantError::InvalidField("asset_id"))?;
+            let authority_spk_bytes = decode_spk_bytes(
+                payload,
+                MintPayloadHeader::AUTHORITY_SPK.len.start,
+                MintPayloadHeader::AUTHORITY_SPK.bytes.start,
+                MintPayloadHeader::AUTHORITY_SPK.bytes.end,
+                "authority_spk_bytes",
+            )?;
+            let token_spk_bytes = decode_spk_bytes(
+                payload,
+                MintPayloadHeader::TOKEN_SPK.len.start,
+                MintPayloadHeader::TOKEN_SPK.bytes.start,
+                MintPayloadHeader::TOKEN_SPK.bytes.end,
+                "token_spk_bytes",
+            )?;
+            let remaining_supply = decode_u64_field(
+                payload,
+                MintPayloadHeader::REMAINING_SUPPLY.start,
+                MintPayloadHeader::REMAINING_SUPPLY.end,
+                "remaining_supply",
+            )?;
+            let op_byte = payload[MintPayloadHeader::OP.start];
+            let op = NativeAssetOp::from_byte(op_byte).ok_or(CovenantError::InvalidPayloadOp { value: op_byte })?;
+            let total_amount =
+                decode_u64_field(payload, MintPayloadHeader::TOTAL_AMOUNT.start, MintPayloadHeader::TOTAL_AMOUNT.end, "total_amount")?;
             if op != NativeAssetOp::Mint {
                 return Err(CovenantError::InvalidPayloadOp { value: op_byte });
             }
@@ -315,6 +318,32 @@ impl NativeAssetPayload {
             });
         }
 
+        let asset_id = payload[TransferPayloadHeader::ASSET_ID.start..TransferPayloadHeader::ASSET_ID.end]
+            .try_into()
+            .map_err(|_| CovenantError::InvalidField("asset_id"))?;
+        let authority_spk_bytes = decode_spk_bytes(
+            payload,
+            TransferPayloadHeader::AUTHORITY_SPK.len.start,
+            TransferPayloadHeader::AUTHORITY_SPK.bytes.start,
+            TransferPayloadHeader::AUTHORITY_SPK.bytes.end,
+            "authority_spk_bytes",
+        )?;
+        let token_spk_bytes = decode_spk_bytes(
+            payload,
+            TransferPayloadHeader::TOKEN_SPK.len.start,
+            TransferPayloadHeader::TOKEN_SPK.bytes.start,
+            TransferPayloadHeader::TOKEN_SPK.bytes.end,
+            "token_spk_bytes",
+        )?;
+        let op_byte = payload[TransferPayloadHeader::OP.start];
+        let op = NativeAssetOp::from_byte(op_byte).ok_or(CovenantError::InvalidPayloadOp { value: op_byte })?;
+        let total_amount = decode_u64_field(
+            payload,
+            TransferPayloadHeader::TOTAL_AMOUNT.start,
+            TransferPayloadHeader::TOTAL_AMOUNT.end,
+            "total_amount",
+        )?;
+        let remaining_supply = 0;
         if op != NativeAssetOp::SplitMerge {
             return Err(CovenantError::InvalidPayloadOp { value: op_byte });
         }
@@ -544,6 +573,9 @@ fn split_grandparent_preimage_for_knat(tx: &Transaction) -> CovenantResult<Grand
     let out0_spk = output0.script_public_key.to_bytes();
     let out0_script = output0.script_public_key.script();
 
+    // following just is just for transaction build time verification to avoid building unspendable (invalid) transactions
+    // not needed for script checks at all
+
     // Output0 script is embedded in the preimage; validate its length.
     let prefix_len = TX_VERSION_SIZE
         + U64_SIZE
@@ -627,6 +659,8 @@ pub fn knat_verify_parent_and_grandparent(sb: &mut ScriptBuilder) -> Result<(), 
     // Leaves prevout_txid and prevout_index on stack for:
     // - binding grandparent txid, and
     // - genesis asset_id derivation (prevout_txid || prevout_index).
+
+    // extract parent input0 prevout txid
     sb.add_i64(DEPTH_PARENT_PREIMAGE)?
         .add_op(OpPick)?
         .add_i64(PARENT_INPUT0_PREVOUT_TXID_START as i64)?
@@ -634,13 +668,14 @@ pub fn knat_verify_parent_and_grandparent(sb: &mut ScriptBuilder) -> Result<(), 
         .add_op(OpSubStr)?;
     sb.add_op(OpDup)?;
 
+    // extract parent input0 prevout index
     sb.add_i64(DEPTH_PARENT_PREIMAGE_WITH_PREVOUT)?
         .add_op(OpPick)?
         .add_i64(PARENT_INPUT0_PREVOUT_INDEX_START as i64)?
         .add_i64(PARENT_INPUT0_PREVOUT_INDEX_END as i64)?
         .add_op(OpSubStr)?;
 
-    // Arrange stack so prevout_txid sits above prevout_index for the gp binding below.
+    // Arrange stack so parent input0 prevout txid sits above prevout_index for the gp binding below.
     sb.add_op(OpSwap)?;
 
     // --- 3) Bind grandparent txid to parent_prev_txid ---
@@ -736,8 +771,8 @@ fn verify_parent_payload_magic_len(sb: &mut ScriptBuilder, expected_len: usize) 
     sb.add_op(OpSize)?;
     sb.add_i64(expected_len as i64)?;
     sb.add_op(OpEqualVerify)?;
-    sb.add_i64(PayloadHeader::MAGIC.start as i64)?;
-    sb.add_i64(PayloadHeader::MAGIC.end as i64)?;
+    sb.add_i64(MintPayloadHeader::MAGIC.start as i64)?;
+    sb.add_i64(MintPayloadHeader::MAGIC.end as i64)?;
     sb.add_op(OpSubStr)?;
     sb.add_data(PAYLOAD_MAGIC)?;
     sb.add_op(OpEqualVerify)?;
@@ -746,11 +781,7 @@ fn verify_parent_payload_magic_len(sb: &mut ScriptBuilder, expected_len: usize) 
 
 // No stack assumptions
 // Stack out: [num, ...]
-fn push_number_from_current_payload(
-    sb: &mut ScriptBuilder,
-    bytes_start: usize,
-    bytes_end: usize,
-) -> Result<(), ScriptBuilderError> {
+fn push_number_from_current_payload(sb: &mut ScriptBuilder, bytes_start: usize, bytes_end: usize) -> Result<(), ScriptBuilderError> {
     sb.add_i64(bytes_start as i64)?.add_i64(bytes_end as i64)?.add_op(OpTxPayloadSubstr)?;
     sb.add_op(OpBin2Num)?;
     Ok(())
@@ -810,13 +841,12 @@ fn push_current_input_amount_by_index(sb: &mut ScriptBuilder) -> Result<(), Scri
 /// Selects the matching output index and pushes its amount from
 /// the parent payload with a hard fail if the index is out of range.
 fn push_parent_output_amount_by_index(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderError> {
-    sb.add_i64(1)?
-        .add_op(OpPick)?
-        .add_i64(PayloadHeader::OP.start as i64)?
-        .add_i64(PayloadHeader::OP.end as i64)?
-        .add_op(OpSubStr)?
-        .add_ops(&[OpData1, TOKEN_OP_MINT])?
-        .add_op(OpEqual)?;
+    sb.add_i64(1)?.add_op(OpPick)?;
+    sb.add_op(OpSize)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpDrop)?;
+    sb.add_i64(MINT_PAYLOAD_LEN as i64)?;
+    sb.add_op(OpEqual)?;
     sb.add_op(OpIf)?;
     push_parent_output_amount_by_index_mint(sb)?;
     sb.add_op(OpElse)?;
@@ -854,13 +884,12 @@ fn push_parent_output_amount_by_index_transfer(sb: &mut ScriptBuilder) -> Result
 // Verifies that the parent payload recipient at auth_output_index matches the
 // current auth input's script pubkey; fails if the index is out of range.
 fn verify_parent_output_recipient_matches_auth_input(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderError> {
-    sb.add_i64(1)?
-        .add_op(OpPick)?
-        .add_i64(PayloadHeader::OP.start as i64)?
-        .add_i64(PayloadHeader::OP.end as i64)?
-        .add_op(OpSubStr)?
-        .add_ops(&[OpData1, TOKEN_OP_MINT])?
-        .add_op(OpEqual)?;
+    sb.add_i64(1)?.add_op(OpPick)?;
+    sb.add_op(OpSize)?;
+    sb.add_op(OpSwap)?;
+    sb.add_op(OpDrop)?;
+    sb.add_i64(MINT_PAYLOAD_LEN as i64)?;
+    sb.add_op(OpEqual)?;
     sb.add_op(OpIf)?;
     verify_parent_output_recipient_matches_auth_input_mint(sb)?;
     sb.add_op(OpElse)?;
@@ -930,8 +959,8 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_op(OpCat)?;
     sb.add_i64(1)?
         .add_op(OpPick)?
-        .add_i64(PayloadHeader::ASSET_ID.start as i64)?
-        .add_i64(PayloadHeader::ASSET_ID.end as i64)?
+        .add_i64(MintPayloadHeader::ASSET_ID.start as i64)?
+        .add_i64(MintPayloadHeader::ASSET_ID.end as i64)?
         .add_op(OpSubStr)?
         .add_op(OpEqualVerify)?;
     sb.add_op(OpEndIf)?;
@@ -945,12 +974,14 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_i64(MINT_PAYLOAD_LEN as i64)?;
     sb.add_op(OpEqualVerify)?;
 
-    sb.add_i64(PayloadHeader::MAGIC.start as i64)?.add_i64(PayloadHeader::MAGIC.end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_i64(TransferPayloadHeader::MAGIC.start as i64)?
+        .add_i64(TransferPayloadHeader::MAGIC.end as i64)?
+        .add_op(OpTxPayloadSubstr)?;
     sb.add_data(PAYLOAD_MAGIC)?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Current payload op = mint ---
-    sb.add_i64(PayloadHeader::OP.start as i64)?.add_i64(PayloadHeader::OP.end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_i64(MintPayloadHeader::OP.start as i64)?.add_i64(MintPayloadHeader::OP.end as i64)?.add_op(OpTxPayloadSubstr)?;
     sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
 
@@ -959,17 +990,17 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     // an alternative would be to make the following check conditional based on GATE path (genesis vs continuation)
     // for the sake of simplicity and readability, i suggest we keep it as is
     sb.add_op(OpDup)?;
-    sb.add_i64(PayloadHeader::OP.start as i64)?.add_i64(PayloadHeader::OP.end as i64)?.add_op(OpSubStr)?;
+    sb.add_i64(MintPayloadHeader::OP.start as i64)?.add_i64(MintPayloadHeader::OP.end as i64)?.add_op(OpSubStr)?;
     sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Fields that must be inherited from parent payload ---
     sb.add_op(OpDup)?
-        .add_i64(PayloadHeader::ASSET_ID.start as i64)?
-        .add_i64(PayloadHeader::TOKEN_SPK.bytes.end as i64)?
+        .add_i64(MintPayloadHeader::ASSET_ID.start as i64)?
+        .add_i64(MintPayloadHeader::TOKEN_SPK.bytes.end as i64)?
         .add_op(OpSubStr)?
-        .add_i64(PayloadHeader::ASSET_ID.start as i64)?
-        .add_i64(PayloadHeader::TOKEN_SPK.bytes.end as i64)?
+        .add_i64(MintPayloadHeader::ASSET_ID.start as i64)?
+        .add_i64(MintPayloadHeader::TOKEN_SPK.bytes.end as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
 
@@ -977,13 +1008,17 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     // Numeric fields are fixed 8-byte LE values and converted via OP_BIN2NUM.
 
     // parent remaining supply from parent payload.
-    push_number_from_parent_payload_on_top(&mut sb, PayloadHeader::REMAINING_SUPPLY.start, PayloadHeader::REMAINING_SUPPLY.end)?;
+    push_number_from_parent_payload_on_top(
+        &mut sb,
+        MintPayloadHeader::REMAINING_SUPPLY.start,
+        MintPayloadHeader::REMAINING_SUPPLY.end,
+    )?;
 
     // current total amount from current payload.
-    push_number_from_current_payload(&mut sb, PayloadHeader::TOTAL_AMOUNT.start, PayloadHeader::TOTAL_AMOUNT.end)?;
+    push_number_from_current_payload(&mut sb, MintPayloadHeader::TOTAL_AMOUNT.start, MintPayloadHeader::TOTAL_AMOUNT.end)?;
 
     // current remaining supply from current payload.
-    push_number_from_current_payload(&mut sb, PayloadHeader::REMAINING_SUPPLY.start, PayloadHeader::REMAINING_SUPPLY.end)?;
+    push_number_from_current_payload(&mut sb, MintPayloadHeader::REMAINING_SUPPLY.start, MintPayloadHeader::REMAINING_SUPPLY.end)?;
 
     // Stack now has (top to bottom):
     // current_remaining_supply, current_total_amount, parent_remaining_supply, parent_payload
@@ -1013,7 +1048,7 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_op(OpDrop)?;
 
     // payload.total_amount must equal payload.output_amounts[0].
-    push_number_from_current_payload(&mut sb, PayloadHeader::TOTAL_AMOUNT.start, PayloadHeader::TOTAL_AMOUNT.end)?;
+    push_number_from_current_payload(&mut sb, MintPayloadHeader::TOTAL_AMOUNT.start, MintPayloadHeader::TOTAL_AMOUNT.end)?;
     push_number_from_current_payload(&mut sb, MintPayloadLayout::OUTPUT0_AMOUNT.start, MintPayloadLayout::OUTPUT0_AMOUNT.end)?;
     sb.add_op(OpNumEqualVerify)?;
 
@@ -1031,10 +1066,10 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_data(authority_spk)?;
     verify_spk_matches_current_payload(
         &mut sb,
-        PayloadHeader::AUTHORITY_SPK.len.start,
-        PayloadHeader::AUTHORITY_SPK.len.end,
-        PayloadHeader::AUTHORITY_SPK.bytes.start,
-        PayloadHeader::AUTHORITY_SPK.bytes.end,
+        MintPayloadHeader::AUTHORITY_SPK.len.start,
+        MintPayloadHeader::AUTHORITY_SPK.len.end,
+        MintPayloadHeader::AUTHORITY_SPK.bytes.start,
+        MintPayloadHeader::AUTHORITY_SPK.bytes.end,
     )?;
 
     // Authorization input and covenant outputs:
@@ -1056,10 +1091,10 @@ pub fn build_minter_covenant_script_knat20(authority_spk: &[u8]) -> Result<Vec<u
     sb.add_i64(1)?.add_op(OpTxOutputSpk)?;
     verify_spk_matches_current_payload(
         &mut sb,
-        PayloadHeader::TOKEN_SPK.len.start,
-        PayloadHeader::TOKEN_SPK.len.end,
-        PayloadHeader::TOKEN_SPK.bytes.start,
-        PayloadHeader::TOKEN_SPK.bytes.end,
+        MintPayloadHeader::TOKEN_SPK.len.start,
+        MintPayloadHeader::TOKEN_SPK.len.end,
+        MintPayloadHeader::TOKEN_SPK.bytes.start,
+        MintPayloadHeader::TOKEN_SPK.bytes.end,
     )?;
 
     sb.add_op(OpTxOutputCount)?.add_i64(2)?.add_op(OpGreaterThanOrEqual)?;
@@ -1090,7 +1125,9 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk: &[u8]) -> Result<
     sb.add_i64(TRANSFER_PAYLOAD_LEN as i64)?;
     sb.add_op(OpEqualVerify)?;
 
-    sb.add_i64(PayloadHeader::MAGIC.start as i64)?.add_i64(PayloadHeader::MAGIC.end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_i64(TransferPayloadHeader::MAGIC.start as i64)?
+        .add_i64(TransferPayloadHeader::MAGIC.end as i64)?
+        .add_op(OpTxPayloadSubstr)?;
     sb.add_data(PAYLOAD_MAGIC)?;
     sb.add_op(OpEqualVerify)?;
 
@@ -1111,8 +1148,8 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk: &[u8]) -> Result<
 
     sb.add_i64(DEPTH_PARENT_PAYLOAD_WITH_PREVOUT)?
         .add_op(OpPick)?
-        .add_i64(PayloadHeader::OP.start as i64)?
-        .add_i64(PayloadHeader::OP.end as i64)?
+        .add_i64(TransferPayloadHeader::OP.start as i64)?
+        .add_i64(TransferPayloadHeader::OP.end as i64)?
         .add_op(OpSubStr)?;
     sb.add_data(&[TOKEN_OP_SPLIT_MERGE])?;
     sb.add_op(OpEqualVerify)?;
@@ -1123,8 +1160,8 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk: &[u8]) -> Result<
 
     sb.add_i64(DEPTH_PARENT_PAYLOAD_WITH_PREVOUT)?
         .add_op(OpPick)?
-        .add_i64(PayloadHeader::OP.start as i64)?
-        .add_i64(PayloadHeader::OP.end as i64)?
+        .add_i64(MintPayloadHeader::OP.start as i64)?
+        .add_i64(MintPayloadHeader::OP.end as i64)?
         .add_op(OpSubStr)?;
     sb.add_ops(&[OpData1, TOKEN_OP_MINT])?;
     sb.add_op(OpEqualVerify)?;
@@ -1145,18 +1182,18 @@ pub fn build_token_covenant_script_knat20(minter_covenant_spk: &[u8]) -> Result<
     sb.add_op(OpDrop)?;
 
     // --- Current payload op = split/merge ---
-    sb.add_i64(PayloadHeader::OP.start as i64)?.add_i64(PayloadHeader::OP.end as i64)?.add_op(OpTxPayloadSubstr)?;
+    sb.add_i64(TransferPayloadHeader::OP.start as i64)?.add_i64(TransferPayloadHeader::OP.end as i64)?.add_op(OpTxPayloadSubstr)?;
     sb.add_data(&[TOKEN_OP_SPLIT_MERGE])?;
     sb.add_op(OpEqualVerify)?;
 
     // --- Fields that must be inherited from parent payload ---
     sb.add_i64(1)?
         .add_op(OpPick)?
-        .add_i64(PayloadHeader::ASSET_ID.start as i64)?
-        .add_i64(PayloadHeader::REMAINING_SUPPLY.end as i64)?
+        .add_i64(MintPayloadHeader::ASSET_ID.start as i64)?
+        .add_i64(MintPayloadHeader::TOKEN_SPK.bytes.end as i64)?
         .add_op(OpSubStr)?
-        .add_i64(PayloadHeader::ASSET_ID.start as i64)?
-        .add_i64(PayloadHeader::REMAINING_SUPPLY.end as i64)?
+        .add_i64(TransferPayloadHeader::ASSET_ID.start as i64)?
+        .add_i64(TransferPayloadHeader::TOKEN_SPK.bytes.end as i64)?
         .add_op(OpTxPayloadSubstr)?
         .add_op(OpEqualVerify)?;
 
