@@ -1355,13 +1355,9 @@ opcode_list! {
         if vm.flags.covenants_enabled {
             match vm.script_source {
                 ScriptSource::TxInput{tx, ..} => {
-                    // // TODO: Add optimization
-                    // let count = tx.outputs().iter()
-                    //     .filter(|output| output.cov_out_info.is_some_and(|x| x.authorizing_input as usize == idx))
-                    //     .count();
                     let [input_idx]: [i32; 1] = vm.dstack.pop_items()?;
                     let input_idx = i32_to_usize(input_idx)?;
-                    let count = vm.cov_out_count(input_idx)?;
+                    let count = vm.covenants_ctx.num_auth_outputs(input_idx)?;
                     push_number(count as i64, vm)
                 },
                 _ => Err(TxScriptError::InvalidSource("OpCovOutCount only applies to transaction inputs".to_string()))
@@ -1375,18 +1371,9 @@ opcode_list! {
         if vm.flags.covenants_enabled {
             match vm.script_source {
                 ScriptSource::TxInput{tx, ..} => {
-                    let [input_idx, authorized_idx]: [i32; 2] = vm.dstack.pop_items()?;
-                    let input_idx = i32_to_usize(input_idx)?;
-                    let authorized_idx = i32_to_usize(authorized_idx)?;
-
-                    // // TODO: Add optimization
-                    // let output_idx = tx.outputs().iter().enumerate()
-                    //     .filter(|(i,output)| output.cov_out_info.is_some_and(|x| x.authorizing_input as usize == idx))
-                    //     .map(|(i, _)| i)
-                    //     .nth(cov_out_idx)
-                    //     .ok_or(TxScriptError::InvalidIndex(cov_out_idx as i32))?;
-
-                    let output_idx = vm.cov_out_idx(input_idx, authorized_idx)?;
+                    let [input_idx, k]: [i32; 2] = vm.dstack.pop_items()?;
+                    let (input_idx, k) = (i32_to_usize(input_idx)?, i32_to_usize(k)?);
+                    let output_idx = vm.covenants_ctx.auth_output_index(input_idx, k)?;
                     push_number(output_idx as i64, vm)
                 },
                 _ => Err(TxScriptError::InvalidSource("OpCovOutIdx only applies to transaction inputs".to_string()))
@@ -1491,7 +1478,7 @@ mod test {
     use crate::caches::Cache;
     use crate::data_stack::Stack;
     use crate::opcodes::{OpCodeExecution, OpCodeImplementation};
-    use crate::{opcodes, pay_to_address_script, TxScriptEngine, TxScriptError, LOCK_TIME_THRESHOLD};
+    use crate::{opcodes, pay_to_address_script, EngineContext, TxScriptEngine, TxScriptError, LOCK_TIME_THRESHOLD};
     use kaspa_addresses::{Address, Prefix, Version};
     use kaspa_consensus_core::constants::{SOMPI_PER_KASPA, TX_VERSION};
     use kaspa_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
@@ -1516,10 +1503,11 @@ mod test {
     fn run_success_test_cases(tests: Vec<TestCase>) {
         let cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
+        let ctx = EngineContext::new(&reused_values, &cache);
         for TestCase { init, code, dstack } in tests {
             let init: Stack = init.into();
             let dstack = dstack.into();
-            let mut vm = TxScriptEngine::new(&reused_values, &cache, Default::default());
+            let mut vm = TxScriptEngine::new(ctx, Default::default());
             vm.dstack = init.clone();
             code.execute(&mut vm).unwrap_or_else(|_| panic!("Opcode {} should not fail", code.value()));
             assert_eq!(vm.dstack, dstack, "OpCode {} Pushed wrong value", code.value());
@@ -1529,8 +1517,9 @@ mod test {
     fn run_error_test_cases(tests: Vec<ErrorTestCase>) {
         let cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
+        let ctx = EngineContext::new(&reused_values, &cache);
         for ErrorTestCase { init, code, error } in tests {
-            let mut vm = TxScriptEngine::new(&reused_values, &cache, Default::default());
+            let mut vm = TxScriptEngine::new(ctx, Default::default());
             vm.dstack = init.clone().into();
             assert_eq!(
                 code.execute(&mut vm)
@@ -1565,7 +1554,8 @@ mod test {
 
         let cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
-        let mut vm = TxScriptEngine::new(&reused_values, &cache, Default::default());
+        let ctx = EngineContext::new(&reused_values, &cache);
+        let mut vm = TxScriptEngine::new(ctx, Default::default());
 
         for pop in tests {
             match pop.execute(&mut vm) {
@@ -1595,7 +1585,8 @@ mod test {
 
         let cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
-        let mut vm = TxScriptEngine::new(&reused_values, &cache, Default::default());
+        let ctx = EngineContext::new(&reused_values, &cache);
+        let mut vm = TxScriptEngine::new(ctx, Default::default());
 
         for pop in tests {
             match pop.execute(&mut vm) {
@@ -1669,7 +1660,8 @@ mod test {
 
         let cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
-        let mut vm = TxScriptEngine::new(&reused_values, &cache, Default::default());
+        let ctx = EngineContext::new(&reused_values, &cache);
+        let mut vm = TxScriptEngine::new(ctx, Default::default());
 
         for pop in tests {
             match pop.execute(&mut vm) {
@@ -3253,6 +3245,7 @@ mod test {
 
         let sig_cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
+        let ctx = EngineContext::new(&reused_values, &sig_cache);
 
         let code = opcodes::OpCheckLockTimeVerify::empty().expect("Should accept empty");
 
@@ -3264,8 +3257,7 @@ mod test {
         ] {
             let mut tx = base_tx.clone();
             tx.0.lock_time = tx_lock_time;
-            let mut vm =
-                TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, &reused_values, &sig_cache, Default::default());
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, ctx, Default::default());
             vm.dstack = vec![lock_time.clone()].into();
             match code.execute(&mut vm) {
                 // Message is based on the should_fail values
@@ -3295,6 +3287,7 @@ mod test {
 
         let sig_cache = Cache::new(10_000);
         let reused_values = SigHashReusedValuesUnsync::new();
+        let ctx = EngineContext::new(&reused_values, &sig_cache);
 
         let code = opcodes::OpCheckSequenceVerify::empty().expect("Should accept empty");
 
@@ -3307,8 +3300,7 @@ mod test {
         ] {
             let mut input = base_input.clone();
             input.sequence = tx_sequence;
-            let mut vm =
-                TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, &reused_values, &sig_cache, Default::default());
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &input, 0, &utxo_entry, ctx, Default::default());
             vm.dstack = vec![sequence.clone()].into();
             match code.execute(&mut vm) {
                 // Message is based on the should_fail values
@@ -3494,6 +3486,7 @@ mod test {
             let tx = PopulatedTransaction::new(&tx, utxo_entries);
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
 
             for current_idx in 0..tx.inputs().len() {
                 let mut vm = TxScriptEngine::from_transaction_input(
@@ -3501,8 +3494,7 @@ mod test {
                     &tx.inputs()[current_idx],
                     current_idx,
                     tx.utxo(current_idx).unwrap(),
-                    &reused_values,
-                    &sig_cache,
+                    ctx,
                     Default::default(),
                 );
 
@@ -3732,14 +3724,14 @@ mod test {
                 let tx = PopulatedTransaction::new(&tx, utxo_entries);
                 let sig_cache = Cache::new(10_000);
                 let reused_values = SigHashReusedValuesUnsync::new();
+                let ctx = EngineContext::new(&reused_values, &sig_cache);
 
                 let mut vm = TxScriptEngine::from_transaction_input(
                     &tx,
                     &tx.inputs()[0], // Use first input
                     0,
                     tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
+                    ctx,
                     Default::default(),
                 );
 
@@ -3797,18 +3789,12 @@ mod test {
             let tx = tx.as_verifiable();
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
 
             // Test success case
             {
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3824,15 +3810,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3853,6 +3832,7 @@ mod test {
                 .drain();
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
             let spk = pay_to_script_hash_script(&redeem_script);
 
             // Test success case
@@ -3864,15 +3844,8 @@ mod test {
                 let mut tx = MutableTransaction::with_entries(tx, utxo_entries);
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -3890,15 +3863,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -3908,6 +3874,7 @@ mod test {
         fn test_input_spk_basic() {
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
 
             // Create script: 0 OP_INPUTSPK OpNop
             // Just verify that OpInputSpk pushes something onto stack
@@ -3919,15 +3886,7 @@ mod test {
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
-            let mut vm = TxScriptEngine::from_transaction_input(
-                &tx,
-                &tx.inputs()[0],
-                0,
-                tx.utxo(0).unwrap(),
-                &reused_values,
-                &sig_cache,
-                Default::default(),
-            );
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
             // OpInputSpk should push input's SPK onto stack, making it non-empty
             assert_eq!(vm.execute(), Ok(()));
@@ -3937,6 +3896,7 @@ mod test {
         fn test_input_spk_different() {
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
 
             // Create script: 0 OP_INPUTSPK 1 OP_INPUTSPK OP_EQUAL OP_NOT
             // Verifies that two different inputs have different SPKs
@@ -3950,15 +3910,7 @@ mod test {
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
-            let mut vm = TxScriptEngine::from_transaction_input(
-                &tx,
-                &tx.inputs()[0],
-                0,
-                tx.utxo(0).unwrap(),
-                &reused_values,
-                &sig_cache,
-                Default::default(),
-            );
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
             // Should succeed because the SPKs are different
             assert_eq!(vm.execute(), Ok(()));
@@ -3968,6 +3920,7 @@ mod test {
         fn test_input_spk_same() {
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
 
             // Create script: 0 OP_INPUTSPK 1 OP_INPUTSPK OP_EQUAL
             // Verifies that two inputs with same SPK are equal
@@ -3982,15 +3935,7 @@ mod test {
             tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
             let tx = tx.as_verifiable();
-            let mut vm = TxScriptEngine::from_transaction_input(
-                &tx,
-                &tx.inputs()[0],
-                0,
-                tx.utxo(0).unwrap(),
-                &reused_values,
-                &sig_cache,
-                Default::default(),
-            );
+            let mut vm = TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
             // Should succeed because both SPKs are identical
             assert_eq!(vm.execute(), Ok(()));
@@ -4003,6 +3948,7 @@ mod test {
             let expected_spk_bytes = expected_spk.to_bytes();
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
             // Create script: 0 OP_OUTPUTSPK <expected_spk_bytes> EQUAL
             let redeem_script = ScriptBuilder::new()
                 .add_op(Op0)
@@ -4027,15 +3973,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -4053,15 +3992,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -4076,6 +4008,7 @@ mod test {
             let spk = pay_to_script_hash_script(&redeem_script);
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
             // Test first input (success case)
             {
                 let input_mock = Kip10Mock { spk: spk.clone(), amount: 200 };
@@ -4086,15 +4019,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -4110,15 +4036,8 @@ mod test {
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&redeem_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[1],
-                    1,
-                    tx.utxo(1).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), ctx, Default::default());
 
                 // Should fail because script expects index 0 but we're at index 1
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
@@ -4129,6 +4048,7 @@ mod test {
         fn test_counts() {
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
             // Test OpInputCount: "OP_INPUTCOUNT 2 EQUAL"
             let input_count_script =
                 ScriptBuilder::new().add_op(OpTxInputCount).unwrap().add_i64(2).unwrap().add_op(OpEqual).unwrap().drain();
@@ -4156,15 +4076,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&input_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -4175,15 +4088,8 @@ mod test {
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&output_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[1],
-                    1,
-                    tx.utxo(1).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Ok(()));
             }
@@ -4198,15 +4104,8 @@ mod test {
                 tx.tx.inputs[0].signature_script = ScriptBuilder::new().add_data(&wrong_input_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[0],
-                    0,
-                    tx.utxo(0).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[0], 0, tx.utxo(0).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -4220,15 +4119,8 @@ mod test {
                 tx.tx.inputs[1].signature_script = ScriptBuilder::new().add_data(&wrong_output_count_script).unwrap().drain();
 
                 let tx = tx.as_verifiable();
-                let mut vm = TxScriptEngine::from_transaction_input(
-                    &tx,
-                    &tx.inputs()[1],
-                    1,
-                    tx.utxo(1).unwrap(),
-                    &reused_values,
-                    &sig_cache,
-                    Default::default(),
-                );
+                let mut vm =
+                    TxScriptEngine::from_transaction_input(&tx, &tx.inputs()[1], 1, tx.utxo(1).unwrap(), ctx, Default::default());
 
                 assert_eq!(vm.execute(), Err(TxScriptError::EvalFalse));
             }
@@ -4350,13 +4242,13 @@ mod test {
             let populated_tx = PopulatedTransaction::new(tx, entries);
             let reused_values = SigHashReusedValuesUnsync::new();
             let sig_cache = Cache::new(10_000);
+            let ctx = EngineContext::new(&reused_values, &sig_cache);
             let mut vm = TxScriptEngine::from_transaction_input(
                 &populated_tx,
                 &populated_tx.tx.inputs[idx],
                 idx,
                 &populated_tx.entries[idx],
-                &reused_values,
-                &sig_cache,
+                ctx,
                 EngineFlags { covenants_enabled: true },
             );
             vm.execute()

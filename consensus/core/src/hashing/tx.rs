@@ -115,7 +115,7 @@ fn write_output<T: HasherBase>(hasher: &mut T, output: &TransactionOutput, versi
         hasher.write_bool(output.cov_out_info.is_some());
         if let Some(cov_out_info) = &output.cov_out_info {
             hasher.write_u16(cov_out_info.authorizing_input);
-            hasher.update(&cov_out_info.covenant_id);
+            hasher.update(cov_out_info.covenant_id);
         }
     }
 }
