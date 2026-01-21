@@ -803,6 +803,9 @@ opcode_list! {
         Ok(())
     }
 
+    /// Given stack `[x, l, u]`
+    /// Returns if `x >= l` and `x < u`
+    /// Lower limit is inclusive and upper limit is exclusive
     opcode OpWithin<0xa5, 1>(self, vm) {
         let [ x, l, u ]: [i64; 3] = vm.dstack.pop_items()?;
         let r = (x >= l && x < u) as i64;

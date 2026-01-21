@@ -87,9 +87,16 @@ macro_rules! opcode_impl {
 }
 
 macro_rules! opcode_list {
-    ( $( opcode $(|$alias:ident|)? $name:ident<$num:literal, $length:tt>($self:ident, $vm:ident) $code: expr ) *)  => {
+    (
+        $(
+            $(#[$doc:meta])*
+            opcode $(|$alias:ident|)? $name:ident<$num:literal, $length:tt>
+                ($self:ident, $vm:ident) $code:expr
+        )*
+    )  => {
         pub mod codes {
             $(
+                $(#[$doc])*
                 #[allow(non_upper_case_globals)]
                 #[allow(dead_code)]
                 pub const $name: u8 = $num;

@@ -1,24 +1,25 @@
 mod covenants;
 mod errors;
-mod payload_layout;
 mod result;
+mod script_layout;
 mod scriptnum;
 
 use covenants::{
-    asset_id_for_outpoint, build_mint_tx, build_minter_covenant_script_knat20, build_token_covenant_script_knat20,
-    build_token_transfer_tx, try_spk_bytes, CovenantError, NativeAssetOp, NativeAssetOutput, NativeAssetPayload, NativeAssetState,
+    build_mint_tx, build_minter_covenant_script_knat20, build_token_transfer_tx, covenant_id_for_outpoint, minter_state_from_spk,
+    token_state_from_spk, try_spk_bytes, MinterState, TokenState,
 };
 use kaspa_addresses::Prefix;
 use kaspa_bip32::{secp256k1::PublicKey, AddressType, ChildNumber, ExtendedPrivateKey, Prefix as KeyPrefix, PrivateKey, SecretKey};
-use kaspa_consensus_core::constants::TX_VERSION;
+use kaspa_consensus_core::constants::TX_VERSION_POST_COV_HF;
 use kaspa_consensus_core::mass::{MassCalculator, NonContextualMasses};
 use kaspa_consensus_core::sign::{sign_with_multiple_v2, Signed};
 use kaspa_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
 use kaspa_consensus_core::tx::{
-    PopulatedTransaction, SignableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry,
+    PopulatedTransaction, ScriptPublicKey, SignableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
+    UtxoEntry,
 };
 use kaspa_rpc_core::{api::rpc::RpcApi, RpcAddress};
-use kaspa_txscript::{extract_script_pub_key_address, pay_to_address_script, pay_to_script_hash_script};
+use kaspa_txscript::pay_to_address_script;
 use kaspa_wallet_core::{
     derivation::WalletDerivationManagerTrait,
     prelude::{Language, Mnemonic},
@@ -33,6 +34,8 @@ use kaspa_wrpc_client::{
 };
 use std::process::ExitCode;
 use std::time::Duration;
+
+use crate::errors::CovenantError;
 
 const ACCOUNT_INDEX: u64 = 1;
 const FUNDING_INDEX: u32 = 0;
@@ -177,28 +180,11 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
     let new_owner_spk = pay_to_address_script(&new_owner_address);
 
     let authority_spk_bytes = try_spk_bytes(&authority_spk).map_err(map_covenant_err)?;
-    let owner_spk_bytes = authority_spk_bytes.clone();
-    let new_owner_spk_bytes = try_spk_bytes(&new_owner_spk).map_err(map_covenant_err)?;
 
     let total_minted = TOKEN_AMOUNT.checked_mul(MINT_COUNT as u64).expect("Mint count exceeds token amount range");
     assert!(total_minted <= TOTAL_SUPPLY, "Minted supply exceeds total supply");
 
-    // Build minter first, then derive the token covenant and carry its spk bytes in the payload.
-    let minter_covenant_script = build_minter_covenant_script_knat20(&authority_spk_bytes).map_err(map_covenant_err)?;
-    let minter_spk = pay_to_script_hash_script(&minter_covenant_script);
-    let minter_spk_bytes = try_spk_bytes(&minter_spk).map_err(map_covenant_err)?;
-
-    let token_covenant_script = build_token_covenant_script_knat20(&minter_spk_bytes).map_err(map_covenant_err)?;
-    let token_spk = pay_to_script_hash_script(&token_covenant_script);
-    let token_spk_bytes = try_spk_bytes(&token_spk).map_err(map_covenant_err)?;
-
-    let minter_address =
-        extract_script_pub_key_address(&minter_spk, Prefix::Testnet).expect("Cannot get address from minter covenant spk");
-    let token_address =
-        extract_script_pub_key_address(&token_spk, Prefix::Testnet).expect("Cannot get address from token covenant spk");
-
-    println!("minter covenant address: {}", minter_address);
-    println!("token covenant address: {}", token_address);
+    println!("note: covenant scripts embed state, so script pubkeys change every spend");
 
     client.connect(Some(options)).await?;
 
@@ -232,7 +218,8 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
         temp_outputs.push(TransactionOutput::new(temp_change_value, funding_spk.clone()));
     }
 
-    let temp_tx = Transaction::new(TX_VERSION, vec![funding_input.clone()], temp_outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
+    let temp_tx =
+        Transaction::new(TX_VERSION_POST_COV_HF, vec![funding_input.clone()], temp_outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
     let temp_tx = PopulatedTransaction::new(&temp_tx, vec![funding_entry.clone()]);
     let mass = calc_mass(&mass_calculator, temp_tx);
 
@@ -240,49 +227,47 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
     assert!(change_value > 0, "Funding UTXO does not cover fees");
     funding_outputs.push(TransactionOutput::new(change_value, funding_spk));
 
-    let funding_tx = Transaction::new(TX_VERSION, vec![funding_input], funding_outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
+    let funding_tx =
+        Transaction::new(TX_VERSION_POST_COV_HF, vec![funding_input], funding_outputs, 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
     let funding_prvkey = wallet_ctx.get_prvkey_at_index(FUNDING_INDEX, AddressType::Receive).to_bytes();
     let funding_tx = sign_and_finalize(funding_tx, vec![funding_entry.clone()], &[funding_prvkey]);
     let funding_tx_id = client.submit_transaction((&funding_tx).into(), false).await?;
 
     let genesis_outpoint = TransactionOutpoint::new(funding_tx.id(), 0);
-    let genesis_entry = UtxoEntry::new(funding_tx.outputs[0].value, genesis_spk.clone(), 0, false);
+    let genesis_entry = UtxoEntry::new(funding_tx.outputs[0].value, genesis_spk.clone(), 0, false, None);
+    let covenant_id = covenant_id_for_outpoint(&genesis_outpoint);
+    println!("covenant id: {}", covenant_id);
 
-    let genesis_payload = NativeAssetPayload {
-        asset_id: asset_id_for_outpoint(&genesis_outpoint),
-        authority_spk_bytes,
-        token_spk_bytes,
-        remaining_supply: TOTAL_SUPPLY,
-        op: NativeAssetOp::Mint,
-        total_amount: TOKEN_AMOUNT,
-        input_amounts: Vec::new(),
-        outputs: vec![NativeAssetOutput { amount: TOKEN_AMOUNT, recipient_spk_bytes: owner_spk_bytes.clone() }],
-    };
+    let genesis_state = MinterState { covenant_id, remaining_supply: TOTAL_SUPPLY, authority_spk_bytes: authority_spk_bytes.clone() };
+    let minter_script = build_minter_covenant_script_knat20(&genesis_state).map_err(map_covenant_err)?;
+    let minter_spk = ScriptPublicKey::from_vec(0, minter_script);
 
     let genesis_input = TransactionInput::new(genesis_outpoint, vec![], 0, 1);
-    let temp_genesis_output = TransactionOutput::new(genesis_entry.amount, minter_spk.clone());
+    let mut temp_genesis_output = TransactionOutput::new(genesis_entry.amount, minter_spk.clone());
+    temp_genesis_output.cov_out_info = Some(kaspa_consensus_core::tx::CovOutInfo { authorizing_input: 0, covenant_id });
     let temp_genesis_tx = Transaction::new(
-        TX_VERSION,
+        TX_VERSION_POST_COV_HF,
         vec![genesis_input.clone()],
         vec![temp_genesis_output],
         0,
         SUBNETWORK_ID_NATIVE,
         0,
-        genesis_payload.encode().unwrap(),
+        vec![],
     );
     let temp_genesis_tx = PopulatedTransaction::new(&temp_genesis_tx, vec![genesis_entry.clone()]);
     let genesis_mass = calc_mass(&mass_calculator, temp_genesis_tx);
 
     let minter_value = genesis_entry.amount.saturating_sub(genesis_mass);
-    let minter_output = kaspa_consensus_core::tx::TransactionOutput::new(minter_value, minter_spk.clone());
+    let mut minter_output = kaspa_consensus_core::tx::TransactionOutput::new(minter_value, minter_spk.clone());
+    minter_output.cov_out_info = Some(kaspa_consensus_core::tx::CovOutInfo { authorizing_input: 0, covenant_id });
     let minter_genesis_tx = kaspa_consensus_core::tx::Transaction::new(
-        kaspa_consensus_core::constants::TX_VERSION,
+        TX_VERSION_POST_COV_HF,
         vec![genesis_input],
         vec![minter_output],
         0,
         kaspa_consensus_core::subnets::SUBNETWORK_ID_NATIVE,
         0,
-        genesis_payload.encode().unwrap(),
+        vec![],
     );
     let genesis_prvkey = wallet_ctx.get_prvkey_at_index(1, kaspa_bip32::AddressType::Receive).to_bytes();
     let minter_genesis_tx = sign_and_finalize(minter_genesis_tx, vec![genesis_entry.clone()], &[genesis_prvkey]);
@@ -294,70 +279,65 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
         let output = funding_tx.outputs[output_index as usize].clone();
         authority_utxos.push(SpendableUtxo {
             outpoint: TransactionOutpoint::new(funding_tx.id(), output_index),
-            entry: UtxoEntry::new(output.value, output.script_public_key, 0, false),
+            entry: UtxoEntry::new(output.value, output.script_public_key, 0, false, None),
         });
     }
 
-    let minter_entry = UtxoEntry::new(minter_genesis_tx.outputs[0].value, minter_spk.clone(), 0, false);
-    let mut minter_state = NativeAssetState::from_tx_with_entry_and_grandparent(minter_genesis_tx.clone(), minter_entry, &funding_tx)
-        .map_err(map_covenant_err)?;
-    let mut minter_parent_tx = minter_genesis_tx.clone();
+    let mut minter_entry = UtxoEntry::new(minter_genesis_tx.outputs[0].value, minter_spk.clone(), 0, false, Some(covenant_id));
+    let mut minter_state = minter_state_from_spk(&minter_genesis_tx.outputs[0].script_public_key).map_err(map_covenant_err)?;
+    let mut minter_outpoint = TransactionOutpoint::new(minter_genesis_tx.id(), 0);
 
     let authority_prvkey = wallet_ctx.get_prvkey_at_index(AUTHORITY_INDEX, AddressType::Receive).to_bytes();
     let mut mint_tx_ids = Vec::with_capacity(MINT_COUNT);
-    let mut last_token_state = None;
+    let mut last_token_state: Option<(TokenState, TransactionOutpoint, UtxoEntry)> = None;
 
     for (idx, auth_utxo) in authority_utxos.iter().take(MINT_COUNT).enumerate() {
         let auth_input = TransactionInput::new(auth_utxo.outpoint, vec![], 0, 1);
         let auth_entry = auth_utxo.entry.clone();
-        let next_payload = minter_state.payload.mint_next(TOKEN_AMOUNT, &owner_spk_bytes).map_err(map_covenant_err)?;
-
         let mint_tx = build_mint_tx(
             &minter_state,
-            &next_payload,
-            &minter_spk,
-            &token_spk,
+            &minter_outpoint,
+            &minter_entry,
+            TOKEN_AMOUNT,
+            &authority_spk,
             token_value,
             auth_input,
             auth_entry.clone(),
-            &minter_covenant_script,
             &mass_calculator,
         )
         .map_err(map_covenant_err)?;
-        let mint_tx = sign_and_finalize(mint_tx, vec![minter_state.utxo_entry().clone(), auth_entry.clone()], &[authority_prvkey]);
+        let mint_tx = sign_and_finalize(mint_tx, vec![minter_entry.clone(), auth_entry.clone()], &[authority_prvkey]);
         let mint_tx_id = client.submit_transaction((&mint_tx).into(), true).await?;
         println!("mint {} tx submitted: {mint_tx_id}", idx + 1);
         mint_tx_ids.push(mint_tx_id);
 
-        let token_entry = UtxoEntry::new(mint_tx.outputs[1].value, token_spk.clone(), 0, false);
-        let token_state =
-            NativeAssetState::from_tx_with_entry_and_grandparent_at_index(mint_tx.clone(), token_entry, &minter_parent_tx, 1)
-                .map_err(map_covenant_err)?;
-        last_token_state = Some(token_state);
+        let token_outpoint = TransactionOutpoint::new(mint_tx.id(), 1);
+        let token_entry =
+            UtxoEntry::new(mint_tx.outputs[1].value, mint_tx.outputs[1].script_public_key.clone(), 0, false, Some(covenant_id));
+        let token_state = token_state_from_spk(&mint_tx.outputs[1].script_public_key).map_err(map_covenant_err)?;
+        last_token_state = Some((token_state, token_outpoint, token_entry));
 
-        let next_minter_entry = UtxoEntry::new(mint_tx.outputs[0].value, minter_spk.clone(), 0, false);
-        minter_state = NativeAssetState::from_tx_with_entry_and_grandparent(mint_tx.clone(), next_minter_entry, &minter_parent_tx)
-            .map_err(map_covenant_err)?;
-        minter_parent_tx = mint_tx;
+        minter_outpoint = TransactionOutpoint::new(mint_tx.id(), 0);
+        minter_entry =
+            UtxoEntry::new(mint_tx.outputs[0].value, mint_tx.outputs[0].script_public_key.clone(), 0, false, Some(covenant_id));
+        minter_state = minter_state_from_spk(&mint_tx.outputs[0].script_public_key).map_err(map_covenant_err)?;
     }
 
-    let token_state = last_token_state.expect("No token state available for transfer");
+    let (token_state, token_outpoint, token_entry) = last_token_state.expect("No token state available for transfer");
     let owner_utxo = &authority_utxos[MINT_COUNT];
     let owner_input = TransactionInput::new(owner_utxo.outpoint, vec![], 0, 1);
     let owner_entry = owner_utxo.entry.clone();
-    let transfer_payload = token_state.payload.token_transfer_next(&new_owner_spk_bytes).map_err(map_covenant_err)?;
-
     let transfer_tx = build_token_transfer_tx(
         &token_state,
-        &transfer_payload,
-        &token_spk,
+        &token_outpoint,
+        &token_entry,
+        &new_owner_spk,
         owner_input,
         owner_entry.clone(),
-        &token_covenant_script,
         &mass_calculator,
     )
     .map_err(map_covenant_err)?;
-    let transfer_tx = sign_and_finalize(transfer_tx, vec![token_state.utxo_entry().clone(), owner_entry.clone()], &[authority_prvkey]);
+    let transfer_tx = sign_and_finalize(transfer_tx, vec![token_entry.clone(), owner_entry.clone()], &[authority_prvkey]);
     let transfer_tx_id = client.submit_transaction((&transfer_tx).into(), true).await?;
 
     println!("funding tx submitted: {funding_tx_id}");
