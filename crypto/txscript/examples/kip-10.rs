@@ -17,7 +17,7 @@ use kaspa_txscript::{
     },
     pay_to_address_script, pay_to_script_hash_script,
     script_builder::{ScriptBuilder, ScriptBuilderResult},
-    EngineContext, TxScriptEngine,
+    EngineCtx, TxScriptEngine,
 };
 use kaspa_txscript_errors::TxScriptError::{EvalFalse, VerifyError};
 use rand::thread_rng;
@@ -61,7 +61,7 @@ fn threshold_scenario() -> ScriptBuilderResult<()> {
     // Prepare to reuse values for signature hashing
     let reused_values = SigHashReusedValuesUnsync::new();
 
-    let ctx = EngineContext::new(&reused_values, &sig_cache);
+    let ctx = EngineCtx::new(&sig_cache).with_reused(&reused_values);
 
     // Create the script builder
     let mut builder = ScriptBuilder::new();
@@ -85,7 +85,7 @@ fn threshold_scenario() -> ScriptBuilderResult<()> {
     let input_value = 1000000000;
 
     // Create a transaction output
-    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: spk.clone(), cov_out_info: None };
+    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: spk.clone(), covenant: None };
 
     // Create a UTXO entry for the input
     let utxo_entry = UtxoEntry::new(input_value, spk, 0, false, None);
@@ -247,7 +247,7 @@ fn threshold_scenario_limited_one_time() -> ScriptBuilderResult<()> {
     // Prepare to reuse values for signature hashing
     let reused_values = SigHashReusedValuesUnsync::new();
 
-    let ctx = EngineContext::new(&reused_values, &sig_cache);
+    let ctx = EngineCtx::new(&sig_cache).with_reused(&reused_values);
 
     // Generate the script public key
     let spk = pay_to_script_hash_script(&script);
@@ -256,7 +256,7 @@ fn threshold_scenario_limited_one_time() -> ScriptBuilderResult<()> {
     let input_value = 1000000000;
 
     // Create a transaction output
-    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: p2pk.clone(), cov_out_info: None };
+    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: p2pk.clone(), covenant: None };
 
     // Create a UTXO entry for the input
     let utxo_entry = UtxoEntry::new(input_value, spk, 0, false, None);
@@ -402,7 +402,7 @@ fn threshold_scenario_limited_2_times() -> ScriptBuilderResult<()> {
     // Prepare to reuse values for signature hashing
     let reused_values = SigHashReusedValuesUnsync::new();
 
-    let ctx = EngineContext::new(&reused_values, &sig_cache);
+    let ctx = EngineCtx::new(&sig_cache).with_reused(&reused_values);
 
     // Generate the script public key
     let spk = pay_to_script_hash_script(&two_times_script);
@@ -411,7 +411,7 @@ fn threshold_scenario_limited_2_times() -> ScriptBuilderResult<()> {
     let input_value = 1000000000;
 
     // Create a transaction output
-    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: p2sh_one_time, cov_out_info: None };
+    let output = TransactionOutput { value: 1000000000 + threshold as u64, script_public_key: p2sh_one_time, covenant: None };
 
     // Create a UTXO entry for the input
     let utxo_entry = UtxoEntry::new(input_value, spk, 0, false, None);
@@ -560,7 +560,7 @@ fn shared_secret_scenario() -> ScriptBuilderResult<()> {
     let input_value = 1000000000;
 
     // Create a transaction output
-    let output = TransactionOutput { value: input_value, script_public_key: spk.clone(), cov_out_info: None };
+    let output = TransactionOutput { value: input_value, script_public_key: spk.clone(), covenant: None };
 
     // Create a UTXO entry for the input
     let utxo_entry = UtxoEntry::new(input_value, spk, 0, false, None);
@@ -614,7 +614,7 @@ fn shared_secret_scenario() -> ScriptBuilderResult<()> {
             &tx.inputs()[0],
             0,
             &utxo_entry,
-            EngineContext::new(&reused_values, &sig_cache),
+            EngineCtx::new(&sig_cache).with_reused(&reused_values),
             Default::default(),
         );
         assert_eq!(vm.execute(), Ok(()));
@@ -639,7 +639,7 @@ fn shared_secret_scenario() -> ScriptBuilderResult<()> {
             &tx.inputs()[0],
             0,
             &utxo_entry,
-            EngineContext::new(&reused_values, &sig_cache),
+            EngineCtx::new(&sig_cache).with_reused(&reused_values),
             Default::default(),
         );
         assert_eq!(vm.execute(), Ok(()));
@@ -664,7 +664,7 @@ fn shared_secret_scenario() -> ScriptBuilderResult<()> {
             &tx.inputs()[0],
             0,
             &utxo_entry,
-            EngineContext::new(&reused_values, &sig_cache),
+            EngineCtx::new(&sig_cache).with_reused(&reused_values),
             Default::default(),
         );
         assert_eq!(vm.execute(), Err(VerifyError));

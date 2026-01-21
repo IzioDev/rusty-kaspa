@@ -4,7 +4,7 @@
 
 use kaspa_bip32::{secp256k1, DerivationPath, KeyFingerprint};
 use kaspa_consensus_core::{hashing::sighash::SigHashReusedValuesUnsync, Hash};
-use kaspa_txscript::EngineContext;
+use kaspa_txscript::EngineCtx;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::BTreeMap, fmt::Display, fmt::Formatter, future::Future, marker::PhantomData, ops::Deref};
@@ -149,7 +149,7 @@ impl<R> PSKT<R> {
                 .map(|Output { amount, script_public_key, .. }: &Output| TransactionOutput {
                     value: *amount,
                     script_public_key: script_public_key.clone(),
-                    cov_out_info: None,
+                    covenant: todo!(),
                 })
                 .collect(),
             self.determine_lock_time(),
@@ -470,7 +470,7 @@ impl PSKT<Extractor> {
             let tx = tx.as_verifiable();
             let cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
-            let ctx = EngineContext::new(&reused_values, &cache);
+            let ctx = EngineCtx::new(&cache).with_reused(&reused_values);
 
             tx.populated_inputs().enumerate().try_for_each(|(idx, (input, entry))| {
                 TxScriptEngine::from_transaction_input(&tx, input, idx, entry, ctx, Default::default()).execute()?;

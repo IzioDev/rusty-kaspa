@@ -18,7 +18,7 @@ pub mod runtime_sig_op_counter;
 use std::ops::Deref;
 
 use crate::caches::Cache;
-use crate::covenants::{CovenantsContext, EMPTY_COV_CONTEXT};
+use crate::covenants::CovenantsContext;
 use crate::data_stack::Stack;
 use crate::opcodes::{deserialize_next_opcode, OpCodeImplementation};
 use itertools::Itertools;
@@ -37,12 +37,20 @@ pub mod prelude {
     pub use super::standard::*;
 }
 use crate::runtime_sig_op_counter::RuntimeSigOpCounter;
+pub use crate::seq_commit_accessor::SeqCommitAccessor;
 pub use standard::*;
+
+pub mod seq_commit_accessor;
+
+pub mod engine_context;
+
+pub(crate) use engine_context::EngineContext;
+pub use engine_context::{EngineCtx, EngineCtxSync, EngineCtxUnsync};
 
 pub const MAX_SCRIPT_PUBLIC_KEY_VERSION: u16 = 0;
 pub const MAX_STACK_SIZE: usize = 244;
 pub const MAX_SCRIPTS_SIZE: usize = 10_000;
-pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 520;
+pub const MAX_SCRIPT_ELEMENT_SIZE: usize = 1_000_000; // TODO(covpp-mainnet): Add proper activation logic, and think of a better regulation mechanism.
 pub const MAX_OPS_PER_SCRIPT: i32 = 201;
 pub const MAX_TX_IN_SEQUENCE_NUM: u64 = u64::MAX;
 pub const SEQUENCE_LOCK_TIME_DISABLED: u64 = 1 << 63;
@@ -85,34 +93,6 @@ enum ScriptSource<'a, T: VerifiableTransaction> {
 pub struct EngineFlags {
     pub covenants_enabled: bool,
 }
-
-pub struct EngineContext<'a, Reused: SigHashReusedValues> {
-    reused_values: &'a Reused,
-    sig_cache: &'a Cache<SigCacheKey, bool>,
-    covenants_ctx: &'a CovenantsContext,
-}
-
-impl<'a, Reused: SigHashReusedValues> EngineContext<'a, Reused> {
-    pub fn new(reused_values: &'a Reused, sig_cache: &'a Cache<SigCacheKey, bool>) -> Self {
-        Self { reused_values, sig_cache, covenants_ctx: &EMPTY_COV_CONTEXT }
-    }
-
-    pub fn with_covenants_ctx(
-        reused_values: &'a Reused,
-        sig_cache: &'a Cache<SigCacheKey, bool>,
-        covenants_ctx: &'a CovenantsContext,
-    ) -> Self {
-        Self { reused_values, sig_cache, covenants_ctx }
-    }
-}
-
-impl<'a, Reused: SigHashReusedValues> Clone for EngineContext<'a, Reused> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<'a, Reused: SigHashReusedValues> Copy for EngineContext<'a, Reused> {}
 
 impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> Deref for TxScriptEngine<'a, T, Reused> {
     type Target = EngineContext<'a, Reused>;
@@ -178,10 +158,14 @@ pub fn get_sig_op_count<T: VerifiableTransaction>(
     tx: &T,
     input_idx: usize,
     covenants_ctx: &CovenantsContext,
+    seq_commit_accessor: Option<&dyn SeqCommitAccessor>,
 ) -> Result<u8, TxScriptError> {
     let sig_cache = Cache::new(0);
     let reused_values = SigHashReusedValuesUnsync::new();
-    let ctx = EngineContext::with_covenants_ctx(&reused_values, &sig_cache, covenants_ctx);
+    let ctx = EngineCtx::new(&sig_cache)
+        .with_reused(&reused_values)
+        .with_covenants_ctx(covenants_ctx)
+        .with_seq_commit_accessor_opt(seq_commit_accessor);
     let mut vm = TxScriptEngine::from_transaction_input(
         tx,
         &tx.inputs()[input_idx],
@@ -344,7 +328,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
             dstack: Self::new_stack(flags),
             astack: Self::new_stack(flags),
             script_source: ScriptSource::StandAloneScripts(vec![script]),
-            ctx: EngineContext::new(reused_values, sig_cache),
+            ctx: EngineCtx::new(sig_cache).with_reused(reused_values),
             cond_stack: Default::default(),
             num_ops: 0,
             // Runtime sig op counting is not needed for standalone scripts, only inputs have sig op count value
@@ -448,8 +432,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
         // try_for_each quits only if an error occurred. So, we always run over all scripts if
         // each is successful
         scripts.iter().enumerate().filter(|(_, s)| !s.is_empty()).try_for_each(|(idx, s)| {
-            let verify_only_push =
-                idx == 0 && matches!(self.script_source, ScriptSource::TxInput { tx: _, input: _, idx: _, utxo_entry: _, is_p2sh: _ });
+            let verify_only_push = idx == 0 && matches!(self.script_source, ScriptSource::TxInput { .. });
             // Save script in p2sh
             if is_p2sh && idx == 1 {
                 saved_stack = Some(self.dstack.clone());
@@ -739,7 +722,7 @@ mod tests {
             let output = TransactionOutput {
                 value: 1000000000,
                 script_public_key: ScriptPublicKey::new(0, test.script.into()),
-                cov_out_info: None,
+                covenant: None,
             };
 
             let tx = Transaction::new(1, vec![input.clone()], vec![output.clone()], 0, Default::default(), 0, vec![]);
@@ -752,7 +735,7 @@ mod tests {
                 &input,
                 0,
                 &utxo_entry,
-                EngineContext::new(&reused_values, &sig_cache),
+                EngineCtx::new(&sig_cache).with_reused(&reused_values),
                 Default::default(),
             );
             assert_eq!(vm.execute(), test.expected_result);
@@ -1318,7 +1301,7 @@ mod tests {
                 &tx.inputs()[0],
                 0,
                 &utxo_entry,
-                EngineContext::new(&reused_values, &sig_cache),
+                EngineCtx::new(&sig_cache).with_reused(&reused_values),
                 Default::default(),
             );
 
@@ -1363,6 +1346,7 @@ mod bitcoind_tests {
     use kaspa_consensus_core::tx::{
         PopulatedTransaction, ScriptPublicKey, Transaction, TransactionId, TransactionOutpoint, TransactionOutput,
     };
+    use kaspa_hashes::Hash;
 
     #[derive(PartialEq, Eq, Debug, Clone)]
     enum UnifiedError {
@@ -1457,12 +1441,47 @@ mod bitcoind_tests {
             // Run transaction
             let sig_cache = Cache::new(10_000);
             let reused_values = SigHashReusedValuesUnsync::new();
+
+            struct MockSeqCommitAccessor;
+            const EXPECTED_INPUT_BLOCK_HASH: [u8; 32] = {
+                let mut block = [b'f'; 32];
+                let input = b"input_block";
+                let mut i = 0;
+                while i < input.len() {
+                    block[i] = input[i];
+                    i += 1;
+                }
+                block
+            };
+
+            const EXPECTED_OUTPUT_ROOT_HASH: [u8; 32] = {
+                let mut block = [b'f'; 32];
+                let input = b"output_root_hash";
+                let mut i = 0;
+                while i < input.len() {
+                    block[i] = input[i];
+                    i += 1;
+                }
+                block
+            };
+            impl SeqCommitAccessor for MockSeqCommitAccessor {
+                fn is_chain_ancestor_from_pov(&self, block_hash: Hash) -> Option<bool> {
+                    (block_hash == Hash::from(EXPECTED_INPUT_BLOCK_HASH)).then_some(true)
+                }
+
+                fn seq_commitment_within_depth(&self, block_hash: Hash) -> Option<Hash> {
+                    (block_hash == Hash::from(EXPECTED_INPUT_BLOCK_HASH)).then_some(Hash::from(EXPECTED_OUTPUT_ROOT_HASH))
+                }
+            }
+
             let mut vm = TxScriptEngine::from_transaction_input(
                 &populated_tx,
                 &populated_tx.tx().inputs[0],
                 0,
                 &populated_tx.entries[0],
-                EngineContext::new(&reused_values, &sig_cache),
+                EngineCtx::new(&sig_cache)
+                    .with_reused(&reused_values)
+                    .with_seq_commit_accessor_opt(flags.covenants_enabled.then_some(&MockSeqCommitAccessor)),
                 flags,
             );
             vm.execute().map_err(UnifiedError::TxScriptError)

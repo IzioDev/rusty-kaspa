@@ -2,18 +2,18 @@ use kaspa_consensus_core::hashing;
 use kaspa_consensus_core::hashing::sighash::SigHashReusedValuesUnsync;
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::tx::{
-    CovOutInfo, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
+    CovenantBinding, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
     UtxoEntry,
 };
 use kaspa_hashes::Hash;
 use kaspa_txscript::caches::Cache;
+use kaspa_txscript::covenants::CovenantsContext;
 use kaspa_txscript::opcodes::codes::{
-    Op1, Op1Add, OpBin2Num, OpBlake2b, OpCat, OpCovOutputCount, OpCovOutputIdx, OpData60, OpData61, OpData62, OpData8, OpDrop, OpDup,
-    OpEqual, OpEqualVerify, OpNum2Bin, OpSub, OpSwap, OpTrue, OpTxInputIndex, OpTxInputScriptSigLen, OpTxInputScriptSigSubstr,
-    OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin,
+    Op1Add, OpBlake2b, OpCat, OpCovOutputCount, OpCovOutputIdx, OpData62, OpData8, OpEqual, OpEqualVerify, OpNum2Bin, OpSwap, OpTrue,
+    OpTxInputIndex, OpTxInputScriptSigLen, OpTxInputScriptSigSubstr, OpTxOutputSpkLen, OpTxOutputSpkSubstr,
 };
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderResult};
-use kaspa_txscript::{pay_to_script_hash_script, EngineContext};
+use kaspa_txscript::{pay_to_script_hash_script, EngineCtx};
 use kaspa_txscript::{EngineFlags, TxScriptEngine};
 use kaspa_txscript_errors::TxScriptError;
 use rand::{seq::SliceRandom, Rng, RngCore, SeedableRng};
@@ -43,7 +43,7 @@ fn counter_state_in_spk() -> ScriptBuilderResult<()> {
         println!("[COVENANT P2SH-WS] Spending to counter {next}");
         let tx = build_spend_tx(&state, next, &covenant_script, &mut rng);
         run_vm(&tx, &state.utxo_entry, &sig_cache, &reused_values, flags).unwrap();
-        state = CovenantState::from_tx(tx, &covenant_script, next);
+        state = CovenantState::from_tx(tx, &covenant_script, next, state.covenant_id);
     }
 
     let counter_2_state = state.clone();
@@ -51,7 +51,7 @@ fn counter_state_in_spk() -> ScriptBuilderResult<()> {
     println!("[COVENANT P2SH-WS] Spending to counter {next}");
     let tx = build_spend_tx(&state, next, &covenant_script, &mut rng);
     run_vm(&tx, &state.utxo_entry, &sig_cache, &reused_values, flags).unwrap();
-    state = CovenantState::from_tx(tx, &covenant_script, next);
+    state = CovenantState::from_tx(tx, &covenant_script, next, state.covenant_id);
 
     println!("[COVENANT P2SH-WS] Attempting invalid spend (no increment)");
     let bad_tx = build_spend_tx(&state, state.counter, &covenant_script, &mut rng);
@@ -90,14 +90,21 @@ struct CovenantState {
 impl CovenantState {
     fn new(counter: u8, covenant_script: &[u8]) -> Self {
         let tx = genesis_tx(counter, covenant_script);
-        Self::from_tx(tx, covenant_script, counter)
+        let covenant_id = hashing::covenant_id::covenant_id(TransactionOutpoint::new(tx.id(), 0));
+        Self::from_tx(tx, covenant_script, counter, covenant_id)
     }
 
-    fn from_tx(tx: Transaction, covenant_script: &[u8], counter: u8) -> Self {
+    fn from_tx(tx: Transaction, covenant_script: &[u8], counter: u8, covenant_id: Hash) -> Self {
         let outpoint = TransactionOutpoint::new(tx.id(), 0);
         let spk = build_spk(counter, covenant_script);
-        let utxo_entry = UtxoEntry::new(1_000_000, spk, 0, false, None);
-        Self { utxo_outpoint: outpoint, utxo_entry, counter, covenant_id: hashing::covenant_id::covenant_id(outpoint) }
+        let utxo_entry = UtxoEntry::new(
+            1_000_000,
+            spk,
+            0,
+            false,
+            Some(covenant_id), // Note this is not needed for the genesis case, but we always set if for simplicity
+        );
+        Self { utxo_outpoint: outpoint, utxo_entry, counter, covenant_id }
     }
 }
 
@@ -108,7 +115,7 @@ impl CovenantState {
 fn build_covenant_script() -> ScriptBuilderResult<Vec<u8>> {
     let p2sh_prefix = [
         0,
-        0, // Script version 0
+        0, // Script version 0 (two bytes)
         kaspa_txscript::opcodes::codes::OpBlake2b,
         kaspa_txscript::opcodes::codes::OpData32,
     ];
@@ -198,7 +205,7 @@ fn build_spend_tx(state: &CovenantState, next_counter: u8, covenant_script: &[u8
 
     let input = TransactionInput::new(state.utxo_outpoint, sig_script, 0, 0);
     let mut output = TransactionOutput::new(state.utxo_entry.amount - 10, build_spk(next_counter, covenant_script));
-    output.cov_out_info = Some(CovOutInfo { covenant_id: state.covenant_id, authorizing_input: 0 });
+    output.covenant = Some(CovenantBinding { covenant_id: state.covenant_id, authorizing_input: 0 });
 
     let mut outputs = vec![output];
 
@@ -226,14 +233,9 @@ fn run_vm(
     flags: EngineFlags,
 ) -> Result<(), TxScriptError> {
     let populated = PopulatedTransaction::new(tx, vec![utxo_entry.clone()]);
-    let mut vm = TxScriptEngine::from_transaction_input(
-        &populated,
-        &tx.inputs[0],
-        0,
-        utxo_entry,
-        EngineContext::new(reused_values, sig_cache),
-        flags,
-    );
+    let cov_ctx = CovenantsContext::from_tx(&populated).unwrap();
+    let ctx = EngineCtx::new(sig_cache).with_reused(reused_values).with_covenants_ctx(&cov_ctx);
+    let mut vm = TxScriptEngine::from_transaction_input(&populated, &tx.inputs[0], 0, utxo_entry, ctx, flags);
     vm.execute()
 }
 
