@@ -23,8 +23,8 @@ use crate::script_layout::{
 };
 use crate::scriptnum::{append_u64_le, decode_u64_le};
 
-const MAX_SPLIT_MERGE_INPUTS_COUNT: usize = 2;
-const MAX_SPLIT_MERGE_OUTPUTS_COUNT: usize = 2;
+const MAX_SPLIT_MERGE_INPUTS_COUNT: usize = 3;
+const MAX_SPLIT_MERGE_OUTPUTS_COUNT: usize = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// This is to be kept externally (but verified internally)
@@ -359,7 +359,6 @@ fn build_minter_covenant_logic(token_logic: &[u8]) -> CovenantResult<Vec<u8>> {
     Ok(sb.drain())
 }
 
-// TODO: make the input and output count parametrable (statically)
 // TODO: verify output[n] spk indeed is the output[n].recipient (new recipient can spend the UTXO)
 fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
     let mut sb = ScriptBuilder::new();
@@ -367,7 +366,7 @@ fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
     // start with a clean stack (drop the state)
     sb.add_op(Op2Drop)?.add_op(OpDrop)?;
 
-    // input count must be 2..=3 (token inputs + auth)
+    // input count must be 2..=(MAX_SPLIT_MERGE_INPUTS_COUNT + 1) (token inputs + auth)
     sb.add_op(OpTxInputCount)?.add_i64(2)?.add_i64((MAX_SPLIT_MERGE_INPUTS_COUNT + 2) as i64)?.add_op(OpWithin)?.add_op(OpVerify)?;
 
     // ensure current input index < auth input index (auth input is last)
@@ -391,58 +390,50 @@ fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
     push_current_state_covenant_id(&mut sb)?;
     sb.add_op(OpEqualVerify)?;
 
-    // @TODO: handle dynamic max split merge inputs count dynamically
-    // if two token inputs, ensure covenant_id matches between input0 and input1
-    sb.add_op(OpTxInputCount)?.add_i64(3)?.add_op(OpEqual)?;
-    sb.add_op(OpIf)?;
-    verify_input_script_at_index_matches_current_script(&mut sb, 1)?;
-    push_input_state_covenant_id(&mut sb, 0)?;
-    push_input_state_covenant_id(&mut sb, 1)?;
-    sb.add_op(OpEqualVerify)?;
-    sb.add_op(OpEndIf)?;
+    // extra token inputs must match script and covenant_id
+    for idx in 1..MAX_SPLIT_MERGE_INPUTS_COUNT {
+        sb.add_op(OpTxInputCount)?.add_i64((idx + 2) as i64)?.add_op(OpGreaterThanOrEqual)?;
+        sb.add_op(OpIf)?;
+        verify_input_script_at_index_matches_current_script(&mut sb, idx as i64)?;
+        push_input_state_covenant_id(&mut sb, 0)?;
+        push_input_state_covenant_id(&mut sb, idx as i64)?;
+        sb.add_op(OpEqualVerify)?;
+        sb.add_op(OpEndIf)?;
+    }
 
-    // @TODO: handle dynamic max split merge inputs count dynamically
     // total input amount validation. sum(inputs[n].amount) == sum(outputs[n].amount)
-    sb.add_op(OpTxInputCount)?.add_i64(3)?.add_op(OpEqual)?;
-    sb.add_op(OpIf)?;
     push_input_amount(&mut sb, 0)?;
     assert_positive_amount(&mut sb)?;
-    push_input_amount(&mut sb, 1)?;
-    assert_positive_amount(&mut sb)?;
-    sb.add_op(OpAdd)?;
-    sb.add_op(OpElse)?;
-    push_input_amount(&mut sb, 0)?;
-    assert_positive_amount(&mut sb)?;
-    sb.add_op(OpEndIf)?;
+    for idx in 1..MAX_SPLIT_MERGE_INPUTS_COUNT {
+        sb.add_op(OpTxInputCount)?.add_i64((idx + 2) as i64)?.add_op(OpGreaterThanOrEqual)?;
+        sb.add_op(OpIf)?;
+        push_input_amount(&mut sb, idx as i64)?;
+        assert_positive_amount(&mut sb)?;
+        sb.add_op(OpAdd)?;
+        sb.add_op(OpEndIf)?;
+    }
 
-    // @TODO: handle dynamic max split merge outputs count dynamically
-    // outputs count for input 0 must be 1..=2.
-    sb.add_i64(0)?.add_op(OpCovOutputCount)?.add_op(OpDup)?;
+    // outputs count for input 0 must be 1..=MAX_SPLIT_MERGE_OUTPUTS_COUNT.
+    sb.add_i64(0)?.add_op(OpCovOutputCount)?;
     sb.add_i64(1)?.add_i64((MAX_SPLIT_MERGE_OUTPUTS_COUNT + 1) as i64)?.add_op(OpWithin)?.add_op(OpVerify)?;
 
     // total output amount
-    sb.add_op(OpDup)?.add_i64(2)?.add_op(OpEqual)?;
-    sb.add_op(OpIf)?;
     verify_authorized_output_at_index_script_matches_input0_script(&mut sb, 0)?;
     verify_auth_output_spk_field_len(&mut sb, 0)?;
     push_auth_output_amount(&mut sb, 0)?;
     assert_positive_amount(&mut sb)?;
-
-    verify_authorized_output_at_index_script_matches_input0_script(&mut sb, 1)?;
-    verify_auth_output_spk_field_len(&mut sb, 1)?;
-    push_auth_output_amount(&mut sb, 1)?;
-    assert_positive_amount(&mut sb)?;
-    sb.add_op(OpAdd)?;
-    sb.add_op(OpElse)?;
-    verify_authorized_output_at_index_script_matches_input0_script(&mut sb, 0)?;
-    verify_auth_output_spk_field_len(&mut sb, 0)?;
-    push_auth_output_amount(&mut sb, 0)?;
-    assert_positive_amount(&mut sb)?;
-    sb.add_op(OpEndIf)?;
+    for idx in 1..MAX_SPLIT_MERGE_OUTPUTS_COUNT {
+        sb.add_i64(0)?.add_op(OpCovOutputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
+        sb.add_op(OpIf)?;
+        verify_authorized_output_at_index_script_matches_input0_script(&mut sb, idx as i64)?;
+        verify_auth_output_spk_field_len(&mut sb, idx as i64)?;
+        push_auth_output_amount(&mut sb, idx as i64)?;
+        assert_positive_amount(&mut sb)?;
+        sb.add_op(OpAdd)?;
+        sb.add_op(OpEndIf)?;
+    }
 
     // compare total inputs and outputs.
-    sb.add_op(OpSwap)?;
-    sb.add_op(OpDrop)?;
     sb.add_op(OpNumEqualVerify)?;
 
     sb.add_op(OpTrue)?;
