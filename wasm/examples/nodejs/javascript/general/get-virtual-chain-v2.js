@@ -10,10 +10,10 @@ const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 (async () => {
   const rpc = new RpcClient({
-    url: "127.0.0.1",
+    url: "wss://tn12reset-wrpc.kasia.fyi",
     encoding: Encoding.Borsh,
     // resolver: new Resolver(),
-    networkId: "mainnet",
+    networkId: "devnet",
   });
   console.log(`Resolving RPC endpoint...`);
   await rpc.connect();
@@ -37,7 +37,7 @@ const delay = (ms) => new Promise((res) => setTimeout(res, ms));
       const vspc = await rpc.getVirtualChainFromBlockV2({
         startHash: lowHash,
         minConfirmationCount: 10,
-        dataVerbosityLevel: "High",
+        dataVerbosityLevel: "Full",
       });
       console.info("VSPC Info:", vspc);
 
@@ -52,9 +52,17 @@ const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
       for (const cbat of vspc.chainBlockAcceptedTransactions) {
         // Do something with the chain block header
-        console.info(cbat.chainBlockHeader);
+        // console.info(cbat.chainBlockHeader);
         // Do something with the accepted transactions
-        console.info(cbat.acceptedTransactions);
+        // console.info(cbat.acceptedTransactions);
+
+        cbat.acceptedTransactions.forEach((t) => {
+          if (!t.inputs.length) {
+            return;
+          }
+
+          console.log(t);
+        });
       }
 
       console.info("Time span:", Date.now() - date.getTime(), "ms");
@@ -64,6 +72,6 @@ const delay = (ms) => new Promise((res) => setTimeout(res, ms));
     }
 
     // wait 10 seconds before next iteration
-    await delay(10000);
+    await delay(5000);
   }
 })();

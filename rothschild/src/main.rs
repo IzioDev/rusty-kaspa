@@ -6,9 +6,10 @@ use kaspa_addresses::{Address, Prefix, Version};
 use kaspa_consensus_core::{
     config::params::TESTNET_PARAMS,
     constants::{SOMPI_PER_KASPA, TX_VERSION},
+    hashing::covenant_id::covenant_id,
     sign::sign,
     subnets::SUBNETWORK_ID_NATIVE,
-    tx::{MutableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
+    tx::{CovenantBinding, MutableTransaction, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput, UtxoEntry},
 };
 use kaspa_core::{info, kaspad_env::version, time::unix_now, warn};
 use kaspa_grpc_client::{ClientPool, GrpcClient};
@@ -27,7 +28,7 @@ use tokio::time::{Instant, MissedTickBehavior, interval};
 const DEFAULT_SEND_AMOUNT: u64 = 10 * SOMPI_PER_KASPA;
 const FEE_RATE: u64 = 10;
 const MILLIS_PER_TICK: u64 = 10;
-const ADDRESS_PREFIX: Prefix = Prefix::Testnet;
+const ADDRESS_PREFIX: Prefix = Prefix::Devnet;
 const ADDRESS_VERSION: Version = Version::PubKey;
 
 struct Stats {
@@ -48,6 +49,7 @@ pub struct Args {
     pub priority_fee: u64,
     pub randomize_fee: bool,
     pub payload_size: usize,
+    pub enable_covenant_id: bool,
 }
 
 impl Args {
@@ -63,6 +65,7 @@ impl Args {
             priority_fee: m.get_one::<u64>("priority-fee").cloned().unwrap_or(0),
             randomize_fee: m.get_one::<bool>("randomize-fee").cloned().unwrap_or(false),
             payload_size: m.get_one::<usize>("payload-size").cloned().unwrap_or(0),
+            enable_covenant_id: m.get_one::<bool>("enable-covenant-id").cloned().unwrap_or_default(),
         }
     }
 }
@@ -126,6 +129,15 @@ pub fn cli() -> Command {
                 .value_parser(clap::value_parser!(usize))
                 .help("Randomized payload size"),
         )
+        .arg(
+            Arg::new("enable-covenant-id")
+                .long("enable-covenant-id")
+                .value_name("enable-covenant-id")
+                .action(ArgAction::SetTrue)
+                .hide(true)
+                .default_value("false")
+                .help("Wether or not to populate with covenant id"),
+        )
 }
 
 async fn new_rpc_client(subscription_context: &SubscriptionContext, address: &str) -> GrpcClient {
@@ -156,6 +168,7 @@ struct TxConfig {
     priority_fee: u64,
     randomize_fee: bool,
     payload_size: usize,
+    with_convenant_id: bool,
 }
 
 #[tokio::main]
@@ -164,6 +177,7 @@ async fn main() {
     let args = Args::parse();
     let stats = Arc::new(Mutex::new(Stats { num_txs: 0, since: unix_now(), num_utxos: 0, utxos_amount: 0, num_outs: 0 }));
     let subscription_context = SubscriptionContext::new();
+    info!("Connecting to {}", format!("grpc://{}", args.rpc_server));
     let rpc_client = GrpcClient::connect_with_args(
         NotificationMode::Direct,
         format!("grpc://{}", args.rpc_server),
@@ -203,7 +217,12 @@ async fn main() {
 
     (args.payload_size <= 20000).then_some(()).expect("payload-size can be max 20000");
 
-    let tx_config = TxConfig { priority_fee: args.priority_fee, randomize_fee: args.randomize_fee, payload_size: args.payload_size };
+    let tx_config = TxConfig {
+        priority_fee: args.priority_fee,
+        randomize_fee: args.randomize_fee,
+        payload_size: args.payload_size,
+        with_convenant_id: args.enable_covenant_id,
+    };
 
     rayon::ThreadPoolBuilder::new().num_threads(args.threads as usize).build_global().unwrap();
 
@@ -483,7 +502,15 @@ async fn maybe_send_tx(
         .into_par_iter()
         .map(|utxo_option| {
             if let Some((selected_utxos, selected_amount)) = utxo_option {
-                let tx = generate_tx(schnorr_key, &selected_utxos, selected_amount, num_outs, &kaspa_addr, tx_config.payload_size);
+                let tx = generate_tx(
+                    schnorr_key,
+                    &selected_utxos,
+                    selected_amount,
+                    num_outs,
+                    &kaspa_addr,
+                    tx_config.payload_size,
+                    tx_config.with_convenant_id,
+                );
 
                 return Some((tx, selected_utxos.len(), selected_utxos.into_iter().map(|(_, entry)| entry.amount).sum::<u64>()));
             }
@@ -522,6 +549,14 @@ fn estimated_mass(num_utxos: usize, num_outs: u64) -> u64 {
     200 + 34 * num_outs + 1000 * (num_utxos as u64)
 }
 
+fn get_covenant_binding(inputs: &[TransactionInput], with_covenant_id: bool) -> Option<CovenantBinding> {
+    if !with_covenant_id {
+        return None;
+    }
+    let idx = thread_rng().gen_range(0..inputs.len());
+    Some(CovenantBinding::new(idx as u16, covenant_id(inputs[idx].previous_outpoint.clone())))
+}
+
 fn generate_tx(
     schnorr_key: Keypair,
     utxos: &[(TransactionOutpoint, UtxoEntry)],
@@ -529,6 +564,7 @@ fn generate_tx(
     num_outs: u64,
     kaspa_addr: &Address,
     payload_size: usize,
+    with_covenant_id: bool,
 ) -> Transaction {
     let script_public_key = pay_to_address_script(kaspa_addr);
     let inputs = utxos
@@ -537,7 +573,11 @@ fn generate_tx(
         .collect_vec();
 
     let outputs = (0..num_outs)
-        .map(|_| TransactionOutput { value: send_amount / num_outs, script_public_key: script_public_key.clone(), covenant: None })
+        .map(|_| TransactionOutput {
+            value: send_amount / num_outs,
+            script_public_key: script_public_key.clone(),
+            covenant: get_covenant_binding(&inputs, with_covenant_id),
+        })
         .collect_vec();
     let mut data = vec![0u8; payload_size];
     rand::thread_rng().fill_bytes(&mut data);
