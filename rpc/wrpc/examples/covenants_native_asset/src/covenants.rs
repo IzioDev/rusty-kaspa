@@ -3,7 +3,7 @@ use kaspa_consensus_core::hashing::covenant_id::covenant_id;
 use kaspa_consensus_core::mass::{MassCalculator, NonContextualMasses};
 use kaspa_consensus_core::subnets::SubnetworkId;
 use kaspa_consensus_core::tx::{
-    CovOutInfo, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
+    CovenantBinding, PopulatedTransaction, ScriptPublicKey, Transaction, TransactionInput, TransactionOutpoint, TransactionOutput,
     UtxoEntry,
 };
 use kaspa_hashes::Hash;
@@ -667,7 +667,7 @@ fn verify_spk_field_matches_stack(sb: &mut ScriptBuilder) -> Result<(), ScriptBu
 
 fn apply_covenant_info(outputs: &mut [TransactionOutput], covenant_id: Hash, authorizing_input: u16) {
     for output in outputs {
-        output.cov_out_info = Some(CovOutInfo { authorizing_input, covenant_id });
+        output.covenant = Some(CovenantBinding { authorizing_input, covenant_id });
     }
 }
 

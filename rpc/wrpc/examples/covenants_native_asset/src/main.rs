@@ -244,7 +244,7 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
 
     let genesis_input = TransactionInput::new(genesis_outpoint, vec![], 0, 1);
     let mut temp_genesis_output = TransactionOutput::new(genesis_entry.amount, minter_spk.clone());
-    temp_genesis_output.cov_out_info = Some(kaspa_consensus_core::tx::CovOutInfo { authorizing_input: 0, covenant_id });
+    temp_genesis_output.covenant = Some(kaspa_consensus_core::tx::CovenantBinding { authorizing_input: 0, covenant_id });
     let temp_genesis_tx = Transaction::new(
         TX_VERSION_POST_COV_HF,
         vec![genesis_input.clone()],
@@ -259,7 +259,7 @@ async fn create_native_asset_flow(wallet_ctx: &WalletContext) -> Result<()> {
 
     let minter_value = genesis_entry.amount.saturating_sub(genesis_mass);
     let mut minter_output = kaspa_consensus_core::tx::TransactionOutput::new(minter_value, minter_spk.clone());
-    minter_output.cov_out_info = Some(kaspa_consensus_core::tx::CovOutInfo { authorizing_input: 0, covenant_id });
+    minter_output.covenant = Some(kaspa_consensus_core::tx::CovenantBinding { authorizing_input: 0, covenant_id });
     let minter_genesis_tx = kaspa_consensus_core::tx::Transaction::new(
         TX_VERSION_POST_COV_HF,
         vec![genesis_input],

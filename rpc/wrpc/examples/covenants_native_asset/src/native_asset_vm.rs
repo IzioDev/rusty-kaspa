@@ -18,7 +18,7 @@ use kaspa_consensus_core::tx::{
 };
 use kaspa_hashes::Hash;
 use kaspa_txscript::caches::Cache;
-use kaspa_txscript::{EngineContext, EngineFlags, TxScriptEngine};
+use kaspa_txscript::{EngineCtx, EngineFlags, TxScriptEngine};
 use kaspa_txscript_errors::TxScriptError;
 use kaspa_wallet_core::utils::try_kaspa_str_to_sompi;
 use kaspa_wrpc_client::prelude::NetworkType;
@@ -101,7 +101,7 @@ fn create_native_asset_vm_flow() -> Result<(), Box<dyn Error>> {
 
     let genesis_input = TransactionInput::new(genesis_outpoint, vec![], 0, 1);
     let mut temp_genesis_output = TransactionOutput::new(genesis_entry.amount, minter_spk.clone());
-    temp_genesis_output.cov_out_info = Some(covenant_info(covenant_id, 0));
+    temp_genesis_output.covenant = Some(covenant_info(covenant_id, 0));
     let temp_genesis_tx = Transaction::new(
         TX_VERSION_POST_COV_HF,
         vec![genesis_input.clone()],
@@ -116,7 +116,7 @@ fn create_native_asset_vm_flow() -> Result<(), Box<dyn Error>> {
 
     let minter_value = genesis_entry.amount.saturating_sub(genesis_mass);
     let mut minter_output = TransactionOutput::new(minter_value, minter_spk.clone());
-    minter_output.cov_out_info = Some(covenant_info(covenant_id, 0));
+    minter_output.covenant = Some(covenant_info(covenant_id, 0));
     let mut minter_genesis_tx =
         Transaction::new(TX_VERSION_POST_COV_HF, vec![genesis_input], vec![minter_output], 0, SUBNETWORK_ID_NATIVE, 0, vec![]);
     minter_genesis_tx.finalize();
@@ -284,7 +284,7 @@ fn run_covenant_vm<Reused: SigHashReusedValues>(
     let populated = PopulatedTransaction::new(tx, entries.clone());
     let entry = populated.utxo(input_index).ok_or_else(|| TxScriptError::InvalidInputIndex(input_index as i32, tx.inputs.len()))?;
     let covenants_ctx = build_covenants_ctx(tx, &entries);
-    let engine_ctx = EngineContext::with_covenants_ctx(reused_values, sig_cache, &covenants_ctx);
+    let engine_ctx = EngineCtx::new(sig_cache).with_reused(reused_values).with_covenants_ctx(&covenants_ctx);
     let mut vm = TxScriptEngine::from_transaction_input(&populated, &tx.inputs[input_index], input_index, entry, engine_ctx, flags);
     vm.execute()
 }
@@ -297,46 +297,46 @@ fn calc_mass(calculator: &MassCalculator, tx: PopulatedTransaction<'_>) -> u64 {
     storage_mass.max(compute_mass).max(transient_mass) + 100
 }
 
-fn covenant_info(covenant_id: Hash, authorizing_input: u16) -> kaspa_consensus_core::tx::CovOutInfo {
-    kaspa_consensus_core::tx::CovOutInfo { authorizing_input, covenant_id }
+fn covenant_info(covenant_id: Hash, authorizing_input: u16) -> kaspa_consensus_core::tx::CovenantBinding {
+    kaspa_consensus_core::tx::CovenantBinding { authorizing_input, covenant_id }
 }
 
 fn build_covenants_ctx(tx: &Transaction, entries: &[UtxoEntry]) -> kaspa_txscript::covenants::CovenantsContext {
-    use kaspa_txscript::covenants::{CovenantGlobalContext, CovenantLocalContext, CovenantsContext};
+    use kaspa_txscript::covenants::{CovenantInputContext, CovenantSharedContext, CovenantsContext};
     use std::collections::hash_map::Entry;
 
     let mut ctx = CovenantsContext::default();
 
     for (i, entry) in entries.iter().enumerate() {
         if let Some(covenant_id) = entry.covenant_id {
-            match ctx.covenant_ctxs.entry(covenant_id) {
+            match ctx.shared_ctxs.entry(covenant_id) {
                 Entry::Occupied(mut e) => e.get_mut().input_indices.push(i),
                 Entry::Vacant(e) => {
-                    e.insert(CovenantGlobalContext { input_indices: vec![i], output_indices: Default::default() });
+                    e.insert(CovenantSharedContext { input_indices: vec![i], output_indices: Default::default() });
                 }
             }
         }
     }
 
     for (i, output) in tx.outputs.iter().enumerate() {
-        if let Some(cov_out_info) = &output.cov_out_info {
-            let auth_input = cov_out_info.authorizing_input as usize;
+        if let Some(covenant_binding) = &output.covenant {
+            let auth_input = covenant_binding.authorizing_input as usize;
             let utxo_entry = entries.get(auth_input).expect("missing auth input entry");
             if let Some(covenant_id) = utxo_entry.covenant_id {
-                assert_eq!(covenant_id, cov_out_info.covenant_id);
+                assert_eq!(covenant_id, covenant_binding.covenant_id);
             }
 
-            match ctx.local_ctxs.entry(auth_input) {
+            match ctx.input_ctxs.entry(auth_input) {
                 Entry::Occupied(mut e) => e.get_mut().auth_outputs.push(i),
                 Entry::Vacant(e) => {
-                    e.insert(CovenantLocalContext { covenant_id: cov_out_info.covenant_id, auth_outputs: vec![i] });
+                    e.insert(CovenantInputContext { covenant_id: covenant_binding.covenant_id, auth_outputs: vec![i] });
                 }
             }
 
-            match ctx.covenant_ctxs.entry(cov_out_info.covenant_id) {
+            match ctx.shared_ctxs.entry(covenant_binding.covenant_id) {
                 Entry::Occupied(mut e) => e.get_mut().output_indices.push(i),
                 Entry::Vacant(e) => {
-                    e.insert(CovenantGlobalContext { input_indices: Default::default(), output_indices: vec![i] });
+                    e.insert(CovenantSharedContext { input_indices: Default::default(), output_indices: vec![i] });
                 }
             }
         }
