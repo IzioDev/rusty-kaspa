@@ -1,4 +1,4 @@
-# Kaspa Native Asset Covenants (Minter + Token) — Specification-Style README
+# Kaspa Native Asset Covenants (Minter + Token)
 
 **Scope:** This document specifies the _on-chain behavior_ of the two covenant scripts contained in this example and the transaction shapes they expect.
 
