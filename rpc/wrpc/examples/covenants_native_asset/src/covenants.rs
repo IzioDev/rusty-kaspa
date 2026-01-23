@@ -270,7 +270,7 @@ pub fn build_token_split_merge_tx(
     let mass = estimate_mass(mass_calculator, &temp_tx);
 
     let available_value = total_input_value.saturating_sub(mass);
-    let output_values = allocate_output_values_by_amount(available_value, outputs)?;
+    let output_values = even_split_values(available_value, outputs.len())?;
 
     let mut final_outputs = Vec::with_capacity(outputs.len());
     for (output, value) in outputs.iter().zip(output_values) {
@@ -740,33 +740,6 @@ fn even_split_values(total: u64, parts: usize) -> CovenantResult<Vec<u64>> {
     let mut values = vec![base; parts];
     if let Some(last) = values.last_mut() {
         *last = last.saturating_add(remainder);
-    }
-    if values.iter().any(|&value| value == 0) {
-        return Err(CovenantError::InvalidField("output_value"));
-    }
-    Ok(values)
-}
-
-fn allocate_output_values_by_amount(total: u64, outputs: &[NativeAssetOutput]) -> CovenantResult<Vec<u64>> {
-    if outputs.is_empty() {
-        return Err(CovenantError::InvalidField("output_count"));
-    }
-    let total_amount: u64 = outputs.iter().map(|output| output.amount).sum();
-    if total_amount == 0 {
-        return Err(CovenantError::InvalidField("total_amount"));
-    }
-
-    let mut values = Vec::with_capacity(outputs.len());
-    let mut allocated = 0u64;
-    for (index, output) in outputs.iter().enumerate() {
-        let value = if index + 1 == outputs.len() {
-            total.saturating_sub(allocated)
-        } else {
-            let value = total.saturating_mul(output.amount) / total_amount;
-            allocated = allocated.saturating_add(value);
-            value
-        };
-        values.push(value);
     }
     if values.iter().any(|&value| value == 0) {
         return Err(CovenantError::InvalidField("output_value"));
