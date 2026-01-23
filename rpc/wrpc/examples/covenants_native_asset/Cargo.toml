@@ -10,10 +10,6 @@ include.workspace = true
 license.workspace = true
 repository.workspace = true
 
-[[bin]]
-name = "kaspa-wrpc-covenants-native-asset-vm"
-path = "src/native_asset_vm.rs"
-
 [dependencies]
 futures.workspace = true
 kaspa-rpc-core.workspace = true

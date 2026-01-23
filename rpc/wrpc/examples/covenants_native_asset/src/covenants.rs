@@ -8,9 +8,9 @@ use kaspa_consensus_core::tx::{
 };
 use kaspa_hashes::Hash;
 use kaspa_txscript::opcodes::codes::{
-    Op1Sub, Op2Drop, OpAdd, OpBin2Num, OpCovOutputCount, OpCovOutputIdx, OpDrop, OpDup, OpElse, OpEndIf, OpEqual, OpEqualVerify,
-    OpGreaterThanOrEqual, OpIf, OpNumEqualVerify, OpPick, OpSize, OpSub, OpSubStr, OpSwap, OpTrue, OpTxInputCount, OpTxInputIndex,
-    OpTxInputSpk, OpTxInputSpkLen, OpTxInputSpkSubstr, OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin,
+    Op2Drop, OpAdd, OpBin2Num, OpCovOutputCount, OpCovOutputIdx, OpDrop, OpDup, OpEndIf, OpEqual, OpEqualVerify, OpGreaterThanOrEqual,
+    OpIf, OpNumEqualVerify, OpPick, OpSize, OpSub, OpSubStr, OpSwap, OpTrue, OpTxInputCount, OpTxInputIndex, OpTxInputSpk,
+    OpTxInputSpkLen, OpTxInputSpkSubstr, OpTxOutputCount, OpTxOutputSpkLen, OpTxOutputSpkSubstr, OpVerify, OpWithin,
 };
 use kaspa_txscript::script_builder::{ScriptBuilder, ScriptBuilderError};
 use kaspa_txscript::SpkEncoding;
@@ -25,6 +25,8 @@ use crate::scriptnum::{append_u64_le, decode_u64_le};
 
 const MAX_SPLIT_MERGE_INPUTS_COUNT: usize = 3;
 const MAX_SPLIT_MERGE_OUTPUTS_COUNT: usize = 3;
+const TOKEN_AUTH_INPUT_INDEX: i64 = 0;
+const TOKEN_LEADER_INPUT_INDEX: i64 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// This is to be kept externally (but verified internally)
@@ -130,7 +132,7 @@ pub fn build_mint_tx(
     utxo_entry: &UtxoEntry,
     mint_amount: u64,
     recipient_spk: &ScriptPublicKey,
-    token_value: u64,
+    kaspa_amount: u64,
     auth_input: TransactionInput,
     auth_entry: UtxoEntry,
     mass_calculator: &MassCalculator,
@@ -148,7 +150,7 @@ pub fn build_mint_tx(
     let minter_input = TransactionInput::new(*utxo_outpoint, vec![], 0, 0);
 
     let mut temp_outputs =
-        vec![TransactionOutput::new(utxo_entry.amount, minter_spk.clone()), TransactionOutput::new(token_value, token_spk.clone())];
+        vec![TransactionOutput::new(utxo_entry.amount, minter_spk.clone()), TransactionOutput::new(kaspa_amount, token_spk.clone())];
     apply_covenant_info(&mut temp_outputs, state.covenant_id, 0);
 
     let temp_tx = Transaction::new(
@@ -163,10 +165,10 @@ pub fn build_mint_tx(
     let temp_tx = PopulatedTransaction::new(&temp_tx, vec![utxo_entry.clone(), auth_entry.clone()]);
 
     let mass = estimate_mass(mass_calculator, &temp_tx);
-    let required = token_value.checked_add(mass).ok_or(CovenantError::InvalidField("fee"))?;
+    let required = kaspa_amount.checked_add(mass).ok_or(CovenantError::InvalidField("fee"))?;
     let minter_value = checked_sub_or_err(utxo_entry.amount, required)?;
 
-    let mut outputs = vec![TransactionOutput::new(minter_value, minter_spk), TransactionOutput::new(token_value, token_spk)];
+    let mut outputs = vec![TransactionOutput::new(minter_value, minter_spk), TransactionOutput::new(kaspa_amount, token_spk)];
     apply_covenant_info(&mut outputs, state.covenant_id, 0);
 
     let mut tx =
@@ -231,6 +233,9 @@ pub fn build_token_split_merge_tx(
     let mut inputs = Vec::with_capacity(token_inputs.len() + 1);
     let mut entries = Vec::with_capacity(token_inputs.len() + 1);
 
+    inputs.push(auth_input.clone());
+    entries.push(auth_entry.clone());
+
     for token in token_inputs {
         let token_script = build_token_covenant_script_knat20(token.state)?;
         let token_spk = ScriptPublicKey::from_vec(0, token_script);
@@ -241,9 +246,6 @@ pub fn build_token_split_merge_tx(
         entries.push(token.entry.clone());
     }
 
-    inputs.push(auth_input.clone());
-    entries.push(auth_entry.clone());
-
     let total_input_value: u64 = token_inputs.iter().map(|token| token.entry.amount).sum();
     let temp_values = even_split_values(total_input_value, outputs.len())?;
 
@@ -253,13 +255,14 @@ pub fn build_token_split_merge_tx(
         let token_state = TokenState { covenant_id, amount: output.amount, owner_spk_bytes: output.recipient_spk_bytes.clone() };
         let token_script = build_token_covenant_script_knat20(&token_state)?;
         let token_spk = ScriptPublicKey::from_vec(0, token_script);
+        // 1 Kaspa allocated to the output
         temp_outputs.push(TransactionOutput::new(1, token_spk));
     }
 
     for (output, value) in temp_outputs.iter_mut().zip(temp_values) {
         output.value = value;
     }
-    apply_covenant_info(&mut temp_outputs, covenant_id, 0);
+    apply_covenant_info(&mut temp_outputs, covenant_id, TOKEN_LEADER_INPUT_INDEX as u16);
 
     let temp_tx =
         Transaction::new(TX_VERSION_POST_COV_HF, inputs.clone(), temp_outputs.clone(), 0, SubnetworkId::default(), 0, vec![]);
@@ -276,7 +279,7 @@ pub fn build_token_split_merge_tx(
         let token_spk = ScriptPublicKey::from_vec(0, token_script);
         final_outputs.push(TransactionOutput::new(value, token_spk));
     }
-    apply_covenant_info(&mut final_outputs, covenant_id, 0);
+    apply_covenant_info(&mut final_outputs, covenant_id, TOKEN_LEADER_INPUT_INDEX as u16);
 
     let mut tx = Transaction::new(TX_VERSION_POST_COV_HF, inputs, final_outputs, 0, SubnetworkId::default(), 0, vec![]);
     tx.finalize();
@@ -324,7 +327,7 @@ fn build_minter_covenant_logic(token_logic: &[u8]) -> CovenantResult<Vec<u8>> {
     // output0 must be the minter covenant and reference input0 as its authorithy
     verify_authorized_output_at_index_script_matches_input0_script(&mut sb, 0)?;
 
-    // output0 authority field must match current authority field
+    // output0 authority field must match current authority field (authorithy doesn't change)
     push_current_spk_field(&mut sb)?;
     push_auth_output_spk_field(&mut sb, 0)?;
     sb.add_op(OpEqualVerify)?;
@@ -366,46 +369,63 @@ fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
     // start with a clean stack (drop the state)
     sb.add_op(Op2Drop)?.add_op(OpDrop)?;
 
-    // input count must be 2..=(MAX_SPLIT_MERGE_INPUTS_COUNT + 1) (token inputs + auth)
+    // input count must be 2..=(MAX_SPLIT_MERGE_INPUTS_COUNT + 1) (auth + token inputs)
     sb.add_op(OpTxInputCount)?.add_i64(2)?.add_i64((MAX_SPLIT_MERGE_INPUTS_COUNT + 2) as i64)?.add_op(OpWithin)?.add_op(OpVerify)?;
 
-    // ensure current input index < auth input index (auth input is last)
-    sb.add_op(OpTxInputCount)?.add_op(Op1Sub)?;
+    // ensure current input index is a token input (auth input is index 0)
+    sb.add_op(OpTxInputCount)?;
     sb.add_op(OpTxInputIndex)?;
     sb.add_op(OpSwap)?;
-    sb.add_i64(0)?;
+    sb.add_i64(1)?;
     sb.add_op(OpSwap)?;
     sb.add_op(OpWithin)?;
     sb.add_op(OpVerify)?;
 
-    // authorization input spk must match the owner spk field
-    sb.add_op(OpTxInputCount)?.add_op(Op1Sub)?.add_op(OpTxInputSpk)?;
-    push_current_spk_field(&mut sb)?;
-    sb.add_op(OpSwap)?;
+    // leader input (index 1) must match the current token logic tail
+    verify_input_script_at_index_matches_current_script(&mut sb, TOKEN_LEADER_INPUT_INDEX)?;
+
+    // all outputs must reference input1 as authority
+    sb.add_op(OpTxOutputCount)?;
+    sb.add_i64(TOKEN_LEADER_INPUT_INDEX)?.add_op(OpCovOutputCount)?;
+    sb.add_op(OpNumEqualVerify)?;
+
+    // only input1 does actual checks, others return true from here
+    sb.add_op(OpTxInputIndex)?;
+    sb.add_i64(TOKEN_LEADER_INPUT_INDEX)?;
+    sb.add_op(OpEqual)?;
+    sb.add_op(OpIf)?;
+
+    // ensure all token inputs share the same owner spk field as the leader
+    push_input_spk_field(&mut sb, TOKEN_LEADER_INPUT_INDEX)?;
+    for idx in 2..=MAX_SPLIT_MERGE_INPUTS_COUNT {
+        sb.add_op(OpTxInputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
+        sb.add_op(OpIf)?;
+        sb.add_op(OpDup)?;
+        push_input_spk_field(&mut sb, idx as i64)?;
+        sb.add_op(OpEqualVerify)?;
+        sb.add_op(OpEndIf)?;
+    }
+
+    // authorization input spk must match the owner spk field (leader input)
+    sb.add_i64(TOKEN_AUTH_INPUT_INDEX)?.add_op(OpTxInputSpk)?;
     verify_spk_field_matches_stack(&mut sb)?;
 
-    // input0 must be a token covenant and covenant_id from state must matches
-    verify_input_script_at_index_matches_current_script(&mut sb, 0)?;
-    push_input_state_covenant_id(&mut sb, 0)?;
-    push_current_state_covenant_id(&mut sb)?;
-    sb.add_op(OpEqualVerify)?;
-
     // extra token inputs must match script and covenant_id
-    for idx in 1..MAX_SPLIT_MERGE_INPUTS_COUNT {
-        sb.add_op(OpTxInputCount)?.add_i64((idx + 2) as i64)?.add_op(OpGreaterThanOrEqual)?;
+    for idx in 2..=MAX_SPLIT_MERGE_INPUTS_COUNT {
+        sb.add_op(OpTxInputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
         sb.add_op(OpIf)?;
         verify_input_script_at_index_matches_current_script(&mut sb, idx as i64)?;
-        push_input_state_covenant_id(&mut sb, 0)?;
+        push_input_state_covenant_id(&mut sb, TOKEN_LEADER_INPUT_INDEX)?;
         push_input_state_covenant_id(&mut sb, idx as i64)?;
         sb.add_op(OpEqualVerify)?;
         sb.add_op(OpEndIf)?;
     }
 
     // total input amount validation. sum(inputs[n].amount) == sum(outputs[n].amount)
-    push_input_amount(&mut sb, 0)?;
+    push_input_amount(&mut sb, TOKEN_LEADER_INPUT_INDEX)?;
     assert_positive_amount(&mut sb)?;
-    for idx in 1..MAX_SPLIT_MERGE_INPUTS_COUNT {
-        sb.add_op(OpTxInputCount)?.add_i64((idx + 2) as i64)?.add_op(OpGreaterThanOrEqual)?;
+    for idx in 2..=MAX_SPLIT_MERGE_INPUTS_COUNT {
+        sb.add_op(OpTxInputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
         sb.add_op(OpIf)?;
         push_input_amount(&mut sb, idx as i64)?;
         assert_positive_amount(&mut sb)?;
@@ -413,21 +433,21 @@ fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
         sb.add_op(OpEndIf)?;
     }
 
-    // outputs count for input 0 must be 1..=MAX_SPLIT_MERGE_OUTPUTS_COUNT.
-    sb.add_i64(0)?.add_op(OpCovOutputCount)?;
+    // outputs count for input1 must be 1..=MAX_SPLIT_MERGE_OUTPUTS_COUNT.
+    sb.add_i64(TOKEN_LEADER_INPUT_INDEX)?.add_op(OpCovOutputCount)?;
     sb.add_i64(1)?.add_i64((MAX_SPLIT_MERGE_OUTPUTS_COUNT + 1) as i64)?.add_op(OpWithin)?.add_op(OpVerify)?;
 
     // total output amount
-    verify_authorized_output_at_index_script_matches_input0_script(&mut sb, 0)?;
-    verify_auth_output_spk_field_len(&mut sb, 0)?;
-    push_auth_output_amount(&mut sb, 0)?;
+    verify_authorized_output_at_index_script_matches_authority_script(&mut sb, TOKEN_LEADER_INPUT_INDEX, 0)?;
+    verify_authorized_output_spk_field_len(&mut sb, TOKEN_LEADER_INPUT_INDEX, 0)?;
+    push_authorized_output_amount(&mut sb, TOKEN_LEADER_INPUT_INDEX, 0)?;
     assert_positive_amount(&mut sb)?;
     for idx in 1..MAX_SPLIT_MERGE_OUTPUTS_COUNT {
-        sb.add_i64(0)?.add_op(OpCovOutputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
+        sb.add_i64(TOKEN_LEADER_INPUT_INDEX)?.add_op(OpCovOutputCount)?.add_i64((idx + 1) as i64)?.add_op(OpGreaterThanOrEqual)?;
         sb.add_op(OpIf)?;
-        verify_authorized_output_at_index_script_matches_input0_script(&mut sb, idx as i64)?;
-        verify_auth_output_spk_field_len(&mut sb, idx as i64)?;
-        push_auth_output_amount(&mut sb, idx as i64)?;
+        verify_authorized_output_at_index_script_matches_authority_script(&mut sb, TOKEN_LEADER_INPUT_INDEX, idx as i64)?;
+        verify_authorized_output_spk_field_len(&mut sb, TOKEN_LEADER_INPUT_INDEX, idx as i64)?;
+        push_authorized_output_amount(&mut sb, TOKEN_LEADER_INPUT_INDEX, idx as i64)?;
         assert_positive_amount(&mut sb)?;
         sb.add_op(OpAdd)?;
         sb.add_op(OpEndIf)?;
@@ -435,6 +455,8 @@ fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
 
     // compare total inputs and outputs.
     sb.add_op(OpNumEqualVerify)?;
+
+    sb.add_op(OpEndIf)?;
 
     sb.add_op(OpTrue)?;
     Ok(sb.drain())
@@ -475,8 +497,8 @@ fn push_current_spk_field(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderErr
 
 // assumed pre-stack: no pre-stack assumptions
 // assumed post-stack: [covenant_id]
-fn push_current_state_covenant_id(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderError> {
-    sb.add_op(OpTxInputIndex)?
+fn push_input_state_covenant_id(sb: &mut ScriptBuilder, idx: i64) -> Result<(), ScriptBuilderError> {
+    sb.add_i64(idx)?
         .add_i64(SPK_COVENANT_ID_OFFSET as i64)?
         .add_i64((SPK_COVENANT_ID_OFFSET + COVENANT_ID_LEN) as i64)?
         .add_op(OpTxInputSpkSubstr)?;
@@ -484,11 +506,11 @@ fn push_current_state_covenant_id(sb: &mut ScriptBuilder) -> Result<(), ScriptBu
 }
 
 // assumed pre-stack: no pre-stack assumptions
-// assumed post-stack: [covenant_id]
-fn push_input_state_covenant_id(sb: &mut ScriptBuilder, idx: i64) -> Result<(), ScriptBuilderError> {
+// post-stack: [spk_field]
+fn push_input_spk_field(sb: &mut ScriptBuilder, idx: i64) -> Result<(), ScriptBuilderError> {
     sb.add_i64(idx)?
-        .add_i64(SPK_COVENANT_ID_OFFSET as i64)?
-        .add_i64((SPK_COVENANT_ID_OFFSET + COVENANT_ID_LEN) as i64)?
+        .add_i64(SPK_SPK_FIELD_OFFSET as i64)?
+        .add_i64((SPK_SPK_FIELD_OFFSET + SPK_FIELD_LEN) as i64)?
         .add_op(OpTxInputSpkSubstr)?;
     Ok(())
 }
@@ -507,18 +529,30 @@ fn push_input_script_from_index(sb: &mut ScriptBuilder, idx: i64) -> Result<(), 
 
 // assumed pre-stack: no pre-stack assumptions
 // assumed post-stack: [amount]
-fn push_auth_output_amount(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
-    sb.add_i64(0)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
+fn push_authorized_output_amount(sb: &mut ScriptBuilder, authorizing_input: i64, k: i64) -> Result<(), ScriptBuilderError> {
+    sb.add_i64(authorizing_input)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
     push_output_amount_from_index(sb)?;
     Ok(())
 }
 
 // assumed pre-stack: no pre-stack assumptions
 // assumed post-stack: [spk_field]
-fn push_auth_output_spk_field(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
-    sb.add_i64(0)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
+fn push_auth_output_amount(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
+    push_authorized_output_amount(sb, TOKEN_AUTH_INPUT_INDEX, k)
+}
+
+// assumed pre-stack: no pre-stack assumptions
+// assumed post-stack: [spk_field]
+fn push_authorized_output_spk_field(sb: &mut ScriptBuilder, authorizing_input: i64, k: i64) -> Result<(), ScriptBuilderError> {
+    sb.add_i64(authorizing_input)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
     push_output_spk_field_from_index(sb)?;
     Ok(())
+}
+
+// assumed pre-stack: no pre-stack assumptions
+// assumed post-stack: [spk_field]
+fn push_auth_output_spk_field(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
+    push_authorized_output_spk_field(sb, TOKEN_AUTH_INPUT_INDEX, k)
 }
 
 // assumed pre-stack: [output_index]
@@ -563,18 +597,28 @@ fn push_current_script(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderError>
 
 // assumed pre-stack: no pre-stack assumptions
 // post-stack: []
-/// Authorized output here means the k-th output that referenced the input authorithy (input0)
-/// Verify that this k-th output references input0 as authorithy AND
-/// that tail (covenant_script) matches, effectively checking if output_script = input0_script (script continuation)
-fn verify_authorized_output_at_index_script_matches_input0_script(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
+/// Authorized output here means the k-th output that referenced the input authorithy.
+/// Verify that this k-th output references `authorizing_input` as authorithy AND
+/// that tail (covenant_script) matches, effectively checking if output_script matches current_script (script continuation).
+fn verify_authorized_output_at_index_script_matches_authority_script(
+    sb: &mut ScriptBuilder,
+    authorizing_input: i64,
+    k: i64,
+) -> Result<(), ScriptBuilderError> {
     // input index that is expected to authorize
-    sb.add_i64(0)?;
-    // get the absolute output index that has been authorized by input0
+    sb.add_i64(authorizing_input)?;
+    // get the absolute output index that has been authorized by authorizing_input
     sb.add_i64(k)?.add_op(OpCovOutputIdx)?;
     push_output_script_from_index(sb)?;
     push_current_script(sb)?;
     sb.add_op(OpEqualVerify)?;
     Ok(())
+}
+
+// assumed pre-stack: no pre-stack assumptions
+// post-stack: []
+fn verify_authorized_output_at_index_script_matches_input0_script(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
+    verify_authorized_output_at_index_script_matches_authority_script(sb, TOKEN_AUTH_INPUT_INDEX, k)
 }
 
 // assumed pre-stack: no pre-stack assumptions
@@ -602,8 +646,8 @@ fn verify_authorized_output_at_index_script_matches_script(
 
 // assumed pre-stack: no pre-stack assumptions
 // post-stack: []
-fn verify_auth_output_spk_field_len(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
-    sb.add_i64(0)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
+fn verify_authorized_output_spk_field_len(sb: &mut ScriptBuilder, authorizing_input: i64, k: i64) -> Result<(), ScriptBuilderError> {
+    sb.add_i64(authorizing_input)?.add_i64(k)?.add_op(OpCovOutputIdx)?;
     sb.add_i64(SPK_FIELD_LEN_OFFSET as i64)?
         .add_i64((SPK_FIELD_LEN_OFFSET + 1) as i64)?
         .add_op(OpTxOutputSpkSubstr)?
@@ -612,6 +656,12 @@ fn verify_auth_output_spk_field_len(sb: &mut ScriptBuilder, k: i64) -> Result<()
         .add_op(OpWithin)?
         .add_op(OpVerify)?;
     Ok(())
+}
+
+// assumed pre-stack: no pre-stack assumptions
+// post-stack: []
+fn verify_auth_output_spk_field_len(sb: &mut ScriptBuilder, k: i64) -> Result<(), ScriptBuilderError> {
+    verify_authorized_output_spk_field_len(sb, TOKEN_AUTH_INPUT_INDEX, k)
 }
 
 // assumed pre-stack: [amount]
