@@ -359,7 +359,7 @@ fn build_minter_covenant_logic(token_logic: &[u8]) -> CovenantResult<Vec<u8>> {
     Ok(sb.drain())
 }
 
-// TODO: verify output[n] spk indeed is the output[n].recipient (new recipient can spend the UTXO)
+// TODO(enhancement): verify output[n] spk indeed is the output[n].recipient
 fn build_token_covenant_logic() -> CovenantResult<Vec<u8>> {
     let mut sb = ScriptBuilder::new();
 
@@ -627,7 +627,7 @@ fn assert_positive_amount(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderErr
 // assumed pre-stack: [spk_field(len+padding), spk_bytes]
 // post-stack: []
 // behavior: throws if doesn't match
-// TODO: requires mental gymnastic, see possibility of simplication
+// TODO(enhancement): requires mental gymnastic, see possibility of simplication
 fn verify_spk_field_matches_stack(sb: &mut ScriptBuilder) -> Result<(), ScriptBuilderError> {
     // 1. compare length byte in spk_field with size(spk_bytes).
     sb.add_op(OpDup)?;

@@ -134,7 +134,7 @@ fn create_native_asset_vm_flow() -> Result<(), Box<dyn Error>> {
 
     let sig_cache = Cache::new(10_000);
     let reused_values = SigHashReusedValuesUnsync::new();
-    let flags = EngineFlags { covenants_enabled: true, trace: true, trace_on_error: true };
+    let flags = EngineFlags { covenants_enabled: true };
 
     let mut minter_entry = UtxoEntry::new(minter_genesis_tx.outputs[0].value, minter_spk.clone(), 0, false, Some(covenant_id));
     let mut minter_state = minter_state_from_spk(&minter_genesis_tx.outputs[0].script_public_key)?;

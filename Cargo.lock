@@ -3667,7 +3667,7 @@ dependencies = [
 
 [[package]]
 name = "kaspa-wrpc-covenants-native-asset"
-version = "1.0.1"
+version = "1.1.0-rc.2"
 dependencies = [
  "futures",
  "kaspa-addresses",
