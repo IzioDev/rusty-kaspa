@@ -646,7 +646,7 @@ impl<'a, T: VerifiableTransaction, Reused: SigHashReusedValues> TxScriptEngine<'
     }
 }
 
-trait SpkEncoding {
+pub trait SpkEncoding {
     fn to_bytes(&self) -> Vec<u8>;
 }
 
