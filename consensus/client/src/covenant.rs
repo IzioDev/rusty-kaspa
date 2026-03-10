@@ -5,15 +5,30 @@
 #![allow(non_snake_case)]
 
 use crate::imports::*;
+use crate::result::Result as ClientResult;
 use kaspa_consensus_core::errors::tx::PopulateGenesisCovenantsError;
 use kaspa_consensus_core::tx::GenesisCovenantGroup as CoreGenesisCovenantGroup;
+use kaspa_wasm_core::types::NumberArray;
+
+#[wasm_bindgen(typescript_custom_section)]
+const TS_GENESIS_COVENANT_GROUP: &'static str = r#"
+/**
+ * A genesis covenant group for bulk covenant binding population.
+ *
+ * @category Consensus
+ */
+export interface IGenesisCovenantGroup {
+    authorizingInput: number;
+    outputs: number[];
+}
+"#;
 
 #[wasm_bindgen]
 extern "C" {
-    /// WASM (TypeScript) type representing an array of [`GenesisCovenantGroup`] objects: `GenesisCovenantGroup[]`.
+    /// WASM (TypeScript) type representing an array of [`GenesisCovenantGroup`] objects.
     ///
     /// @category Consensus
-    #[wasm_bindgen(extends = js_sys::Array, typescript_type = "GenesisCovenantGroup[]")]
+    #[wasm_bindgen(extends = js_sys::Array, typescript_type = "(IGenesisCovenantGroup | GenesisCovenantGroup)[]")]
     pub type GenesisCovenantGroupArrayT;
 }
 
@@ -66,8 +81,9 @@ impl From<GenesisCovenantGroup> for CoreGenesisCovenantGroup {
 #[wasm_bindgen]
 impl GenesisCovenantGroup {
     #[wasm_bindgen(constructor)]
-    pub fn ctor(authorizing_input: u16, outputs: Vec<u32>) -> Self {
-        Self { inner: CoreGenesisCovenantGroup::new(authorizing_input, outputs) }
+    pub fn ctor(authorizing_input: u16, outputs: NumberArray) -> ClientResult<Self> {
+        let outputs: Vec<u32> = serde_wasm_bindgen::from_value(outputs.into())?;
+        Ok(Self { inner: CoreGenesisCovenantGroup::new(authorizing_input, outputs) })
     }
 
     #[wasm_bindgen(getter, js_name = authorizingInput)]
@@ -81,13 +97,17 @@ impl GenesisCovenantGroup {
     }
 
     #[wasm_bindgen(setter = outputs)]
-    pub fn set_outputs(&mut self, outputs: Vec<u32>) {
+    pub fn set_outputs(&mut self, outputs: NumberArray) -> ClientResult<()> {
+        let outputs: Vec<u32> = serde_wasm_bindgen::from_value(outputs.into())?;
         self.inner.outputs = outputs;
+        Ok(())
     }
 
     #[wasm_bindgen(getter)]
-    pub fn outputs(&self) -> Vec<u32> {
-        self.inner.outputs.clone()
+    pub fn outputs(&self) -> NumberArray {
+        serde_wasm_bindgen::to_value(&self.inner.outputs)
+            .expect("serializing genesis covenant outputs should not fail")
+            .unchecked_into()
     }
 
     #[wasm_bindgen(js_name = "toJSON")]
@@ -116,11 +136,8 @@ impl TryCastFromJs for GenesisCovenantGroup {
                 return Err(workflow_wasm::error::Error::NotAnObject);
             };
             let authorizing_input = object.get_u16("authorizingInput")?;
-            let outputs = object
-                .get_vec("outputs")?
-                .iter()
-                .map(|idx| idx.try_as_u32())
-                .collect::<Result<Vec<u32>, workflow_wasm::error::Error>>()?;
+            let outputs: Vec<u32> = serde_wasm_bindgen::from_value(object.get_value("outputs")?)
+                .map_err(|err| workflow_wasm::error::Error::from(JsValue::from(err)))?;
             Ok(Self { inner: CoreGenesisCovenantGroup::new(authorizing_input, outputs) })
         })
     }
