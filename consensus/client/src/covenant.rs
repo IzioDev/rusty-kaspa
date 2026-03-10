@@ -33,17 +33,12 @@ extern "C" {
 }
 
 impl TryFrom<&GenesisCovenantGroupArrayT> for Vec<CoreGenesisCovenantGroup> {
-    type Error = PopulateGenesisCovenantsError;
+    type Error = Error;
     fn try_from(value: &GenesisCovenantGroupArrayT) -> Result<Self, Self::Error> {
         if value.is_array() {
-            value
-                .iter()
-                .map(|v| {
-                    GenesisCovenantGroup::try_owned_from(v).map(|gcp| gcp.inner().clone()).map_err(PopulateGenesisCovenantsError::from)
-                })
-                .collect()
+            value.iter().map(|v| GenesisCovenantGroup::try_owned_from(v).map(|gcp| gcp.inner().clone()).map_err(Error::from)).collect()
         } else {
-            Err(PopulateGenesisCovenantsError::InvalidGenesisCovenantGroupArray)
+            Err(PopulateGenesisCovenantsError::InvalidGenesisCovenantGroupArray.into())
         }
     }
 }
