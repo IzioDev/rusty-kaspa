@@ -22,10 +22,6 @@ INTEGRATION_GUIDE.md
 PACKAGE_CHECKLIST.md
 INTEGRATION_PLAN.md
 SETUP_RUSTY_KASPA.md
-README.md
-
-!docs/
-!docs/README.md
 
 # Configuration files (will use rusty-kaspa's instead)
 rustfmt.toml
@@ -67,4 +63,3 @@ Thumbs.db
 # - Cargo.toml (package definition)
 # - config.yaml (example configuration)
 # ============================================
-
