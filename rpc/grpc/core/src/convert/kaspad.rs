@@ -185,6 +185,7 @@ pub mod kaspad_response_convert {
     impl_into_kaspad_response!(ResolveFinalityConflict);
     impl_into_kaspad_response!(GetHeaders);
     impl_into_kaspad_response!(GetUtxosByAddresses);
+    impl_into_kaspad_response!(GetUtxosByCovenantId);
     impl_into_kaspad_response!(GetBalanceByAddress);
     impl_into_kaspad_response!(GetBalancesByAddresses);
     impl_into_kaspad_response!(GetSinkBlueScore);
@@ -205,7 +206,6 @@ pub mod kaspad_response_convert {
     impl_into_kaspad_response!(GetCurrentBlockColor);
     impl_into_kaspad_response!(GetUtxoReturnAddress);
     impl_into_kaspad_response!(GetVirtualChainFromBlockV2);
-    impl_into_kaspad_response!(GetUtxosByCovenantId);
 
     impl_into_kaspad_notify_response!(NotifyBlockAdded);
     impl_into_kaspad_notify_response!(NotifyNewBlockTemplate);

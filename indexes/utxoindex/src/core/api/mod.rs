@@ -28,8 +28,6 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey>;
 
     /// Retrieve utxos by covenant id from the utxoindex db.
-    ///
-    /// Note: Use a read lock when accessing this method
     fn get_utxos_by_covenant_id(
         &self,
         covenant_id: Hash,
@@ -50,7 +48,7 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     ///
     /// Note:
     /// 1) Use a read lock when accessing this method
-    /// 2) due to potential sync-gaps is_synced is unreliable while consensus is actively resolving virtual states.  
+    /// 2) due to potential sync-gaps is_synced is unreliable while consensus is actively resolving virtual states.
     fn is_synced(&self) -> UtxoIndexResult<bool>;
 
     /// Update the utxoindex with the given utxo_diff, and tips.

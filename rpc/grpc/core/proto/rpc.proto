@@ -577,10 +577,6 @@ message GetUtxosByAddressesResponseMessage {
   RPCError error = 1000;
 }
 
-// GetUtxosByCovenantIdRequestMessage requests all current UTXOs for the given covenant id,
-// optionally filtered by an address.
-//
-// This call is only available when this kaspad was started with `--utxoindex`
 message GetUtxosByCovenantIdRequestMessage {
   string covenantId = 1;
   optional string address = 2;
