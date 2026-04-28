@@ -1247,6 +1247,48 @@ try_from! ( args: GetUtxosByAddressesResponse, IGetUtxosByAddressesResponse, {
 // ---
 
 declare! {
+    IGetUtxosByCovenantIdRequest,
+    r#"
+    /**
+     * @category Node RPC
+     */
+    export interface IGetUtxosByCovenantIdRequest {
+        covenantId: HexString;
+        address?: Address | string;
+    }
+    "#,
+}
+
+try_from! ( args: IGetUtxosByCovenantIdRequest, GetUtxosByCovenantIdRequest, {
+    let covenant_id = from_value::<RpcHash>(args.get_value("covenantId")?)?;
+    let address = args.try_cast_into::<Address>("address")?;
+    Ok(GetUtxosByCovenantIdRequest { covenant_id, address })
+});
+
+declare! {
+    IGetUtxosByCovenantIdResponse,
+    r#"
+    /**
+     * @category Node RPC
+     */
+    export interface IGetUtxosByCovenantIdResponse {
+        entries: UtxoEntryReference[];
+    }
+    "#,
+}
+
+try_from! ( args: GetUtxosByCovenantIdResponse, IGetUtxosByCovenantIdResponse, {
+    let GetUtxosByCovenantIdResponse { entries } = args;
+    let entries = entries.into_iter().map(UtxoEntryReference::from).collect::<Vec<UtxoEntryReference>>();
+    let entries = js_sys::Array::from_iter(entries.into_iter().map(JsValue::from));
+    let response = IGetUtxosByCovenantIdResponse::default();
+    response.set("entries", entries.as_ref())?;
+    Ok(response)
+});
+
+// ---
+
+declare! {
     IGetVirtualChainFromBlockRequest,
     r#"
     /**

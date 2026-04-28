@@ -1,12 +1,12 @@
 use kaspa_consensus_core::{
     BlockHashSet,
-    tx::{ScriptPublicKeys, TransactionOutpoint},
+    tx::{ScriptPublicKey, ScriptPublicKeys, TransactionOutpoint},
     utxo::utxo_diff::UtxoDiff,
 };
 use kaspa_consensusmanager::spawn_blocking;
 use kaspa_database::prelude::StoreResult;
 use kaspa_hashes::Hash;
-use kaspa_index_core::indexed_utxos::BalanceByScriptPublicKey;
+use kaspa_index_core::indexed_utxos::{BalanceByScriptPublicKey, UtxoReferenceEntry};
 use parking_lot::RwLock;
 use std::{collections::HashSet, fmt::Debug, sync::Arc};
 
@@ -27,6 +27,13 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     /// Note: Use a read lock when accessing this method
     fn get_utxos_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey>;
 
+    /// Retrieve utxos by covenant id from the utxoindex db.
+    fn get_utxos_by_covenant_id(
+        &self,
+        covenant_id: Hash,
+        script_public_key: Option<ScriptPublicKey>,
+    ) -> StoreResult<Vec<UtxoReferenceEntry>>;
+
     fn get_balance_by_script_public_keys(&self, script_public_keys: ScriptPublicKeys) -> StoreResult<BalanceByScriptPublicKey>;
 
     // This can have a big memory footprint, so it should be used only for tests.
@@ -41,7 +48,7 @@ pub trait UtxoIndexApi: Send + Sync + Debug {
     ///
     /// Note:
     /// 1) Use a read lock when accessing this method
-    /// 2) due to potential sync-gaps is_synced is unreliable while consensus is actively resolving virtual states.  
+    /// 2) due to potential sync-gaps is_synced is unreliable while consensus is actively resolving virtual states.
     fn is_synced(&self) -> UtxoIndexResult<bool>;
 
     /// Update the utxoindex with the given utxo_diff, and tips.
@@ -72,6 +79,14 @@ impl UtxoIndexProxy {
 
     pub async fn get_utxos_by_script_public_keys(self, script_public_keys: ScriptPublicKeys) -> StoreResult<UtxoSetByScriptPublicKey> {
         spawn_blocking(move || self.inner.read().get_utxos_by_script_public_keys(script_public_keys)).await.unwrap()
+    }
+
+    pub async fn get_utxos_by_covenant_id(
+        self,
+        covenant_id: Hash,
+        script_public_key: Option<ScriptPublicKey>,
+    ) -> StoreResult<Vec<UtxoReferenceEntry>> {
+        spawn_blocking(move || self.inner.read().get_utxos_by_covenant_id(covenant_id, script_public_key)).await.unwrap()
     }
 
     pub async fn get_balance_by_script_public_keys(
