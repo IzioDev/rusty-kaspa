@@ -37,7 +37,6 @@ impl DbKey {
         TBucket: Copy + AsRef<[u8]>,
     {
         self.path.extend(bucket.as_ref().iter().copied());
-        self.prefix_len += bucket.as_ref().len();
     }
 
     pub fn add_key<TKey>(&mut self, key: TKey)

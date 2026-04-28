@@ -229,6 +229,7 @@ where
             move || DbKey::prefix_only(&self.prefix),
             move |bucket| {
                 let mut key = DbKey::prefix_only(&self.prefix);
+                // here do not add bucket as a prefix, as in prefix to strip later
                 key.add_bucket(bucket);
                 key
             },
@@ -250,6 +251,9 @@ where
 
         db_iterator.take(limit).map(move |item| match item {
             Ok((key_bytes, value_bytes)) => match bincode::deserialize::<TData>(value_bytes.as_ref()) {
+                // here, key is returned as is, without the store prefix but still with the key
+                // if i have passed: <utxo_by_spk_store_prefix> | <spk_bucket>
+                // it will return: <spk_bucket> | <transaction_outpoint> instead of just <transaction_outpoint>
                 Ok(value) => Ok((key_bytes[db_key.prefix_len()..].into(), value)),
                 Err(err) => Err(err.into()),
             },
