@@ -433,7 +433,7 @@ async fn sanity_test() {
                     let response = rpc_client
                         .get_utxos_by_covenant_id_call(
                             None,
-                            GetUtxosByCovenantIdRequest { covenant_id: Hash::from_bytes([1u8; 32]), script_public_key: None },
+                            GetUtxosByCovenantIdRequest { covenant_id: Hash::from_bytes([1u8; 32]), address: None },
                         )
                         .await
                         .unwrap();

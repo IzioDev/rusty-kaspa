@@ -578,12 +578,12 @@ message GetUtxosByAddressesResponseMessage {
 }
 
 // GetUtxosByCovenantIdRequestMessage requests all current UTXOs for the given covenant id,
-// optionally filtered by a script public key.
+// optionally filtered by an address.
 //
 // This call is only available when this kaspad was started with `--utxoindex`
 message GetUtxosByCovenantIdRequestMessage {
   string covenantId = 1;
-  optional RpcScriptPublicKey scriptPublicKey = 2;
+  optional string address = 2;
 }
 
 message GetUtxosByCovenantIdResponseMessage {

@@ -356,15 +356,15 @@ pub trait RpcApi: Sync + Send + AnySync {
         request: GetUtxosByAddressesRequest,
     ) -> RpcResult<GetUtxosByAddressesResponse>;
 
-    /// Requests all current UTXOs for the given covenant id, optionally filtered by script public key.
+    /// Requests all current UTXOs for the given covenant id, optionally filtered by address.
     ///
     /// This call is only available when this node was started with `--utxoindex`.
     async fn get_utxos_by_covenant_id(
         &self,
         covenant_id: RpcHash,
-        script_public_key: Option<RpcScriptPublicKey>,
+        address: Option<RpcAddress>,
     ) -> RpcResult<Vec<RpcUtxoReferenceEntry>> {
-        Ok(self.get_utxos_by_covenant_id_call(None, GetUtxosByCovenantIdRequest::new(covenant_id, script_public_key)).await?.entries)
+        Ok(self.get_utxos_by_covenant_id_call(None, GetUtxosByCovenantIdRequest::new(covenant_id, address)).await?.entries)
     }
     async fn get_utxos_by_covenant_id_call(
         &self,

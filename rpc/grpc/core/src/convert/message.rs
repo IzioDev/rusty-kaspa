@@ -341,7 +341,7 @@ from!(item: RpcResult<&kaspa_rpc_core::GetUtxosByAddressesResponse>, protowire::
 from!(item: &kaspa_rpc_core::GetUtxosByCovenantIdRequest, protowire::GetUtxosByCovenantIdRequestMessage, {
     Self {
         covenant_id: item.covenant_id.to_string(),
-        script_public_key: item.script_public_key.as_ref().map(|x| x.into()),
+        address: item.address.as_ref().map(|x| x.into()),
     }
 });
 from!(item: RpcResult<&kaspa_rpc_core::GetUtxosByCovenantIdResponse>, protowire::GetUtxosByCovenantIdResponseMessage, {
@@ -872,7 +872,7 @@ try_from!(item: &protowire::GetUtxosByAddressesResponseMessage, RpcResult<kaspa_
 try_from!(item: &protowire::GetUtxosByCovenantIdRequestMessage, kaspa_rpc_core::GetUtxosByCovenantIdRequest, {
     Self {
         covenant_id: RpcHash::from_str(&item.covenant_id)?,
-        script_public_key: item.script_public_key.as_ref().map(kaspa_rpc_core::RpcScriptPublicKey::try_from).transpose()?,
+        address: item.address.as_ref().map(|x| x.as_str().try_into()).transpose()?,
     }
 });
 try_from!(item: &protowire::GetUtxosByCovenantIdResponseMessage, RpcResult<kaspa_rpc_core::GetUtxosByCovenantIdResponse>, {

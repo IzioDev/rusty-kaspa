@@ -1080,7 +1080,7 @@ mod mockery {
 
     impl Mock for GetUtxosByCovenantIdRequest {
         fn mock() -> Self {
-            GetUtxosByCovenantIdRequest { covenant_id: mock(), script_public_key: mock() }
+            GetUtxosByCovenantIdRequest { covenant_id: mock(), address: mock() }
         }
     }
 

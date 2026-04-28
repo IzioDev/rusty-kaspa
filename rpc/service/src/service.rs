@@ -733,7 +733,8 @@ NOTE: This error usually indicates an RPC conversion error between the node and 
             return Err(RpcError::ConsensusInTransitionalIbdState);
         }
 
-        let entries = self.query_utxos_by_covenant_id(request.covenant_id, request.script_public_key).await;
+        let script_public_key = request.address.as_ref().map(pay_to_address_script);
+        let entries = self.query_utxos_by_covenant_id(request.covenant_id, script_public_key).await;
         Ok(GetUtxosByCovenantIdResponse::new(self.index_converter.get_utxo_reference_entries(&entries)))
     }
 

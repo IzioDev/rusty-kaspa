@@ -1510,13 +1510,12 @@ impl Deserializer for GetUtxosByAddressesResponse {
 #[serde(rename_all = "camelCase")]
 pub struct GetUtxosByCovenantIdRequest {
     pub covenant_id: RpcHash,
-    // @TODO(izio): maybe use address instead of spk
-    pub script_public_key: Option<RpcScriptPublicKey>,
+    pub address: Option<RpcAddress>,
 }
 
 impl GetUtxosByCovenantIdRequest {
-    pub fn new(covenant_id: RpcHash, script_public_key: Option<RpcScriptPublicKey>) -> Self {
-        Self { covenant_id, script_public_key }
+    pub fn new(covenant_id: RpcHash, address: Option<RpcAddress>) -> Self {
+        Self { covenant_id, address }
     }
 }
 
@@ -1524,7 +1523,7 @@ impl Serializer for GetUtxosByCovenantIdRequest {
     fn serialize<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         store!(u16, &1, writer)?;
         store!(RpcHash, &self.covenant_id, writer)?;
-        store!(Option<RpcScriptPublicKey>, &self.script_public_key, writer)?;
+        store!(Option<RpcAddress>, &self.address, writer)?;
 
         Ok(())
     }
@@ -1534,9 +1533,9 @@ impl Deserializer for GetUtxosByCovenantIdRequest {
     fn deserialize<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
         let _version = load!(u16, reader)?;
         let covenant_id = load!(RpcHash, reader)?;
-        let script_public_key = load!(Option<RpcScriptPublicKey>, reader)?;
+        let address = load!(Option<RpcAddress>, reader)?;
 
-        Ok(Self { covenant_id, script_public_key })
+        Ok(Self { covenant_id, address })
     }
 }
 

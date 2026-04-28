@@ -1254,14 +1254,15 @@ declare! {
      */
     export interface IGetUtxosByCovenantIdRequest {
         covenantId: HexString;
-        scriptPublicKey?: IScriptPublicKey;
+        address?: Address | string;
     }
     "#,
 }
 
 try_from! ( args: IGetUtxosByCovenantIdRequest, GetUtxosByCovenantIdRequest, {
-    let js_value = JsValue::from(args);
-    Ok(from_value::<GetUtxosByCovenantIdRequest>(js_value)?)
+    let covenant_id = from_value::<RpcHash>(args.get_value("covenantId")?)?;
+    let address = args.try_cast_into::<Address>("address")?;
+    Ok(GetUtxosByCovenantIdRequest { covenant_id, address })
 });
 
 declare! {
