@@ -11,8 +11,11 @@ use crate::tx::{DataKind, Generator, MAXIMUM_STANDARD_TRANSACTION_MASS};
 use crate::utxo::{UtxoContext, UtxoEntryId, UtxoEntryReference, UtxoIterator};
 use kaspa_consensus_core::hashing::sighash_type::SigHashType;
 use kaspa_consensus_core::sign::{Signed, sign_input, sign_with_multiple_v2};
-use kaspa_consensus_core::tx::{SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput};
+use kaspa_consensus_core::tx::{
+    SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput, UtxoEntry, VerifiableTransaction,
+};
 use kaspa_rpc_core::{RpcTransaction, RpcTransactionId};
+use kaspa_wallet_pskt::prelude::{Inner as PSKTInner, PSKT, Signer};
 
 pub(crate) struct PendingTransactionInner {
     /// Generator that produced the transaction
@@ -439,4 +442,17 @@ impl PendingTransaction {
         // *self.inner.signable_tx.lock().unwrap() = mutable_tx;
     }
     */
+}
+
+impl TryFrom<PendingTransaction> for PSKT<Signer> {
+    type Error = crate::error::Error;
+
+    fn try_from(pending_tx: PendingTransaction) -> Result<Self, Self::Error> {
+        let signable_tx = pending_tx.signable_transaction();
+        let verifiable_tx = signable_tx.as_verifiable();
+        let populated_inputs: Vec<(&TransactionInput, &UtxoEntry)> = verifiable_tx.populated_inputs().collect();
+        let pskt_inner = PSKTInner::try_from((pending_tx.transaction(), populated_inputs))?;
+
+        Ok(PSKT::<Signer>::from(pskt_inner))
+    }
 }

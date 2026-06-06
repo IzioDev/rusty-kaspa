@@ -3,7 +3,7 @@
 //!
 
 use crate::account::Inner;
-use crate::derivation::{AddressDerivationManager, AddressDerivationManagerTrait};
+use crate::derivation::{AddressDerivationConfig, AddressDerivationManager, AddressDerivationManagerTrait, MultisigDerivationScheme};
 use crate::imports::*;
 
 pub const WATCH_ONLY_ACCOUNT_KIND: &str = "kaspa-watch-only-standard";
@@ -114,11 +114,9 @@ impl WatchOnly {
             1 => {
                 AddressDerivationManager::new(
                     wallet,
-                    WATCH_ONLY_ACCOUNT_KIND.into(),
+                    AddressDerivationConfig::standard(WATCH_ONLY_ACCOUNT_KIND.into(), 0),
                     &xpub_keys,
                     ecdsa,
-                    0,
-                    None,
                     1,
                     Default::default(),
                 )
@@ -127,11 +125,9 @@ impl WatchOnly {
             _ => {
                 AddressDerivationManager::new(
                     wallet,
-                    MULTISIG_ACCOUNT_KIND.into(),
+                    AddressDerivationConfig::multisig(0, MultisigDerivationScheme::kaspa45(Some(0))),
                     &xpub_keys,
                     ecdsa,
-                    0,
-                    Some(u32::MIN),
                     minimum_signatures,
                     Default::default(),
                 )
@@ -152,11 +148,9 @@ impl WatchOnly {
             1 => {
                 AddressDerivationManager::new(
                     wallet,
-                    WATCH_ONLY_ACCOUNT_KIND.into(),
+                    AddressDerivationConfig::standard(WATCH_ONLY_ACCOUNT_KIND.into(), 0),
                     &xpub_keys,
                     ecdsa,
-                    0,
-                    None,
                     1,
                     address_derivation_indexes,
                 )
@@ -165,11 +159,9 @@ impl WatchOnly {
             _ => {
                 AddressDerivationManager::new(
                     wallet,
-                    MULTISIG_ACCOUNT_KIND.into(),
+                    AddressDerivationConfig::multisig(0, MultisigDerivationScheme::kaspa45(Some(0))),
                     &xpub_keys,
                     ecdsa,
-                    0,
-                    Some(u32::MIN),
                     minimum_signatures,
                     address_derivation_indexes,
                 )
@@ -266,6 +258,15 @@ impl Account for WatchOnly {
         Ok(self.clone())
     }
 
+    fn as_signature_scheme_account(self: Arc<Self>) -> Result<Arc<dyn SignatureSchemeAccount>> {
+        Ok(self.clone())
+    }
+}
+
+impl SignatureSchemeAccount for WatchOnly {
+    fn signature_scheme(&self) -> SignatureScheme {
+        if self.ecdsa { SignatureScheme::ECDSA } else { SignatureScheme::Schnorr }
+    }
 }
 
 impl DerivationCapableAccount for WatchOnly {

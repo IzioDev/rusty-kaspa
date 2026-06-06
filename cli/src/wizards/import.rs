@@ -4,6 +4,7 @@ use crate::imports::*;
 use crate::result::Result;
 use kaspa_bip32::{Language, Mnemonic};
 use kaspa_wallet_core::account::{BIP32_ACCOUNT_KIND, LEGACY_ACCOUNT_KIND, MULTISIG_ACCOUNT_KIND};
+use kaspa_wallet_core::derivation::MultisigDerivationScheme;
 use std::sync::Arc;
 
 pub async fn prompt_for_mnemonic(term: &Arc<Terminal>) -> Result<Vec<String>> {
@@ -115,7 +116,15 @@ pub(crate) async fn import_with_mnemonic(ctx: &Arc<KaspaCli>, account_kind: Acco
         }
         let n_required: u16 = term.ask(false, "Enter the minimum number of signatures required: ").await?.parse()?;
 
-        wallet.import_multisig_with_mnemonic(&wallet_secret, mnemonics_secrets, n_required, additional_xpubs).await?
+        wallet
+            .import_multisig_with_mnemonic(
+                &wallet_secret,
+                mnemonics_secrets,
+                n_required,
+                additional_xpubs,
+                MultisigDerivationScheme::default(),
+            )
+            .await?
     };
 
     tprintln!(ctx, "\naccount imported: {}\n", account.get_list_string()?);

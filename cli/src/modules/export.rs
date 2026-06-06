@@ -51,7 +51,7 @@ async fn export_multisig_account(ctx: Arc<KaspaCli>, account: Arc<MultiSig>) -> 
                 let mnemonic = prv_key_data.as_mnemonic(None).unwrap().unwrap();
 
                 let xpub_key: kaspa_bip32::ExtendedPublicKey<kaspa_bip32::secp256k1::PublicKey> =
-                    prv_key_data.create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+                    prv_key_data.create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0, Some(account.derivation_scheme())).await?; // todo it can be done concurrently
 
                 tprintln!(ctx, "");
                 tprintln!(ctx, "extended public key {}:", id + 1);
@@ -66,17 +66,15 @@ async fn export_multisig_account(ctx: Arc<KaspaCli>, account: Arc<MultiSig>) -> 
 
                 generated_xpub_keys.push(xpub_key);
             }
-            let test = account.xpub_keys();
+            let keys = account.xpub_keys();
 
-            if let Some(keys) = test {
-                let additional = keys.iter().filter(|item| !generated_xpub_keys.contains(item));
-                additional.enumerate().for_each(|(idx, xpub)| {
-                    if idx == 0 {
-                        tprintln!(ctx, "additional xpubs: ");
-                    }
-                    tprintln!(ctx, "{}", ctx.wallet().network_format_xpub(xpub));
-                });
-            }
+            let additional = keys.iter().filter(|item| !generated_xpub_keys.contains(item));
+            additional.enumerate().for_each(|(idx, xpub)| {
+                if idx == 0 {
+                    tprintln!(ctx, "additional xpubs: ");
+                }
+                tprintln!(ctx, "{}", ctx.wallet().network_format_xpub(xpub));
+            });
             Ok(())
         }
     }
@@ -106,7 +104,7 @@ async fn export_single_key_account(ctx: Arc<KaspaCli>, account: Arc<dyn Account>
     let prv_key_data = keydata.payload.decrypt(payment_secret.as_ref())?;
     let mnemonic = prv_key_data.as_ref().as_mnemonic()?;
 
-    let xpub_key = keydata.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+    let xpub_key = keydata.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0, None).await?; // todo it can be done concurrently
 
     tprintln!(ctx, "extended public key:");
     tprintln!(ctx, "");
