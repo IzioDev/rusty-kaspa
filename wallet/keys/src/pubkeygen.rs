@@ -2,7 +2,7 @@
 //! [`PublicKeyGenerator`] helper for generating public key derivations from an extended public key (XPub).
 //!
 
-use crate::derivation::gen1::WalletDerivationManager;
+use crate::derivation::gen1::{DerivationPurpose, WalletDerivationManager};
 use crate::derivation::traits::WalletDerivationManagerTrait;
 use crate::imports::*;
 use kaspa_addresses::AddressArrayT;
@@ -39,7 +39,8 @@ impl PublicKeyGenerator {
         account_index: u64,
         cosigner_index: Option<u32>,
     ) -> Result<PublicKeyGenerator> {
-        let path = WalletDerivationManager::build_derivate_path(is_multisig, account_index, None, None)?;
+        let purpose = if is_multisig { DerivationPurpose::Bip45 } else { DerivationPurpose::Bip44 };
+        let path = WalletDerivationManager::build_derivate_path(purpose, account_index, None, None)?;
         let xprv = XPrv::try_owned_from(xprv)?.inner().clone().derive_path(&path)?;
         let xpub = xprv.public_key();
         let hd_wallet = WalletDerivationManager::from_extended_public_key(xpub, cosigner_index)?;

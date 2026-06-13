@@ -23,6 +23,7 @@ kaspa-addresses.workspace = true
 kaspa-bip32.workspace = true
 kaspa-consensus-client.workspace = true
 kaspa-consensus-core.workspace = true
+kaspa-wallet-keys.workspace = true
 kaspa-txscript-errors.workspace = true
 kaspa-txscript.workspace = true
 kaspa-utils.workspace = true

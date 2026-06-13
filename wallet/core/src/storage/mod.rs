@@ -60,12 +60,12 @@ mod tests {
         let mnemonic1 = Mnemonic::new(mnemonic1s.clone(), Language::English)?;
         let prv_key_data1 =
             PrvKeyData::try_new_from_mnemonic(mnemonic1.clone(), Some(&payment_secret), EncryptionKind::XChaCha20Poly1305)?;
-        let pub_key_data1 = prv_key_data1.create_xpub(Some(&payment_secret), BIP32_ACCOUNT_KIND.into(), 0).await?;
+        let pub_key_data1 = prv_key_data1.create_xpub(Some(&payment_secret), BIP32_ACCOUNT_KIND.into(), 0, None).await?;
 
         let mnemonic2 = Mnemonic::new(mnemonic2s.clone(), Language::English)?;
         let prv_key_data2 =
             PrvKeyData::try_new_from_mnemonic(mnemonic2.clone(), Some(&payment_secret), EncryptionKind::XChaCha20Poly1305)?;
-        let pub_key_data2 = prv_key_data2.create_xpub(Some(&payment_secret), BIP32_ACCOUNT_KIND.into(), 0).await?;
+        let pub_key_data2 = prv_key_data2.create_xpub(Some(&payment_secret), BIP32_ACCOUNT_KIND.into(), 0, None).await?;
 
         // println!("keydata1 id: {:?}", prv_key_data1.id);
         //assert_eq!(prv_key_data.id.0, [79, 36, 5, 159, 220, 113, 179, 22]);
