@@ -38,13 +38,10 @@ use crate::{
         pruning_processor::processor::{PruningProcessingMessage, PruningProcessor},
         virtual_processor::{VirtualStateProcessor, errors::PruningImportResult},
     },
-    processes::{
-        ghostdag::ordering::SortableBlock,
-        window::{WindowManager, WindowType},
-    },
+    processes::window::{WindowManager, WindowType},
 };
 use kaspa_consensus_core::{
-    BlockHashSet, BlueWorkType, ChainPath, HashMapCustomHasher,
+    BlockHashSet, BlueWorkType, ChainPath,
     acceptance_data::{AcceptanceData, MergedBlockContext, MergesetBlockAcceptanceData},
     api::{
         BlockValidationFutures, ConsensusApi, ConsensusStats, ImportLaneBatchIterator, SeqCommitLaneProof,
@@ -102,8 +99,7 @@ use self::{services::ConsensusServices, storage::ConsensusStorage};
 use kaspa_consensus_core::api::SeqCommitLaneEntry;
 use std::{
     cmp,
-    cmp::Reverse,
-    collections::{BinaryHeap, HashSet, VecDeque},
+    collections::{HashSet, VecDeque},
     future::Future,
     iter::once,
     ops::Deref,
@@ -770,48 +766,24 @@ impl ConsensusApi for Consensus {
 
         let sink = self.get_sink();
 
-        // Optimization: verify that the block is in past(sink), otherwise the search will fail anyway
-        // (means the block was not merged yet by a virtual chain block)
-        if !self.services.reachability_service.is_dag_ancestor_of(hash, sink) {
+        // The merging block is the lowest chain block of `sink` whose mergeset contains `hash`.
+        // `None` means `hash` is not in `past(sink)`, i.e. it was not merged yet by a virtual chain block.
+        let Some(merging_chain_block) = self.services.reachability_service.find_merging_chain_block(sink, hash) else {
             return Ok(None);
-        }
+        };
 
-        let mut heap: BinaryHeap<Reverse<SortableBlock>> = BinaryHeap::new();
-        let mut visited = BlockHashSet::new();
-
-        for child in self.get_block_children(hash).unwrap() {
-            if visited.insert(child) {
-                let blue_work = self.ghostdag_store.get_blue_work(child).unwrap();
-                heap.push(Reverse(SortableBlock::new(child, blue_work)));
-            }
-        }
-
-        while let Some(Reverse(SortableBlock { hash: decedent, .. })) = heap.pop() {
-            if self.services.reachability_service.is_chain_ancestor_of(decedent, sink) {
-                let decedent_data = self.get_ghostdag_data(decedent).unwrap();
-
-                return Ok(if decedent_data.mergeset_blues.contains(&hash) {
-                    Some(MergedBlockContext { merging_chain_block_hash: decedent, is_blue: true })
-                } else if decedent_data.mergeset_reds.contains(&hash) {
-                    Some(MergedBlockContext { merging_chain_block_hash: decedent, is_blue: false })
-                } else {
-                    // Note: because we are doing a topological BFS up (from `hash` towards virtual), the first chain block
-                    // found must also be our merging block, so hash will be either in blues or in reds, rendering this line
-                    // unreachable.
-                    kaspa_core::warn!("DAG topology inconsistency: {decedent} is expected to be a merging block of {hash}");
-                    None
-                });
-            }
-
-            for child in self.get_block_children(decedent).unwrap() {
-                if visited.insert(child) {
-                    let blue_work = self.ghostdag_store.get_blue_work(child).unwrap();
-                    heap.push(Reverse(SortableBlock::new(child, blue_work)));
-                }
-            }
-        }
-
-        Ok(None)
+        // `merging_chain_block` is a chain block returned by the search above, so its ghostdag data exists.
+        let merging_chain_block_data = self.get_ghostdag_data(merging_chain_block).unwrap();
+        Ok(if merging_chain_block_data.mergeset_blues.contains(&hash) {
+            Some(MergedBlockContext { merging_chain_block_hash: merging_chain_block, is_blue: true })
+        } else if merging_chain_block_data.mergeset_reds.contains(&hash) {
+            Some(MergedBlockContext { merging_chain_block_hash: merging_chain_block, is_blue: false })
+        } else {
+            // The mergeset of a chain block is exactly the set of blocks it merges, so a found merging
+            // block always contains `hash` in either its blues or its reds; this branch is unreachable.
+            kaspa_core::warn!("DAG topology inconsistency: {merging_chain_block} is expected to be a merging block of {hash}");
+            None
+        })
     }
 
     fn get_virtual_state_approx_id(&self) -> VirtualStateApproxId {
@@ -1731,5 +1703,125 @@ impl ConsensusApi for Consensus {
     fn get_n_last_pruning_points(&self, n: usize) -> Vec<Hash> {
         let (_pruning_point, pruning_index) = self.pruning_point_store.read().pruning_point_and_index().unwrap();
         (0..=pruning_index).rev().take(n).map(|ind| self.past_pruning_points_store.get(ind).unwrap()).collect_vec()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::consensus::test_consensus::TestConsensus;
+    use crate::processes::ghostdag::ordering::SortableBlock;
+    use crate::processes::reachability::tests::r#gen::generate_complex_dag;
+    use kaspa_consensus_core::HashMapCustomHasher;
+    use kaspa_consensus_core::config::{ConfigBuilder, params::MAINNET_PARAMS};
+    use std::cmp::Reverse;
+    use std::collections::{BinaryHeap, HashMap};
+
+    /// Reproduces the topological BFS that `get_merged_block_context` ran before the
+    /// `find_merging_chain_block` refactor: the past(sink) optimization guard, then a
+    /// min-`blue_work` heap walk up the DAG children of `hash`, returning the first chain block of
+    /// `sink` it reaches. The existence and retention guards are satisfied for every block in the
+    /// in-memory test DAG, so only the search is reproduced. Independent of `find_merging_chain_block`.
+    fn pre_refactor_merged_block_context(consensus: &Consensus, sink: Hash, hash: Hash) -> Option<MergedBlockContext> {
+        if !consensus.services.reachability_service.is_dag_ancestor_of(hash, sink) {
+            return None;
+        }
+
+        let mut heap: BinaryHeap<Reverse<SortableBlock>> = BinaryHeap::new();
+        let mut visited = BlockHashSet::new();
+
+        for child in consensus.get_block_children(hash).unwrap() {
+            if visited.insert(child) {
+                let blue_work = consensus.ghostdag_store.get_blue_work(child).unwrap();
+                heap.push(Reverse(SortableBlock::new(child, blue_work)));
+            }
+        }
+
+        while let Some(Reverse(SortableBlock { hash: decedent, .. })) = heap.pop() {
+            if consensus.services.reachability_service.is_chain_ancestor_of(decedent, sink) {
+                let decedent_data = consensus.get_ghostdag_data(decedent).unwrap();
+                return if decedent_data.mergeset_blues.contains(&hash) {
+                    Some(MergedBlockContext { merging_chain_block_hash: decedent, is_blue: true })
+                } else if decedent_data.mergeset_reds.contains(&hash) {
+                    Some(MergedBlockContext { merging_chain_block_hash: decedent, is_blue: false })
+                } else {
+                    None
+                };
+            }
+
+            for child in consensus.get_block_children(decedent).unwrap() {
+                if visited.insert(child) {
+                    let blue_work = consensus.ghostdag_store.get_blue_work(child).unwrap();
+                    heap.push(Reverse(SortableBlock::new(child, blue_work)));
+                }
+            }
+        }
+
+        None
+    }
+
+    fn assert_merged_block_context_eq(
+        actual: &Option<MergedBlockContext>,
+        expected: &Option<MergedBlockContext>,
+        block: Hash,
+        sink: Hash,
+    ) {
+        match (actual, expected) {
+            (None, None) => {}
+            (Some(a), Some(e)) => {
+                assert_eq!(
+                    a.merging_chain_block_hash, e.merging_chain_block_hash,
+                    "merging chain block mismatch for {block} (sink {sink})"
+                );
+                assert_eq!(a.is_blue, e.is_blue, "color mismatch for {block} (sink {sink})");
+            }
+            _ => panic!("merged block context presence mismatch for {block} (sink {sink}): actual={actual:?} expected={expected:?}"),
+        }
+    }
+
+    /// The refactored `get_merged_block_context` (now backed by `find_merging_chain_block`) must
+    /// return byte-identical results to the pre-refactor BFS for every block over a randomized
+    /// complex DAG. This is the consensus-critical hard gate: a divergence would change block
+    /// coloring.
+    #[tokio::test]
+    async fn get_merged_block_context_equivalence() {
+        let config = ConfigBuilder::new(MAINNET_PARAMS)
+            .skip_proof_of_work()
+            .edit_consensus_params(|p| {
+                p.min_difficulty_window_size = p.difficulty_window_size;
+            })
+            .build();
+        let consensus = TestConsensus::new(&config);
+        let wait_handles = consensus.init();
+
+        // Build a complex DAG from the reachability generator. Its blocks take all current tips as
+        // parents, so clamp each parent set to the consensus max-parents bound to keep every block
+        // valid; the equivalence property holds for whatever DAG results.
+        let genesis = config.genesis.hash;
+        let max_parents = config.max_block_parents as usize;
+        let (gen_genesis, blocks) = generate_complex_dag(2.0, 2.0, 30);
+        let mut id_to_hash: HashMap<u64, Hash> = HashMap::new();
+        id_to_hash.insert(gen_genesis, genesis);
+        let mut all_blocks = vec![genesis];
+        for (id, parents) in blocks {
+            let mut parent_hashes: Vec<Hash> = parents.iter().map(|p| id_to_hash[p]).collect();
+            parent_hashes.sort();
+            parent_hashes.truncate(max_parents);
+            let hash: Hash = id.into();
+            consensus.add_utxo_valid_block_with_parents(hash, parent_hashes, vec![]).await.unwrap();
+            id_to_hash.insert(id, hash);
+            all_blocks.push(hash);
+        }
+
+        // Compare the refactored method against the pre-refactor BFS for every block (chain
+        // ancestors of the sink, non-selected-parent merges, anticone/future tips, and the sink).
+        let sink = consensus.get_sink();
+        for &block in all_blocks.iter() {
+            let actual = consensus.get_merged_block_context(block).unwrap();
+            let expected = pre_refactor_merged_block_context(&consensus, sink, block);
+            assert_merged_block_context_eq(&actual, &expected, block, sink);
+        }
+
+        consensus.shutdown(wait_handles);
     }
 }
