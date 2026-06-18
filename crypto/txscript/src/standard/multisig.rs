@@ -199,7 +199,12 @@ pub fn parse_multisig_redeem_script(script: &[u8]) -> Result<MultisigRedeemScrip
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{EngineContext, TxScriptEngine, caches::Cache, opcodes::codes::OpData65, pay_to_script_hash_script};
+    use crate::{
+        EngineContext, TxScriptEngine,
+        caches::Cache,
+        opcodes::codes::{Op1, Op2, Op3, OpData32, OpData65},
+        pay_to_script_hash_script,
+    };
     use core::str::FromStr;
     use kaspa_consensus_core::{
         hashing::{
@@ -314,6 +319,25 @@ mod tests {
         // 3 out of 2
         script[0] = crate::opcodes::codes::Op3;
         assert!(matches!(parse_multisig_redeem_script(&script), Err(Error::InvalidMultisigThreshold { required: 3, public_keys: 2 })));
+
+        // Truncated pushdata: OpData32 declares a 32-byte pubkey push but only 2 bytes follow.
+        let truncated = vec![Op2, OpData32, 0x11, 0x22];
+        assert!(parse_multisig_redeem_script(&truncated).is_err());
+
+        // Declared-vs-pushed mismatch: one pubkey is pushed but the trailing count claims three.
+        let mut mismatch = vec![Op1, OpData32];
+        mismatch.extend_from_slice(&[0xaa; 32]);
+        mismatch.push(Op3);
+        mismatch.push(OpCheckMultiSig);
+        assert!(matches!(parse_multisig_redeem_script(&mismatch), Err(Error::InvalidMultisigRedeemScript(_))));
+
+        // Trailing byte: a well-formed 1-of-1 redeem script with one extra byte after OpCheckMultiSig.
+        let mut trailing = vec![Op1, OpData32];
+        trailing.extend_from_slice(&[0xaa; 32]);
+        trailing.push(Op1);
+        trailing.push(OpCheckMultiSig);
+        trailing.push(0xff);
+        assert!(parse_multisig_redeem_script(&trailing).is_err());
     }
 
     fn check_multisig_scenario(inputs: Vec<Input>, required: usize, is_ok: bool, is_ecdsa: bool) {
