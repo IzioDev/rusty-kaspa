@@ -27,6 +27,30 @@ use std::{
 };
 use workflow_core::abortable::Abortable;
 
+/// True when a partial signature's curve matches the multisig account scheme:
+/// an ECDSA account carries `Signature::ECDSA`, a Schnorr account `Signature::Schnorr`.
+fn signature_matches_scheme(signature: &Signature, is_ecdsa: bool) -> bool {
+    match signature {
+        Signature::ECDSA(_) => is_ecdsa,
+        Signature::Schnorr(_) => !is_ecdsa,
+    }
+}
+
+/// Assemble a P2SH multisig script-sig: each selected signature pushed as
+/// `OpData65 || sig(64) || sighash_type(1)` in redeem-key order, followed by the redeem
+/// script push. The framing is curve-agnostic: each signature serializes to a fixed 64 bytes
+/// (ECDSA compact r||s, never DER; Schnorr native 64-byte), so every push is exactly 64
+/// signature bytes plus one sighash-type byte and the consensus multisig verifier consumes a
+/// fixed-width element.
+fn assemble_script_sig(selected: &[Signature], redeem_script: &[u8], sighash_type: u8) -> Result<Vec<u8>> {
+    let mut script = Vec::new();
+    for signature in selected {
+        script.extend(iter::once(OpData65).chain(signature.into_bytes()).chain([sighash_type]));
+    }
+    script.extend(ScriptBuilder::new().add_data(redeem_script)?.drain());
+    Ok(script)
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MultisigInputAddressDerivation {
     input_index: usize,
@@ -232,10 +256,6 @@ impl MultiSig {
         wallet_secret: Secret,
         payment_secret: Option<Secret>,
     ) -> Result<Bundle> {
-        if self.is_ecdsa() {
-            return Err(Error::UnsupportedSignatureType);
-        }
-
         let key_data = self.clone().as_dyn_arc().prv_key_data_list(wallet_secret).await?;
         if key_data.is_empty() {
             return Err(Error::NoMatchingLocalSigner);
@@ -260,7 +280,8 @@ impl MultiSig {
             }
 
             let spend_plans = self.build_input_spend_plans(&pskt, PlanningMode::Verify, &input_address_derivations)?;
-            let signature_hashes = pskt.signature_hashes(SignatureScheme::Schnorr)?;
+            let signature_scheme = if self.is_ecdsa() { SignatureScheme::ECDSA } else { SignatureScheme::Schnorr };
+            let signature_hashes = pskt.signature_hashes(signature_scheme)?;
             let mut signatures = Vec::new();
             let mut signed_keys = pskt
                 .inputs
@@ -276,7 +297,7 @@ impl MultiSig {
                     if spend_plan.signer_key(signature_public_key).is_none() {
                         return Err(Error::InvalidPartialSignature);
                     }
-                    if !matches!(signature, Signature::Schnorr(_)) {
+                    if !signature_matches_scheme(signature, self.is_ecdsa()) {
                         return Err(Error::UnsupportedSignatureType);
                     }
                     signature.verify(&message, signature_public_key).map_err(|_| Error::InvalidPartialSignature)?;
@@ -301,7 +322,11 @@ impl MultiSig {
                     if !signed_keys.insert((spend_plan.input_index, public_key)) {
                         continue;
                     }
-                    let signature = Signature::Schnorr(keypair.sign_schnorr(message));
+                    let signature = if self.is_ecdsa() {
+                        Signature::ECDSA(keypair.secret_key().sign_ecdsa(message))
+                    } else {
+                        Signature::Schnorr(keypair.sign_schnorr(message))
+                    };
                     signature.verify(&message, &public_key).map_err(|_| Error::InvalidPartialSignature)?;
                     signatures.push((
                         spend_plan.input_index,
@@ -460,64 +485,106 @@ impl MultiSig {
     }
 
     fn finalize_pskt(pskt: PSKT<Finalizer>) -> Result<PSKT<Finalizer>> {
-        let signature_hashes = PSKT::<Signer>::from(pskt.deref().clone()).signature_hashes(SignatureScheme::Schnorr)?;
+        // finalize_pskt has no account handle, so the finalize-side sighash domain is read
+        // from each input's parsed redeem context: OpCheckMultiSigECDSA verifies under the
+        // ECDSA sighash domain, so an ECDSA input must be finalized against the ECDSA digest
+        // and a Schnorr input against the Schnorr digest. Both digest sets are computed up
+        // front and selected per input below.
+        let signer = PSKT::<Signer>::from(pskt.deref().clone());
+        let schnorr_hashes = signer.signature_hashes(SignatureScheme::Schnorr)?;
+        let ecdsa_hashes = signer.signature_hashes(SignatureScheme::ECDSA)?;
 
         match pskt.finalize_sync(|inner| {
-            if signature_hashes.len() != inner.inputs.len() {
+            if schnorr_hashes.len() != inner.inputs.len() {
                 return Err(Error::Custom(format!(
                     "Signature hash count mismatch: expected {}, actual {}",
                     inner.inputs.len(),
-                    signature_hashes.len()
+                    schnorr_hashes.len()
+                )));
+            }
+
+            if ecdsa_hashes.len() != inner.inputs.len() {
+                return Err(Error::Custom(format!(
+                    "Signature hash count mismatch: expected {}, actual {}",
+                    inner.inputs.len(),
+                    ecdsa_hashes.len()
                 )));
             }
 
             inner
                 .inputs
                 .iter()
-                .zip(signature_hashes.iter())
-                .map(|(input, signature_hash)| {
+                .enumerate()
+                .map(|(input_index, input)| {
                     let redeem_script = input.redeem_script.as_ref().ok_or(Error::MissingRedeemScript)?;
                     let context = parse_multisig_redeem_script(redeem_script).map_err(|_| Error::InvalidMultisigRedeemScript)?;
 
-                    let MultisigRedeemScriptContext::Schnorr { required, public_keys } = context else {
-                        return Err(Error::UnsupportedSignatureType);
-                    };
-
+                    let is_ecdsa = matches!(context, MultisigRedeemScriptContext::Ecdsa { .. });
+                    let signature_hash = if is_ecdsa { &ecdsa_hashes[input_index] } else { &schnorr_hashes[input_index] };
                     let message = Message::from_digest_slice(signature_hash.as_bytes().as_slice())?;
 
-                    for (signature_public_key, signature) in input.partial_sigs.iter() {
-                        if !public_keys.iter().any(|public_key| *public_key == signature_public_key.x_only_public_key().0) {
-                            return Err(Error::InvalidPartialSignature);
-                        }
-                        if !matches!(signature, Signature::Schnorr(_)) {
-                            return Err(Error::UnsupportedSignatureType);
-                        }
-                        signature.verify(&message, signature_public_key).map_err(|_| Error::InvalidPartialSignature)?;
-                    }
+                    let script = match context {
+                        MultisigRedeemScriptContext::Schnorr { required, public_keys } => {
+                            for (signature_public_key, signature) in input.partial_sigs.iter() {
+                                if !public_keys.iter().any(|public_key| *public_key == signature_public_key.x_only_public_key().0) {
+                                    return Err(Error::InvalidPartialSignature);
+                                }
+                                if !signature_matches_scheme(signature, is_ecdsa) {
+                                    return Err(Error::UnsupportedSignatureType);
+                                }
+                                signature.verify(&message, signature_public_key).map_err(|_| Error::InvalidPartialSignature)?;
+                            }
 
-                    let mut selected = Vec::with_capacity(required);
-                    for public_key in public_keys.iter() {
-                        if let Some((_, signature)) = input
-                            .partial_sigs
-                            .iter()
-                            .find(|(signature_public_key, _)| signature_public_key.x_only_public_key().0 == *public_key)
-                        {
-                            selected.push(*signature);
-                        }
-                        if selected.len() == required {
-                            break;
-                        }
-                    }
+                            let mut selected = Vec::with_capacity(required);
+                            for public_key in public_keys.iter() {
+                                if let Some((_, signature)) = input
+                                    .partial_sigs
+                                    .iter()
+                                    .find(|(signature_public_key, _)| signature_public_key.x_only_public_key().0 == *public_key)
+                                {
+                                    selected.push(*signature);
+                                }
+                                if selected.len() == required {
+                                    break;
+                                }
+                            }
 
-                    if selected.len() < required {
-                        return Err(Error::InsufficientSignatures { required, present: selected.len() });
-                    }
+                            if selected.len() < required {
+                                return Err(Error::InsufficientSignatures { required, present: selected.len() });
+                            }
 
-                    let mut script = Vec::new();
-                    for signature in selected {
-                        script.extend(iter::once(OpData65).chain(signature.into_bytes()).chain([input.sighash_type.to_u8()]));
-                    }
-                    script.extend(ScriptBuilder::new().add_data(redeem_script)?.drain());
+                            assemble_script_sig(&selected, redeem_script, input.sighash_type.to_u8())?
+                        }
+                        MultisigRedeemScriptContext::Ecdsa { required, public_keys } => {
+                            for (signature_public_key, signature) in input.partial_sigs.iter() {
+                                if !public_keys.iter().any(|public_key| public_key == signature_public_key) {
+                                    return Err(Error::InvalidPartialSignature);
+                                }
+                                if !signature_matches_scheme(signature, is_ecdsa) {
+                                    return Err(Error::UnsupportedSignatureType);
+                                }
+                                signature.verify(&message, signature_public_key).map_err(|_| Error::InvalidPartialSignature)?;
+                            }
+
+                            let mut selected = Vec::with_capacity(required);
+                            for public_key in public_keys.iter() {
+                                if let Some((_, signature)) =
+                                    input.partial_sigs.iter().find(|(signature_public_key, _)| *signature_public_key == public_key)
+                                {
+                                    selected.push(*signature);
+                                }
+                                if selected.len() == required {
+                                    break;
+                                }
+                            }
+
+                            if selected.len() < required {
+                                return Err(Error::InsufficientSignatures { required, present: selected.len() });
+                            }
+
+                            assemble_script_sig(&selected, redeem_script, input.sighash_type.to_u8())?
+                        }
+                    };
                     Ok(script)
                 })
                 .collect()
@@ -538,7 +605,7 @@ enum PlanningMode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kaspa_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_schnorr_signature_hash};
+    use kaspa_consensus_core::hashing::sighash::{SigHashReusedValuesUnsync, calc_ecdsa_signature_hash, calc_schnorr_signature_hash};
     use kaspa_consensus_core::tx::{TransactionOutpoint, UtxoEntry};
     use kaspa_wallet_pskt::prelude::{Inner, InputBuilder};
     use kaspa_wallet_pskt::pskt::SignInputOk;
@@ -726,5 +793,231 @@ mod tests {
         let result = MultiSig::finalize_pskt(signed.finalizer());
 
         assert!(matches!(result, Err(Error::InsufficientSignatures { required: 2, present: 1 })));
+    }
+
+    fn multisig_signer_context_ecdsa() -> ([Keypair; 2], PSKT<Signer>) {
+        let kps = [Keypair::new(secp256k1::SECP256K1, &mut thread_rng()), Keypair::new(secp256k1::SECP256K1, &mut thread_rng())];
+        let redeem_script = multisig_redeem_script_ecdsa(kps.iter().map(|kp| kp.public_key().serialize()), 2).unwrap();
+        let input = InputBuilder::default()
+            .utxo_entry(UtxoEntry {
+                amount: 12_793_000_000_000,
+                script_public_key: pay_to_script_hash_script(&redeem_script),
+                block_daa_score: 36_151_168,
+                is_coinbase: false,
+                covenant_id: None,
+            })
+            .previous_outpoint(TransactionOutpoint {
+                transaction_id: TransactionId::from_str("63020db736215f8b1105a9281f7bcbb6473d965ecc45bb2fb5da59bd35e6ff84").unwrap(),
+                index: 0,
+            })
+            .sig_op_count(2)
+            .redeem_script(redeem_script)
+            .build()
+            .unwrap();
+
+        (kps, PSKT::<Signer>::from(Inner { inputs: vec![input], outputs: vec![], ..Default::default() }))
+    }
+
+    fn sign_with_ecdsa(pskt: PSKT<Signer>, kp: &Keypair) -> PSKT<Signer> {
+        let reused_values = SigHashReusedValuesUnsync::new();
+        pskt.pass_signature_sync(|tx, sighash| -> std::result::Result<Vec<SignInputOk>, String> {
+            tx.tx
+                .inputs
+                .iter()
+                .enumerate()
+                .map(|(input_index, _)| {
+                    let hash = calc_ecdsa_signature_hash(&tx.as_verifiable(), input_index, sighash[input_index], &reused_values);
+                    let message =
+                        secp256k1::Message::from_digest_slice(hash.as_bytes().as_slice()).map_err(|error| error.to_string())?;
+                    Ok(SignInputOk {
+                        signature: Signature::ECDSA(kp.secret_key().sign_ecdsa(message)),
+                        pub_key: kp.public_key(),
+                        key_source: None,
+                    })
+                })
+                .collect()
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn finalize_pskt_ecdsa_orders_and_clears_partial_signatures() {
+        let (kps, pskt) = multisig_signer_context_ecdsa();
+        let signed_0 = sign_with_ecdsa(pskt.clone(), &kps[0]);
+        let signed_1 = sign_with_ecdsa(pskt.clone(), &kps[1]);
+        let combined = pskt.combiner().combine(signed_1).unwrap().combine(signed_0).unwrap();
+
+        let finalized = MultiSig::finalize_pskt(combined.finalizer()).unwrap();
+
+        let input = &finalized.inputs[0];
+        assert!(input.final_script_sig.as_ref().is_some_and(|script| !script.is_empty()));
+        assert!(input.partial_sigs.is_empty());
+        assert!(input.redeem_script.is_none());
+        assert!(input.bip32_derivations.is_empty());
+    }
+
+    #[test]
+    fn finalize_pskt_ecdsa_rejects_insufficient_signatures() {
+        let (kps, pskt) = multisig_signer_context_ecdsa();
+        let signed = sign_with_ecdsa(pskt, &kps[0]);
+
+        let result = MultiSig::finalize_pskt(signed.finalizer());
+
+        assert!(matches!(result, Err(Error::InsufficientSignatures { required: 2, present: 1 })));
+    }
+
+    #[test]
+    fn finalize_pskt_ecdsa_rejects_schnorr_partial_signature() {
+        // Cross-scheme rejection: an ECDSA redeem context must reject a Schnorr partial sig.
+        // Both signers are redeem-script members so membership passes, isolating the scheme
+        // check - the ECDSA finalize arm rejects the Schnorr signature.
+        let (kps, pskt) = multisig_signer_context_ecdsa();
+        let ecdsa_signed = sign_with_ecdsa(pskt.clone(), &kps[0]);
+        let schnorr_signed = sign_with(pskt.clone(), &kps[1]);
+        let combined = pskt.combiner().combine(ecdsa_signed).unwrap().combine(schnorr_signed).unwrap();
+
+        let result = MultiSig::finalize_pskt(combined.finalizer());
+
+        assert!(matches!(result, Err(Error::UnsupportedSignatureType)));
+    }
+
+    #[test]
+    fn finalize_pskt_schnorr_rejects_ecdsa_partial_signature() {
+        // Cross-scheme rejection in the other direction: a Schnorr redeem context rejects an
+        // ECDSA partial sig at the Schnorr finalize arm.
+        let (kps, pskt) = multisig_signer_context();
+        let schnorr_signed = sign_with(pskt.clone(), &kps[0]);
+        let ecdsa_signed = sign_with_ecdsa(pskt.clone(), &kps[1]);
+        let combined = pskt.combiner().combine(schnorr_signed).unwrap().combine(ecdsa_signed).unwrap();
+
+        let result = MultiSig::finalize_pskt(combined.finalizer());
+
+        assert!(matches!(result, Err(Error::UnsupportedSignatureType)));
+    }
+
+    #[test]
+    fn signature_matches_scheme_enforces_account_curve() {
+        let kp = Keypair::new(secp256k1::SECP256K1, &mut thread_rng());
+        let message = Message::from_digest_slice(&[7u8; 32]).unwrap();
+        let schnorr = Signature::Schnorr(kp.sign_schnorr(message));
+        let ecdsa = Signature::ECDSA(kp.secret_key().sign_ecdsa(message));
+
+        assert!(signature_matches_scheme(&ecdsa, true));
+        assert!(!signature_matches_scheme(&schnorr, true));
+        assert!(signature_matches_scheme(&schnorr, false));
+        assert!(!signature_matches_scheme(&ecdsa, false));
+    }
+
+    #[test]
+    fn finalize_pskt_rejects_non_member_partial_signature() {
+        // Membership gate (Schnorr arm): a partial sig from a key absent from the redeem script
+        // is rejected before the scheme and sufficiency checks. The signer's scheme matches the
+        // context, so the only failing gate is membership -> InvalidPartialSignature.
+        let (_members, pskt) = multisig_signer_context();
+        let non_member = Keypair::new(secp256k1::SECP256K1, &mut thread_rng());
+        let signed = sign_with(pskt, &non_member);
+
+        let result = MultiSig::finalize_pskt(signed.finalizer());
+
+        assert!(matches!(result, Err(Error::InvalidPartialSignature)));
+    }
+
+    #[test]
+    fn finalize_pskt_ecdsa_rejects_non_member_partial_signature() {
+        // Membership gate (ECDSA arm): same isolation as the Schnorr case with full-key compare.
+        let (_members, pskt) = multisig_signer_context_ecdsa();
+        let non_member = Keypair::new(secp256k1::SECP256K1, &mut thread_rng());
+        let signed = sign_with_ecdsa(pskt, &non_member);
+
+        let result = MultiSig::finalize_pskt(signed.finalizer());
+
+        assert!(matches!(result, Err(Error::InvalidPartialSignature)));
+    }
+
+    fn multisig_signer_context_mixed() -> ([Keypair; 2], PSKT<Signer>) {
+        let kps = [Keypair::new(secp256k1::SECP256K1, &mut thread_rng()), Keypair::new(secp256k1::SECP256K1, &mut thread_rng())];
+        let schnorr_redeem = multisig_redeem_script(kps.iter().map(|kp| kp.x_only_public_key().0.serialize()), 2).unwrap();
+        let ecdsa_redeem = multisig_redeem_script_ecdsa(kps.iter().map(|kp| kp.public_key().serialize()), 2).unwrap();
+        let schnorr_input = InputBuilder::default()
+            .utxo_entry(UtxoEntry {
+                amount: 12_793_000_000_000,
+                script_public_key: pay_to_script_hash_script(&schnorr_redeem),
+                block_daa_score: 36_151_168,
+                is_coinbase: false,
+                covenant_id: None,
+            })
+            .previous_outpoint(TransactionOutpoint {
+                transaction_id: TransactionId::from_str("63020db736215f8b1105a9281f7bcbb6473d965ecc45bb2fb5da59bd35e6ff84").unwrap(),
+                index: 0,
+            })
+            .sig_op_count(2)
+            .redeem_script(schnorr_redeem)
+            .build()
+            .unwrap();
+        let ecdsa_input = InputBuilder::default()
+            .utxo_entry(UtxoEntry {
+                amount: 12_793_000_000_000,
+                script_public_key: pay_to_script_hash_script(&ecdsa_redeem),
+                block_daa_score: 36_151_168,
+                is_coinbase: false,
+                covenant_id: None,
+            })
+            .previous_outpoint(TransactionOutpoint {
+                transaction_id: TransactionId::from_str("63020db736215f8b1105a9281f7bcbb6473d965ecc45bb2fb5da59bd35e6ff84").unwrap(),
+                index: 1,
+            })
+            .sig_op_count(2)
+            .redeem_script(ecdsa_redeem)
+            .build()
+            .unwrap();
+
+        (kps, PSKT::<Signer>::from(Inner { inputs: vec![schnorr_input, ecdsa_input], outputs: vec![], ..Default::default() }))
+    }
+
+    fn sign_mixed_with(pskt: PSKT<Signer>, kp: &Keypair) -> PSKT<Signer> {
+        let reused_values = SigHashReusedValuesUnsync::new();
+        pskt.pass_signature_sync(|tx, sighash| -> std::result::Result<Vec<SignInputOk>, String> {
+            tx.tx
+                .inputs
+                .iter()
+                .enumerate()
+                .map(|(input_index, _)| {
+                    // Input 0 is the Schnorr redeem, input 1 the ECDSA redeem: select the digest
+                    // and signing curve by input index so one PSKT carries both schemes.
+                    let signature = if input_index == 0 {
+                        let hash = calc_schnorr_signature_hash(&tx.as_verifiable(), input_index, sighash[input_index], &reused_values);
+                        let message =
+                            secp256k1::Message::from_digest_slice(hash.as_bytes().as_slice()).map_err(|error| error.to_string())?;
+                        Signature::Schnorr(kp.sign_schnorr(message))
+                    } else {
+                        let hash = calc_ecdsa_signature_hash(&tx.as_verifiable(), input_index, sighash[input_index], &reused_values);
+                        let message =
+                            secp256k1::Message::from_digest_slice(hash.as_bytes().as_slice()).map_err(|error| error.to_string())?;
+                        Signature::ECDSA(kp.secret_key().sign_ecdsa(message))
+                    };
+                    Ok(SignInputOk { signature, pub_key: kp.public_key(), key_source: None })
+                })
+                .collect()
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn finalize_pskt_mixed_schemes_orders_and_clears_partial_signatures() {
+        // One PSKT with a Schnorr input and an ECDSA input proves per-input scheme detection and
+        // per-input digest selection in finalize: both inputs finalize and clear their state.
+        let (kps, pskt) = multisig_signer_context_mixed();
+        let signed_0 = sign_mixed_with(pskt.clone(), &kps[0]);
+        let signed_1 = sign_mixed_with(pskt.clone(), &kps[1]);
+        let combined = pskt.combiner().combine(signed_1).unwrap().combine(signed_0).unwrap();
+
+        let finalized = MultiSig::finalize_pskt(combined.finalizer()).unwrap();
+
+        for input in finalized.inputs.iter() {
+            assert!(input.final_script_sig.as_ref().is_some_and(|script| !script.is_empty()));
+            assert!(input.partial_sigs.is_empty());
+            assert!(input.redeem_script.is_none());
+            assert!(input.bip32_derivations.is_empty());
+        }
     }
 }
