@@ -212,7 +212,6 @@ igd-next = { version = "0.17.0", features = ["aio_tokio"] }
 indexmap = "2.1.0"
 ipnet = { version = "2.11.0", default-features = false }
 itertools = { version = "0.13.0", default-features = false }
-js-sys = { version = "=0.3.77", default-features = false }
 keccak = "0.1.4"
 local-ip-address = "0.6.1"
 log = { version = "0.4.20", default-features = false }
@@ -277,9 +276,10 @@ tonic-prost-build = { version = "0.14.5" }
 triggered = "0.1.2"
 uuid = { version = "1.16.0", default-features = false }
 wasm-bindgen = { version = "=0.2.125", default-features = false }
-wasm-bindgen-futures = "=0.4.50"
+js-sys = { version = "=0.3.102", default-features = false }
+wasm-bindgen-futures = "=0.4.75"
+web-sys = "=0.3.102"
 wasm-bindgen-test = "0.3.50"
-web-sys = "=0.3.77"
 xxhash-rust = { version = "0.8.7", features = ["xxh3"] }
 zerocopy = { version = "0.8", features = ["derive"] }
 zeroize = { version = "1.6.0", default-features = false, features = ["alloc"] }
