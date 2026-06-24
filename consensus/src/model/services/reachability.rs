@@ -43,6 +43,20 @@ pub trait ReachabilityService {
     /// (A "tree child of X" is a block which X is its chain parent)
     fn get_next_chain_ancestor(&self, descendant: Hash, ancestor: Hash) -> Hash;
 
+    /// Result version of [`Self::find_merging_chain_block`] (avoids unwrapping internally)
+    fn try_find_merging_chain_block(&self, sink: Hash, merged_block: Hash) -> Result<Option<Hash>>;
+
+    /// Finds the merging block of `merged_block` on the selected chain of `sink`.
+    /// See [`inquirer::find_merging_chain_block`]. Panicking convenience variant; callers needing
+    /// error propagation use [`Self::try_find_merging_chain_block`].
+    fn find_merging_chain_block(&self, sink: Hash, merged_block: Hash) -> Option<Hash> {
+        // Precondition (as for the other query wrappers here): `sink` and `merged_block` have
+        // reachability data, so the store reads succeed. The only branch-specific fallible call,
+        // `get_next_chain_ancestor`, runs only when `merged_block` is a strict chain ancestor of
+        // `sink` -- exactly its own precondition -- so it never returns `BadQuery`; the result is Ok.
+        self.try_find_merging_chain_block(sink, merged_block).unwrap()
+    }
+
     /// Returns the chain parent of `this`
     fn get_chain_parent(&self, this: Hash) -> Hash;
 
@@ -57,6 +71,10 @@ impl<T: ReachabilityStoreReader + ?Sized> ReachabilityService for T {
 
     fn try_is_dag_ancestor_of(&self, this: Hash, queried: Hash) -> Result<bool> {
         inquirer::is_dag_ancestor_of(self, this, queried)
+    }
+
+    fn try_find_merging_chain_block(&self, sink: Hash, merged_block: Hash) -> Result<Option<Hash>> {
+        inquirer::find_merging_chain_block(self, sink, merged_block)
     }
 
     fn is_dag_ancestor_of_any(&self, this: Hash, queried: &mut impl Iterator<Item = Hash>) -> bool {
@@ -106,6 +124,11 @@ impl<T: ReachabilityStoreReader + ?Sized> ReachabilityService for MTReachability
     fn try_is_dag_ancestor_of(&self, this: Hash, queried: Hash) -> Result<bool> {
         let read_guard = self.store.read();
         inquirer::is_dag_ancestor_of(read_guard.deref(), this, queried)
+    }
+
+    fn try_find_merging_chain_block(&self, sink: Hash, merged_block: Hash) -> Result<Option<Hash>> {
+        let read_guard = self.store.read();
+        inquirer::find_merging_chain_block(read_guard.deref(), sink, merged_block)
     }
 
     fn is_dag_ancestor_of_any(&self, this: Hash, queried: &mut impl Iterator<Item = Hash>) -> bool {
