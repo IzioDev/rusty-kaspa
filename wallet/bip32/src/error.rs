@@ -55,6 +55,10 @@ pub enum Error {
     #[error("Invalid child number")]
     ChildNumber,
 
+    /// Address type-related errors.
+    #[error("Invalid address type {0}")]
+    AddressType(u32),
+
     /// Cryptographic errors.
     #[error("Secp256k1 -> {0}")]
     Crypto(#[from] secp256k1::Error),

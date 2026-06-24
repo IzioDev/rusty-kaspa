@@ -17,6 +17,7 @@ pub use args::*;
 use crate::account::ScanNotifier;
 use crate::api::traits::WalletApi;
 use crate::compat::gen1::decrypt_mnemonic;
+use crate::derivation::MultisigDerivationScheme;
 use crate::error::Error::Custom;
 use crate::factory::try_load_account;
 use crate::imports::*;
@@ -506,6 +507,10 @@ impl Wallet {
         stream.try_collect::<Vec<_>>().await
     }
 
+    pub async fn get_prv_key_data_map(&self, wallet_secret: &Secret) -> Result<Decrypted<PrvKeyDataMap>> {
+        self.inner.store.as_prv_key_data_store()?.load_key_data_map(wallet_secret).await
+    }
+
     pub async fn get_prv_key_data(&self, wallet_secret: &Secret, id: &PrvKeyDataId) -> Result<Option<PrvKeyData>> {
         self.inner.store.as_prv_key_data_store()?.load_key_data(wallet_secret, id).await
     }
@@ -687,7 +692,15 @@ impl Wallet {
                 self.create_account_legacy(wallet_secret, prv_key_data_id, account_name).await?
             }
             AccountCreateArgs::Multisig { prv_key_data_args, additional_xpub_keys, name, minimum_signatures } => {
-                self.create_account_multisig(wallet_secret, prv_key_data_args, additional_xpub_keys, name, minimum_signatures).await?
+                self.create_account_multisig(
+                    wallet_secret,
+                    prv_key_data_args,
+                    additional_xpub_keys,
+                    name,
+                    minimum_signatures,
+                    MultisigDerivationScheme::default(),
+                )
+                .await?
             }
             AccountCreateArgs::Bip32Watch { account_args } => self.create_account_bip32_watch(wallet_secret, account_args).await?,
             AccountCreateArgs::Keypair { prv_key_data_id, account_name, ecdsa } => {
@@ -710,6 +723,7 @@ impl Wallet {
         mut xpub_keys: Vec<String>,
         account_name: Option<String>,
         minimum_signatures: u16,
+        derivation_scheme: MultisigDerivationScheme,
     ) -> Result<Arc<dyn Account>> {
         let account_store = self.inner.store.clone().as_account_store()?;
 
@@ -725,7 +739,9 @@ impl Wallet {
                     .load_key_data(wallet_secret, &prv_key_data_id)
                     .await?
                     .ok_or_else(|| Error::PrivateKeyNotFound(prv_key_data_id))?;
-                let xpub_key = prv_key_data.create_xpub(payment_secret.as_ref(), MULTISIG_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+                let xpub_key = prv_key_data
+                    .create_xpub(payment_secret.as_ref(), MULTISIG_ACCOUNT_KIND.into(), 0, Some(derivation_scheme))
+                    .await?; // todo it can be done concurrently
                 generated_xpubs.push(xpub_key.to_string(Some(KeyPrefix::XPUB)));
                 prv_key_data_ids.push(prv_key_data_id);
             }
@@ -733,9 +749,9 @@ impl Wallet {
             generated_xpubs.sort_unstable();
             xpub_keys.extend_from_slice(generated_xpubs.as_slice());
             xpub_keys.sort_unstable();
-
-            let min_cosigner_index =
-                generated_xpubs.first().and_then(|first_generated| xpub_keys.binary_search(first_generated).ok()).map(|v| v as u8);
+            let cosigner_index =
+                generated_xpubs.first().and_then(|first_generated| xpub_keys.binary_search(first_generated).ok()).map(|v| v as u32);
+            let account_derivation_scheme = derivation_scheme.with_default_cosigner_index(cosigner_index);
 
             let xpub_keys = xpub_keys
                 .into_iter()
@@ -750,7 +766,7 @@ impl Wallet {
                     account_name,
                     Arc::new(xpub_keys),
                     Some(Arc::new(prv_key_data_ids)),
-                    min_cosigner_index,
+                    account_derivation_scheme,
                     minimum_signatures,
                     false,
                 )
@@ -765,7 +781,16 @@ impl Wallet {
                 .collect::<Result<Vec<_>>>()?;
 
             Arc::new(
-                multisig::MultiSig::try_new(self, account_name, Arc::new(xpub_keys), None, None, minimum_signatures, false).await?,
+                multisig::MultiSig::try_new(
+                    self,
+                    account_name,
+                    Arc::new(xpub_keys),
+                    None,
+                    derivation_scheme.with_default_cosigner_index(Some(0)),
+                    minimum_signatures,
+                    false,
+                )
+                .await?,
             )
         };
 
@@ -810,7 +835,7 @@ impl Wallet {
                 .len() as u64
         };
 
-        let xpub_key = prv_key_data.create_xpub(payment_secret, BIP32_ACCOUNT_KIND.into(), account_index).await?;
+        let xpub_key = prv_key_data.create_xpub(payment_secret, BIP32_ACCOUNT_KIND.into(), account_index, None).await?;
         let xpub_keys = Arc::new(vec![xpub_key]);
 
         let account: Arc<dyn Account> =
@@ -1001,7 +1026,7 @@ impl Wallet {
         let account_index = 0;
         let prv_key_data = PrvKeyData::try_from_mnemonic(mnemonic.clone(), payment_secret.as_ref(), encryption_kind, None)?;
         let xpub_key = prv_key_data
-            .create_xpub(payment_secret.as_ref(), account_kind.unwrap_or(BIP32_ACCOUNT_KIND.into()), account_index)
+            .create_xpub(payment_secret.as_ref(), account_kind.unwrap_or(BIP32_ACCOUNT_KIND.into()), account_index, None)
             .await?;
         let xpub_keys = Arc::new(vec![xpub_key]);
 
@@ -1371,7 +1396,7 @@ impl Wallet {
         let prefix = file.xpublic_key.split_at(kaspa_bip32::Prefix::LENGTH).0;
         let prefix = kaspa_bip32::Prefix::try_from(prefix)?;
 
-        if prv_key_data.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await?.to_string(Some(prefix)) != file.xpublic_key {
+        if prv_key_data.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0, None).await?.to_string(Some(prefix)) != file.xpublic_key {
             return Err(Custom("imported xpub does not equal derived one".to_owned()));
         }
         self.import_with_mnemonic(wallet_secret, None, mnemonic, BIP32_ACCOUNT_KIND.into()).await
@@ -1392,7 +1417,9 @@ impl Wallet {
         let prv_key_data = storage::PrvKeyData::try_new_from_mnemonic(mnemonic.clone(), None, self.store().encryption_kind()?)?;
         let prefix = file.xpublic_key.split_at(kaspa_bip32::Prefix::LENGTH).0;
         let prefix = kaspa_bip32::Prefix::try_from(prefix)?;
-        if prv_key_data.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await.unwrap().to_string(Some(prefix)) != file.xpublic_key {
+        if prv_key_data.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0, None).await.unwrap().to_string(Some(prefix))
+            != file.xpublic_key
+        {
             return Err(Custom("imported xpub does not equal derived one".to_owned()));
         }
         self.import_with_mnemonic(wallet_secret, None, mnemonic, BIP32_ACCOUNT_KIND.into()).await
@@ -1430,13 +1457,20 @@ impl Wallet {
         let mut pubkeys_from_mnemonics = Vec::with_capacity(mnemonics_and_secrets.len());
         for (mnemonic, _) in mnemonics_and_secrets.iter() {
             let priv_key = storage::PrvKeyData::try_new_from_mnemonic(mnemonic.clone(), None, self.store().encryption_kind()?)?;
-            let xpub_key = priv_key.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await.unwrap().to_string(Some(prefix));
+            let xpub_key = priv_key.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0, None).await.unwrap().to_string(Some(prefix));
             pubkeys_from_mnemonics.push(xpub_key);
         }
         pubkeys_from_mnemonics.sort_unstable();
         all_pub_keys.retain(|v| pubkeys_from_mnemonics.binary_search_by_key(v, |xpub| xpub.as_str()).is_err());
         let additional_pub_keys = all_pub_keys.into_iter().map(String::from).collect();
-        self.import_multisig_with_mnemonic(wallet_secret, mnemonics_and_secrets, file.required_signatures, additional_pub_keys).await
+        self.import_multisig_with_mnemonic(
+            wallet_secret,
+            mnemonics_and_secrets,
+            file.required_signatures,
+            additional_pub_keys,
+            MultisigDerivationScheme::kaspa45(Some(u32::from(file.cosigner_index))),
+        )
+        .await
     }
 
     pub async fn import_kaspawallet_golang_multisig_v1<T: AsRef<[u8]>>(
@@ -1471,9 +1505,14 @@ impl Wallet {
         });
 
         let mut pubkeys_from_mnemonics = Vec::with_capacity(mnemonics_and_secrets.len());
+        let derivation_scheme = MultisigDerivationScheme::kaspa45(Some(u32::from(file.cosigner_index)));
         for (mnemonic, _) in mnemonics_and_secrets.iter() {
             let priv_key = storage::PrvKeyData::try_new_from_mnemonic(mnemonic.clone(), None, self.store().encryption_kind()?)?;
-            let xpub_key = priv_key.create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0).await.unwrap().to_string(Some(prefix));
+            let xpub_key = priv_key
+                .create_xpub(None, MULTISIG_ACCOUNT_KIND.into(), 0, Some(derivation_scheme))
+                .await
+                .unwrap()
+                .to_string(Some(prefix));
             pubkeys_from_mnemonics.push(xpub_key);
         }
         pubkeys_from_mnemonics.sort_unstable_by(|left, right| {
@@ -1485,7 +1524,13 @@ impl Wallet {
         });
         let additional_pub_keys = all_pub_keys.into_iter().map(String::from).collect();
         let acc = self
-            .import_multisig_with_mnemonic(wallet_secret, mnemonics_and_secrets, file.required_signatures, additional_pub_keys)
+            .import_multisig_with_mnemonic(
+                wallet_secret,
+                mnemonics_and_secrets,
+                file.required_signatures,
+                additional_pub_keys,
+                derivation_scheme,
+            )
             .await?;
         Ok(acc)
     }
@@ -1560,7 +1605,7 @@ impl Wallet {
         let account: Arc<dyn Account> = match account_kind.as_ref() {
             BIP32_ACCOUNT_KIND => {
                 let account_index = 0;
-                let xpub_key = prv_key_data.create_xpub(payment_secret, account_kind, account_index).await?;
+                let xpub_key = prv_key_data.create_xpub(payment_secret, account_kind, account_index, None).await?;
                 let xpub_keys = Arc::new(vec![xpub_key]);
                 let ecdsa = false;
                 // ---
@@ -1627,7 +1672,7 @@ impl Wallet {
 
         while account_index < last_account_index + account_scan_extent {
             let xpub_key =
-                prv_key_data.create_xpub(bip39_passphrase.as_ref(), BIP32_ACCOUNT_KIND.into(), account_index as u64).await?;
+                prv_key_data.create_xpub(bip39_passphrase.as_ref(), BIP32_ACCOUNT_KIND.into(), account_index as u64, None).await?;
             let xpub_keys = Arc::new(vec![xpub_key]);
             let ecdsa = false;
             // ---
@@ -1650,6 +1695,7 @@ impl Wallet {
         mnemonics_secrets: Vec<(Mnemonic, Option<Secret>)>,
         minimum_signatures: u16,
         additional_xpub_keys: Vec<String>,
+        derivation_scheme: MultisigDerivationScheme,
     ) -> Result<Arc<dyn Account>> {
         let mut additional_xpub_keys = additional_xpub_keys
             .into_iter()
@@ -1671,7 +1717,8 @@ impl Wallet {
             if prv_key_data_store.load_key_data(wallet_secret, &prv_key_data.id).await?.is_some() {
                 return Err(Error::PrivateKeyAlreadyExists(prv_key_data.id));
             }
-            let xpub_key = prv_key_data.create_xpub(payment_secret.as_ref(), MULTISIG_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+            let xpub_key =
+                prv_key_data.create_xpub(payment_secret.as_ref(), MULTISIG_ACCOUNT_KIND.into(), 0, Some(derivation_scheme)).await?; // todo it can be done concurrently
             generated_xpubs.push(xpub_key.to_string(Some(KeyPrefix::XPUB)));
             prv_key_data_ids.push(prv_key_data.id);
             prv_key_data_store.store(wallet_secret, prv_key_data).await?;
@@ -1681,9 +1728,9 @@ impl Wallet {
         additional_xpub_keys.extend_from_slice(generated_xpubs.as_slice());
         let mut xpub_keys = additional_xpub_keys;
         xpub_keys.sort_unstable();
-
-        let min_cosigner_index =
-            generated_xpubs.first().and_then(|first_generated| xpub_keys.binary_search(first_generated).ok()).map(|v| v as u8);
+        let cosigner_index =
+            generated_xpubs.first().and_then(|first_generated| xpub_keys.binary_search(first_generated).ok()).map(|v| v as u32);
+        let account_derivation_scheme = derivation_scheme.with_default_cosigner_index(cosigner_index);
 
         let xpub_keys = xpub_keys
             .into_iter()
@@ -1698,7 +1745,7 @@ impl Wallet {
                 None,
                 Arc::new(xpub_keys),
                 Some(Arc::new(prv_key_data_ids)),
-                min_cosigner_index,
+                account_derivation_scheme,
                 minimum_signatures,
                 false,
             )

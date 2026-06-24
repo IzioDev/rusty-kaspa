@@ -22,6 +22,20 @@ where
     digest[..4].try_into().expect("digest truncated")
 }
 
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DerivationPurpose {
+    Bip44 = 44,
+    Bip45 = 45,
+    Bip87 = 87,
+}
+
+impl DerivationPurpose {
+    pub fn as_u16(self) -> u16 {
+        self as u16
+    }
+}
+
 #[derive(Clone)]
 // #[wasm_bindgen(inspectable)]
 pub struct PubkeyDerivationManager {
@@ -151,20 +165,23 @@ pub struct WalletDerivationManager {
 }
 
 impl WalletDerivationManager {
-    pub fn create_extended_key_from_xprv(xprv: &str, is_multisig: bool, account_index: u64) -> Result<(SecretKey, ExtendedKeyAttrs)> {
+    pub fn create_extended_key_from_xprv(
+        xprv: &str,
+        purpose: DerivationPurpose,
+        account_index: u64,
+    ) -> Result<(SecretKey, ExtendedKeyAttrs)> {
         let xprv_key = ExtendedPrivateKey::<SecretKey>::from_str(xprv)?;
-        Self::derive_extended_key_from_master_key(xprv_key, is_multisig, account_index)
+        Self::derive_extended_key_from_master_key(xprv_key, purpose, account_index)
     }
 
     pub fn derive_extended_key_from_master_key(
         xprv_key: ExtendedPrivateKey<SecretKey>,
-        is_multisig: bool,
+        purpose: DerivationPurpose,
         account_index: u64,
     ) -> Result<(SecretKey, ExtendedKeyAttrs)> {
         let attrs = xprv_key.attrs();
 
-        let (extended_private_key, attrs) =
-            Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), is_multisig, account_index)?;
+        let (extended_private_key, attrs) = Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), purpose, account_index)?;
 
         Ok((extended_private_key, attrs))
     }
@@ -172,11 +189,10 @@ impl WalletDerivationManager {
     fn create_extended_key(
         mut private_key: SecretKey,
         mut attrs: ExtendedKeyAttrs,
-        is_multisig: bool,
+        purpose: DerivationPurpose,
         account_index: u64,
     ) -> Result<(SecretKey, ExtendedKeyAttrs)> {
-        let purpose = if is_multisig { 45 } else { 44 };
-        let address_path = format!("{purpose}'/111111'/{account_index}'");
+        let address_path = format!("{}'/111111'/{account_index}'", purpose.as_u16());
         let children = address_path.split('/');
         for child in children {
             (private_key, attrs) = Self::derive_private_key(&private_key, &attrs, child.parse::<ChildNumber>()?)?;
@@ -186,21 +202,18 @@ impl WalletDerivationManager {
     }
 
     pub fn build_derivate_path(
-        is_multisig: bool,
+        purpose: DerivationPurpose,
         account_index: u64,
         cosigner_index: Option<u32>,
         address_type: Option<AddressType>,
     ) -> Result<DerivationPath> {
-        if is_multisig && cosigner_index.is_none() {
-            return Err("cosigner_index is required for multisig path derivation".to_string().into());
-        }
-        let purpose = if is_multisig { 45 } else { 44 };
-        let mut path = format!("m/{purpose}'/111111'/{account_index}'");
+        let mut path = format!("m/{}'/111111'/{account_index}'", purpose.as_u16());
         if let Some(cosigner_index) = cosigner_index {
             path = format!("{path}/{}", cosigner_index)
         }
         if let Some(address_type) = address_type {
-            path = format!("{path}/{}", address_type.index());
+            let index: u32 = address_type.into();
+            path = format!("{path}/{index}");
         }
         let path = path.parse::<DerivationPath>()?;
         Ok(path)
@@ -222,7 +235,7 @@ impl WalletDerivationManager {
             public_key = public_key.derive_child(ChildNumber::new(cosigner_index, false)?)?;
         }
 
-        public_key = public_key.derive_child(ChildNumber::new(address_type.index(), false)?)?;
+        public_key = public_key.derive_child(ChildNumber::new(address_type.into(), false)?)?;
 
         let mut hmac = HmacSha512::new_from_slice(&public_key.attrs().chain_code).map_err(kaspa_bip32::Error::Hmac)?;
         hmac.update(&public_key.to_bytes());
@@ -362,9 +375,9 @@ impl WalletDerivationManagerTrait for WalletDerivationManager {
     fn from_master_xprv(xprv: &str, is_multisig: bool, account_index: u64, cosigner_index: Option<u32>) -> Result<Self> {
         let xprv_key = ExtendedPrivateKey::<SecretKey>::from_str(xprv)?;
         let attrs = xprv_key.attrs();
+        let purpose = if is_multisig { DerivationPurpose::Bip45 } else { DerivationPurpose::Bip44 };
 
-        let (extended_private_key, attrs) =
-            Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), is_multisig, account_index)?;
+        let (extended_private_key, attrs) = Self::create_extended_key(*xprv_key.private_key(), attrs.clone(), purpose, account_index)?;
 
         let extended_public_key = ExtendedPublicKey { public_key: extended_private_key.get_public_key(), attrs };
 
