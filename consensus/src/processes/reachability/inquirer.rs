@@ -213,6 +213,65 @@ pub(super) fn get_next_chain_ancestor_unchecked(
     }
 }
 
+/// Finds the merging block of `merged_block` on the selected chain of `sink`:
+/// the unique block `m` that is a chain ancestor of `sink` and whose mergeset
+/// contains `merged_block`. Returns `Ok(None)` when no chain block of `sink`
+/// merges `merged_block` (that is, `merged_block` is not in the past of `sink`).
+///
+/// Two cases, because the future covering set excludes selected-parent merges
+/// (only `unordered_mergeset_without_selected_parent` is inserted into the FCS):
+///   1. `merged_block` is a strict chain ancestor of `sink`: its merging block
+///      is the next chain ancestor (the chain child whose selected parent is
+///      `merged_block`), which the FCS does not record.
+///   2. otherwise `merged_block` is merged as a non-selected-parent member of
+///      some chain block's mergeset, which the FCS does record; locate it with
+///      a binary search descendant over the FCS.
+///
+/// Complexity: `O(log(|future_covering_set(merged_block)|))` for case 2, plus an
+/// `O(1)` chain-ancestor check; case 1 is `O(log(|children(merged_block)|))`.
+///
+/// # Examples
+///
+/// ```
+/// use kaspa_consensus::model::stores::reachability::MemoryReachabilityStore;
+/// use kaspa_consensus::processes::reachability::inquirer::{add_block, find_merging_chain_block, init};
+/// use kaspa_consensus_core::blockhash::ORIGIN;
+/// use kaspa_hashes::Hash;
+///
+/// let mut store = MemoryReachabilityStore::new();
+/// init(&mut store).unwrap();
+///
+/// let (genesis, a, side, sink): (Hash, Hash, Hash, Hash) = (1.into(), 2.into(), 3.into(), 4.into());
+/// // Selected chain ORIGIN -> genesis -> a -> sink, with `side` (off genesis) merged by `sink`.
+/// add_block(&mut store, genesis, ORIGIN, &mut std::iter::empty()).unwrap();
+/// add_block(&mut store, a, genesis, &mut std::iter::empty()).unwrap();
+/// add_block(&mut store, side, genesis, &mut std::iter::empty()).unwrap();
+/// add_block(&mut store, sink, a, &mut std::iter::once(side)).unwrap();
+///
+/// // `genesis` is a strict chain ancestor of `sink`: its merging block is its chain child `a`.
+/// assert_eq!(find_merging_chain_block(&store, sink, genesis).unwrap(), Some(a));
+/// // `side` is merged by `sink` as a non-selected-parent member.
+/// assert_eq!(find_merging_chain_block(&store, sink, side).unwrap(), Some(sink));
+/// // A block is never its own merging block.
+/// assert_eq!(find_merging_chain_block(&store, sink, sink).unwrap(), None);
+/// ```
+pub fn find_merging_chain_block(
+    store: &(impl ReachabilityStoreReader + ?Sized),
+    sink: Hash,
+    merged_block: Hash,
+) -> Result<Option<Hash>> {
+    if merged_block == sink {
+        return Ok(None);
+    }
+    if is_strict_chain_ancestor_of(store, merged_block, sink)? {
+        return Ok(Some(get_next_chain_ancestor(store, sink, merged_block)?));
+    }
+    match binary_search_descendant(store, store.get_future_covering_set(merged_block)?.as_slice(), sink)? {
+        SearchOutput::Found(m, _) => Ok(Some(m)),
+        SearchOutput::NotFound(_) => Ok(None),
+    }
+}
+
 enum SearchOutput {
     NotFound(usize), // `usize` is the position to insert at
     Found(Hash, usize),
@@ -260,10 +319,13 @@ mod tests {
     use crate::{
         model::stores::{
             children::ChildrenStore,
-            reachability::{DbReachabilityStore, MemoryReachabilityStore, StagingReachabilityStore},
-            relations::{DbRelationsStore, MemoryRelationsStore, RelationsStore, StagingRelationsStore},
+            reachability::{DbReachabilityStore, MemoryReachabilityStore, ReachabilityStoreReader, StagingReachabilityStore},
+            relations::{DbRelationsStore, MemoryRelationsStore, RelationsStore, RelationsStoreReader, StagingRelationsStore},
         },
-        processes::reachability::{interval::Interval, tests::r#gen::generate_complex_dag},
+        processes::{
+            ghostdag::mergeset::unordered_mergeset_without_selected_parent,
+            reachability::{interval::Interval, tests::r#gen::generate_complex_dag},
+        },
     };
     use itertools::Itertools;
     use kaspa_consensus_core::blockhash::ORIGIN;
@@ -528,6 +590,124 @@ mod tests {
 
             // Run with a staging process
             run_dag_test_case_with_staging(&test);
+        }
+    }
+
+    /// Independent reference for the merging chain block: the unique chain block `m` of `sink`
+    /// (chain ancestors of `sink` plus `sink` itself) whose ghostdag mergeset contains `merged_block`.
+    /// The mergeset of `m` is its selected parent (the reachability tree parent) together with
+    /// `unordered_mergeset_without_selected_parent`. Computed straight from relations + reachability,
+    /// with no dependence on `find_merging_chain_block`.
+    fn brute_force_merging_chain_block<V: ReachabilityStoreReader + ?Sized, S: RelationsStoreReader + ?Sized>(
+        reachability: &V,
+        relations: &S,
+        all_blocks: &[Hash],
+        sink: Hash,
+        merged_block: Hash,
+    ) -> Option<Hash> {
+        let mut found = None;
+        for &m in all_blocks {
+            if !is_chain_ancestor_of(reachability, m, sink).unwrap() {
+                continue;
+            }
+            let selected_parent = reachability.get_parent(m).unwrap();
+            let parents = relations.get_parents(m).unwrap();
+            let mergeset = unordered_mergeset_without_selected_parent(relations, reachability, selected_parent, &parents);
+            if selected_parent == merged_block || mergeset.contains(&merged_block) {
+                assert!(found.is_none(), "a block has at most one merging chain block (sink={sink}, merged={merged_block})");
+                found = Some(m);
+            }
+        }
+        found
+    }
+
+    /// Builds a DAG via [`DagBuilder`] over memory stores, returning the genesis plus all block hashes.
+    fn build_memory_dag(genesis: Hash, blocks: &[(u64, Vec<u64>)]) -> (MemoryReachabilityStore, MemoryRelationsStore, Vec<Hash>) {
+        let mut reachability = MemoryReachabilityStore::new();
+        let mut relations = MemoryRelationsStore::new();
+        let mut all = vec![genesis];
+        {
+            let mut builder = DagBuilder::new(&mut reachability, &mut relations);
+            builder.init();
+            builder.add_block(DagBlock::new(genesis, vec![ORIGIN]));
+            for (block, parents) in blocks.iter() {
+                let hash: Hash = (*block).into();
+                builder.add_block(DagBlock::new(hash, parents.iter().map(|&i| i.into()).collect()));
+                all.push(hash);
+            }
+        }
+        (reachability, relations, all)
+    }
+
+    /// Asserts `find_merging_chain_block` matches the brute-force reference for every ordered
+    /// `(merged_block, sink)` pair, including selected-chain-ancestor pairs, `merged == sink`, and
+    /// non-past pairs (both of which must be `None`).
+    fn assert_matches_brute_force<V: ReachabilityStoreReader + ?Sized, S: RelationsStoreReader + ?Sized>(
+        reachability: &V,
+        relations: &S,
+        all_blocks: &[Hash],
+    ) {
+        for &sink in all_blocks {
+            for &merged in all_blocks {
+                let expected = brute_force_merging_chain_block(reachability, relations, all_blocks, sink, merged);
+                let actual = find_merging_chain_block(reachability, sink, merged).unwrap();
+                assert_eq!(actual, expected, "find_merging_chain_block(sink={sink}, merged={merged}) != brute force");
+                if merged == sink {
+                    assert_eq!(actual, None, "a block is never its own merging block (block={sink})");
+                } else if is_dag_ancestor_of(reachability, merged, sink).unwrap() {
+                    // merged is in past(sink): a merging chain block must exist
+                    assert!(actual.is_some(), "merged={merged} is in past(sink={sink}) but no merging block found");
+                } else {
+                    assert_eq!(actual, None, "merged={merged} is not in past(sink={sink}) but a merging block was found");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn find_merging_chain_block_matches_brute_force() {
+        // Hand-built DAG with a chain (1-2-3), a side block (4) off genesis merged by 5, and
+        // further chain blocks, so that every equivalence case is represented.
+        let manual: Vec<(u64, Vec<u64>)> =
+            vec![(2, vec![1]), (3, vec![2]), (4, vec![1]), (5, vec![3, 4]), (6, vec![5]), (7, vec![1]), (8, vec![6, 7])];
+        let (reachability, relations, all) = build_memory_dag(1.into(), &manual);
+        assert_matches_brute_force(&reachability, &relations, &all);
+
+        // Randomized complex DAGs across a range of block rates.
+        for bps in [2.0, 3.0, 4.0] {
+            let target_blocks = 40;
+            let (genesis, blocks) = generate_complex_dag(2.0, bps, target_blocks);
+            assert_eq!(target_blocks as usize, blocks.len());
+            let (reachability, relations, all) = build_memory_dag(genesis.into(), &blocks);
+            assert_matches_brute_force(&reachability, &relations, &all);
+        }
+    }
+
+    #[test]
+    fn find_merging_chain_block_selected_chain_ancestor() {
+        // Selected chain 1-2-3-5 with side block 4 (off genesis) merged by 5; sink = 5.
+        let blocks: Vec<(u64, Vec<u64>)> = vec![(2, vec![1]), (3, vec![2]), (4, vec![1]), (5, vec![3, 4])];
+        let (reachability, relations, _all) = build_memory_dag(1.into(), &blocks);
+        let sink: Hash = 5.into();
+
+        // For each strict chain ancestor of the sink, the merging block is its chain child
+        // (the chain block whose selected parent is the ancestor), which the FCS does not record.
+        for ancestor in [1u64, 2, 3].map(Hash::from) {
+            assert!(is_strict_chain_ancestor_of(&reachability, ancestor, sink).unwrap());
+            let merging = find_merging_chain_block(&reachability, sink, ancestor).unwrap();
+            assert_eq!(merging, Some(get_next_chain_ancestor(&reachability, sink, ancestor).unwrap()));
+            assert!(merging.is_some(), "a strict chain ancestor always has a merging chain block");
+            // The merging block is the chain child whose selected parent is `ancestor`.
+            assert_eq!(reachability.get_parent(merging.unwrap()).unwrap(), ancestor);
+        }
+
+        // `relations` is consumed by the brute-force cross-check to confirm the focused case agrees
+        // with the general reference.
+        for ancestor in [1u64, 2, 3].map(Hash::from) {
+            assert_eq!(
+                find_merging_chain_block(&reachability, sink, ancestor).unwrap(),
+                brute_force_merging_chain_block(&reachability, &relations, &[1, 2, 3, 4, 5].map(Hash::from), sink, ancestor)
+            );
         }
     }
 }
