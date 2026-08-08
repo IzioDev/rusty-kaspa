@@ -238,11 +238,17 @@ pub enum Error {
     #[error("At least one xpub is required for a bip32-watch account")]
     Bip32WatchXpubRequired,
 
+    #[error("At least one xpub is required for a multisig account")]
+    MultisigXpubRequired,
+
     #[error("This feature is not supported by this account type")]
     AccountKindFeature,
 
     #[error("Address derivation processing is not supported by this account type")]
     AccountAddressDerivationCaps,
+
+    #[error("Signature scheme processing is not supported by this account type")]
+    AccountSignatureSchemeCaps,
 
     #[error("{0}")]
     DowncastError(String),
@@ -341,12 +347,62 @@ pub enum Error {
     NotSynced,
     #[error(transparent)]
     Pskt(#[from] kaspa_wallet_pskt::error::Error),
+    #[error("Missing redeem script in PSKT input")]
+    MissingRedeemScript,
+
+    #[error("Invalid multisig redeem script")]
+    InvalidMultisigRedeemScript,
+
+    #[error("Invalid multisig derivation path: {0}")]
+    InvalidMultisigDerivationPath(String),
+
+    #[error("Invalid multisig derivation scheme")]
+    InvalidMultisigDerivationScheme,
+
+    #[error("Invalid multisig derivation count for PSKT {pskt_index} input {input_index}: expected {expected}, actual {actual}")]
+    InvalidMultisigDerivationCount { pskt_index: usize, input_index: usize, expected: usize, actual: usize },
+
+    #[error("Missing multisig key source for PSKT {pskt_index} input {input_index}")]
+    MissingMultisigKeySource { pskt_index: usize, input_index: usize },
+
+    #[error("Missing multisig input derivation for input {0}")]
+    MissingMultisigInputDerivation(usize),
+
+    #[error("Conflicting multisig derivation path for PSKT {pskt_index} input {input_index}")]
+    ConflictingMultisigDerivationPath { pskt_index: usize, input_index: usize },
+
+    #[error("Missing multisig public key at index {0}")]
+    MissingMultisigPublicKey(u32),
+
+    #[error("Invalid multisig threshold")]
+    InvalidMultisigThreshold,
+
+    #[error("Invalid multisig signer count")]
+    InvalidMultisigSignerCount,
+
+    #[error("Unsupported signature type")]
+    UnsupportedSignatureType,
+
+    #[error("No matching local signer")]
+    NoMatchingLocalSigner,
+
+    #[error("Conflicting partial signature")]
+    ConflictingPartialSignature,
+
+    #[error("Invalid partial signature")]
+    InvalidPartialSignature,
+
+    #[error("Insufficient signatures: required {required}, present {present}")]
+    InsufficientSignatures { required: usize, present: usize },
 
     #[error("Error generating pending transaction from PSKT: {0}")]
     PendingTransactionFromPSKTError(String),
 
     #[error("Address not found")]
     AddressNotFound,
+
+    #[error("Address ({0}) index not found")]
+    AddressIndexNotFound(String),
 
     #[error("Invalid payment destination: expected PaymentOutputs, found Change")]
     CommitRevealInvalidPaymentDestination,

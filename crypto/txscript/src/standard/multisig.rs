@@ -1,5 +1,10 @@
-use crate::opcodes::codes::{OpCheckMultiSig, OpCheckMultiSigECDSA};
+use crate::opcodes::{
+    codes::{OpCheckMultiSig, OpCheckMultiSigECDSA},
+    to_script_num,
+};
 use crate::script_builder::{ScriptBuilder, ScriptBuilderError};
+use crate::{MAX_PUB_KEYS_PER_MUTLTISIG, TxScriptError, parse_script};
+use kaspa_consensus_core::{hashing::sighash::SigHashReusedValuesUnsync, tx::PopulatedTransaction};
 use std::borrow::Borrow;
 use thiserror::Error;
 
@@ -14,7 +19,31 @@ pub enum Error {
     ScriptBuilderError(#[from] ScriptBuilderError),
     #[error("provided public keys should not be empty")]
     EmptyKeys,
+    #[error("too many public keys")]
+    ErrTooManyPublicKeys,
+    #[error("invalid multisig redeem script: {0}")]
+    InvalidMultisigRedeemScript(String),
+    #[error("invalid multisig threshold: required {required}, public keys {public_keys}")]
+    InvalidMultisigThreshold { required: usize, public_keys: usize },
+    #[error("invalid multisig public key")]
+    InvalidMultisigPublicKey(#[from] secp256k1::Error),
+    #[error("multisig redeem script parse error: {0}")]
+    TxScriptError(#[from] TxScriptError),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MultisigSignatureType {
+    Schnorr,
+    Ecdsa,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// Context of a Multisig Redeem script after a successful parsing
+pub enum MultisigRedeemScriptContext {
+    Schnorr { required: usize, public_keys: Box<[secp256k1::XOnlyPublicKey]> },
+    Ecdsa { required: usize, public_keys: Box<[secp256k1::PublicKey]> },
+}
+
 pub fn multisig_redeem_script(pub_keys: impl Iterator<Item = impl Borrow<[u8; 32]>>, required: usize) -> Result<Vec<u8>, Error> {
     if pub_keys.size_hint().1.is_some_and(|upper| upper < required) {
         return Err(Error::ErrTooManyRequiredSigs);
@@ -25,6 +54,9 @@ pub fn multisig_redeem_script(pub_keys: impl Iterator<Item = impl Borrow<[u8; 32
     let mut count = 0i64;
     for pub_key in pub_keys {
         count += 1;
+        if count > MAX_PUB_KEYS_PER_MUTLTISIG as i64 {
+            return Err(Error::ErrTooManyPublicKeys);
+        }
         builder.add_data(pub_key.borrow().as_slice())?;
     }
 
@@ -51,6 +83,9 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
     let mut count = 0i64;
     for pub_key in pub_keys {
         count += 1;
+        if count > MAX_PUB_KEYS_PER_MUTLTISIG as i64 {
+            return Err(Error::ErrTooManyPublicKeys);
+        }
         builder.add_data(pub_key.borrow().as_slice())?;
     }
 
@@ -65,6 +100,100 @@ pub fn multisig_redeem_script_ecdsa(pub_keys: impl Iterator<Item = impl Borrow<[
     builder.add_op(OpCheckMultiSigECDSA)?;
 
     Ok(builder.drain())
+}
+
+pub fn parse_multisig_redeem_script(script: &[u8]) -> Result<MultisigRedeemScriptContext, Error> {
+    let opcodes = parse_script::<PopulatedTransaction<'_>, SigHashReusedValuesUnsync>(script).collect::<Result<Vec<_>, _>>()?;
+
+    // <required_count> <pubkey>... <pubkey_count> <OP_CHECKMULTISIG>
+    if opcodes.len() < 4 {
+        return Err(Error::InvalidMultisigRedeemScript("script is too short".to_string()));
+    }
+
+    let terminal = opcodes.last().expect("just checked len >= 4");
+
+    let signature_type = match terminal.value() {
+        value if value == OpCheckMultiSig => MultisigSignatureType::Schnorr,
+        value if value == OpCheckMultiSigECDSA => MultisigSignatureType::Ecdsa,
+        _ => return Err(Error::InvalidMultisigRedeemScript("terminal opcode is not CHECKMULTISIG".to_string())),
+    };
+
+    let required = usize::try_from(to_script_num(&opcodes[0])?)
+        .map_err(|_| Error::InvalidMultisigRedeemScript("required signature count is negative".to_string()))?;
+
+    let public_key_count = usize::try_from(to_script_num(&opcodes[opcodes.len() - 2])?)
+        .map_err(|_| Error::InvalidMultisigRedeemScript("public key count is negative".to_string()))?;
+
+    if public_key_count > MAX_PUB_KEYS_PER_MUTLTISIG as usize {
+        return Err(Error::InvalidMultisigRedeemScript(format!(
+            "public key count {public_key_count} exceeds maximum {MAX_PUB_KEYS_PER_MUTLTISIG}"
+        )));
+    }
+
+    let key_opcodes = &opcodes[1..opcodes.len() - 2];
+
+    if key_opcodes.len() != public_key_count {
+        return Err(Error::InvalidMultisigRedeemScript(format!(
+            "declared public key count {public_key_count} does not match {} pushed keys",
+            key_opcodes.len()
+        )));
+    }
+
+    if required == 0 || required > public_key_count {
+        return Err(Error::InvalidMultisigThreshold { required, public_keys: public_key_count });
+    }
+
+    match signature_type {
+        MultisigSignatureType::Schnorr => {
+            let public_keys = key_opcodes
+                .iter()
+                .map(|opcode| {
+                    if !opcode.is_push_opcode() {
+                        return Err(Error::InvalidMultisigRedeemScript("public key is not a push opcode".to_string()));
+                    }
+
+                    let data = opcode.get_data();
+
+                    if data.len() != 32 {
+                        return Err(Error::InvalidMultisigRedeemScript(format!(
+                            "schnorr public key length is {}, expected 32",
+                            data.len()
+                        )));
+                    }
+
+                    Ok(secp256k1::XOnlyPublicKey::from_slice(data)?)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_boxed_slice();
+
+            Ok(MultisigRedeemScriptContext::Schnorr { required, public_keys })
+        }
+
+        MultisigSignatureType::Ecdsa => {
+            let public_keys = key_opcodes
+                .iter()
+                .map(|opcode| {
+                    if !opcode.is_push_opcode() {
+                        return Err(Error::InvalidMultisigRedeemScript("public key is not a push opcode".to_string()));
+                    }
+
+                    let data = opcode.get_data();
+
+                    if data.len() != 33 {
+                        return Err(Error::InvalidMultisigRedeemScript(format!(
+                            "ecdsa public key length is {}, expected 33",
+                            data.len()
+                        )));
+                    }
+
+                    Ok(secp256k1::PublicKey::from_slice(data)?)
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_boxed_slice();
+
+            Ok(MultisigRedeemScriptContext::Ecdsa { required, public_keys })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -118,6 +247,73 @@ mod tests {
     fn test_empty_keys() {
         let result = multisig_redeem_script(empty::<[u8; 32]>(), 0);
         assert_eq!(result, Err(Error::EmptyKeys));
+    }
+
+    #[test]
+    fn test_too_many_public_keys_while_building_redeem_script() {
+        let result = multisig_redeem_script(iter::repeat_n([0u8; 32], MAX_PUB_KEYS_PER_MUTLTISIG as usize + 1), 1);
+        assert_eq!(result, Err(Error::ErrTooManyPublicKeys));
+
+        let result = multisig_redeem_script_ecdsa(iter::repeat_n([0u8; 33], MAX_PUB_KEYS_PER_MUTLTISIG as usize + 1), 1);
+        assert_eq!(result, Err(Error::ErrTooManyPublicKeys));
+    }
+
+    #[test]
+    fn test_parse_schnorr_multisig_redeem_script() {
+        let [kp1, kp2, kp3] = kp();
+        let keys = [kp1, kp2, kp3];
+        let x_only_keys = keys.iter().map(|kp| kp.x_only_public_key().0).collect::<Vec<_>>();
+        let script = multisig_redeem_script(x_only_keys.iter().map(|key| key.serialize()), 2).unwrap();
+
+        let context = parse_multisig_redeem_script(&script).unwrap();
+
+        let MultisigRedeemScriptContext::Schnorr { required, public_keys } = context else {
+            panic!("expected Schnorr multisig redeem script context");
+        };
+
+        assert_eq!(required, 2);
+        assert_eq!(public_keys.as_ref(), x_only_keys.as_slice());
+    }
+
+    #[test]
+    fn test_parse_ecdsa_multisig_redeem_script() {
+        let [kp1, kp2, kp3] = kp();
+        let keys = [kp1.public_key(), kp2.public_key(), kp3.public_key()];
+        let script = multisig_redeem_script_ecdsa(keys.iter().map(|key| key.serialize()), 2).unwrap();
+
+        let context = parse_multisig_redeem_script(&script).unwrap();
+
+        let MultisigRedeemScriptContext::Ecdsa { required, public_keys } = context else {
+            panic!("expected ECDSA multisig redeem script context");
+        };
+
+        assert_eq!(required, 2);
+        assert_eq!(public_keys.as_ref(), keys.as_slice());
+    }
+
+    #[test]
+    fn test_parse_rejects_malformed_multisig_redeem_script() {
+        // empty pks
+        assert!(parse_multisig_redeem_script(&[]).is_err());
+
+        let [kp1, kp2, ..] = kp();
+        let mut script = ScriptBuilder::new()
+            // 2 out of 2 and missing checksig op
+            .add_i64(2)
+            .unwrap()
+            .add_data(&kp1.x_only_public_key().0.serialize())
+            .unwrap()
+            .add_data(&kp2.x_only_public_key().0.serialize())
+            .unwrap()
+            .add_i64(2)
+            .unwrap()
+            .drain();
+        assert!(parse_multisig_redeem_script(&script).is_err());
+
+        script.push(OpCheckMultiSig);
+        // 3 out of 2
+        script[0] = crate::opcodes::codes::Op3;
+        assert!(matches!(parse_multisig_redeem_script(&script), Err(Error::InvalidMultisigThreshold { required: 3, public_keys: 2 })));
     }
 
     fn check_multisig_scenario(inputs: Vec<Input>, required: usize, is_ok: bool, is_ecdsa: bool) {

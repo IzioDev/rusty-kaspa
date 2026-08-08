@@ -46,6 +46,14 @@ pub enum Error {
     PayloadRequiresVersion1(crate::pskt::Version),
     #[error("Outputs not allowed to contain covenant due to pskt or tx versions mismatch")]
     Covenant,
+    #[error("Conflicting partial signature for public key {0}")]
+    ConflictingPartialSignature(secp256k1::PublicKey),
+    #[error("Signature count mismatch: expected {expected}, actual {actual}")]
+    SignatureCountMismatch { expected: usize, actual: usize },
+    #[error("PSKB transactions do not match")]
+    PskbTransactionMismatch,
+    #[error("PSKT combine error: {0}")]
+    PsktCombineError(String),
 }
 #[derive(thiserror::Error, Debug)]
 pub enum ConstructorError {

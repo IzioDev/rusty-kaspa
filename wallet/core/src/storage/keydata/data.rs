@@ -2,7 +2,7 @@
 //! Private key storage and encryption.
 //!
 
-use crate::derivation::create_xpub_from_xprv;
+use crate::derivation::{MultisigDerivationScheme, create_xpub_from_xprv};
 use crate::imports::*;
 use kaspa_bip32::{ExtendedPrivateKey, ExtendedPublicKey, Language, Mnemonic};
 use kaspa_utils::hex::ToHex;
@@ -202,10 +202,11 @@ impl PrvKeyData {
         payment_secret: Option<&Secret>,
         account_kind: AccountKind,
         account_index: u64,
+        multisig_derivation_scheme: Option<MultisigDerivationScheme>,
     ) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
         let payload = self.payload.decrypt(payment_secret)?;
         let xprv = payload.get_xprv(payment_secret)?;
-        create_xpub_from_xprv(xprv, account_kind, account_index).await
+        create_xpub_from_xprv(xprv, account_kind, account_index, multisig_derivation_scheme).await
     }
 
     pub fn get_xprv(&self, payment_secret: Option<&Secret>) -> Result<ExtendedPrivateKey<secp256k1::SecretKey>> {

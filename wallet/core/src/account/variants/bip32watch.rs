@@ -3,7 +3,7 @@
 //!
 
 use crate::account::Inner;
-use crate::derivation::{AddressDerivationManager, AddressDerivationManagerTrait};
+use crate::derivation::{AddressDerivationConfig, AddressDerivationManager, AddressDerivationManagerTrait};
 use crate::imports::*;
 
 pub const BIP32_WATCH_ACCOUNT_KIND: &str = "kaspa-bip32-watch-standard";
@@ -96,9 +96,15 @@ impl Bip32Watch {
 
         let inner = Arc::new(Inner::new(wallet, id, storage_key, settings));
 
-        let derivation =
-            AddressDerivationManager::new(wallet, BIP32_WATCH_ACCOUNT_KIND.into(), &xpub_keys, ecdsa, 0, None, 1, Default::default())
-                .await?;
+        let derivation = AddressDerivationManager::new(
+            wallet,
+            AddressDerivationConfig::standard(BIP32_WATCH_ACCOUNT_KIND.into(), 0),
+            &xpub_keys,
+            ecdsa,
+            1,
+            Default::default(),
+        )
+        .await?;
 
         Ok(Self { inner, xpub_keys, ecdsa, derivation })
     }
@@ -111,11 +117,9 @@ impl Bip32Watch {
 
         let derivation = AddressDerivationManager::new(
             wallet,
-            BIP32_WATCH_ACCOUNT_KIND.into(),
+            AddressDerivationConfig::standard(BIP32_WATCH_ACCOUNT_KIND.into(), 0),
             &xpub_keys,
             ecdsa,
-            0,
-            None,
             1,
             address_derivation_indexes,
         )
@@ -236,6 +240,16 @@ impl Account for Bip32Watch {
 
     fn as_derivation_capable(self: Arc<Self>) -> Result<Arc<dyn DerivationCapableAccount>> {
         Ok(self.clone())
+    }
+
+    fn as_signature_scheme_capable(self: Arc<Self>) -> Result<Arc<dyn SignatureSchemeCapableAccount>> {
+        Ok(self.clone())
+    }
+}
+
+impl SignatureSchemeCapableAccount for Bip32Watch {
+    fn signature_scheme(&self) -> SignatureScheme {
+        if self.ecdsa { SignatureScheme::ECDSA } else { SignatureScheme::Schnorr }
     }
 }
 

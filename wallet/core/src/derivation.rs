@@ -3,7 +3,7 @@
 //!
 
 use kaspa_wallet_keys::derivation::gen0::{PubkeyDerivationManagerV0, WalletDerivationManagerV0};
-use kaspa_wallet_keys::derivation::gen1::{PubkeyDerivationManager, WalletDerivationManager};
+use kaspa_wallet_keys::derivation::gen1::{DerivationPurpose, PubkeyDerivationManager, WalletDerivationManager};
 
 pub use kaspa_wallet_keys::derivation::traits::*;
 use kaspa_wallet_keys::publickey::{PublicKey, PublicKeyArrayT, PublicKeyT};
@@ -19,6 +19,111 @@ use kaspa_consensus_core::network::{NetworkType, NetworkTypeT};
 use kaspa_txscript::{
     extract_script_pub_key_address, multisig_redeem_script, multisig_redeem_script_ecdsa, pay_to_script_hash_script,
 };
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+pub enum MultisigDerivationScheme {
+    /// `m/87'/111111'/account'/change/address_index`
+    Bip87,
+    /// Golang kaspad 45, not strict BIP45 (coin index is not part of BIP45)
+    ///
+    /// `m/45'/111111'/account'/cosigner_index/change/address_index`
+    Kaspa45 { cosigner_index: Option<u32> },
+}
+
+impl Default for MultisigDerivationScheme {
+    fn default() -> Self {
+        Self::Kaspa45 { cosigner_index: None }
+    }
+}
+
+impl MultisigDerivationScheme {
+    pub fn kaspa45(cosigner_index: Option<u32>) -> Self {
+        Self::Kaspa45 { cosigner_index }
+    }
+
+    pub fn with_cosigner_index(self, cosigner_index: Option<u32>) -> Self {
+        match self {
+            Self::Bip87 => Self::Bip87,
+            Self::Kaspa45 { .. } => Self::Kaspa45 { cosigner_index },
+        }
+    }
+
+    pub fn with_default_cosigner_index(self, cosigner_index: Option<u32>) -> Self {
+        match self {
+            Self::Bip87 => Self::Bip87,
+            Self::Kaspa45 { cosigner_index: Some(_) } => self,
+            Self::Kaspa45 { cosigner_index: None } => Self::Kaspa45 { cosigner_index },
+        }
+    }
+
+    pub fn purpose(&self) -> DerivationPurpose {
+        match self {
+            Self::Bip87 => DerivationPurpose::Bip87,
+            Self::Kaspa45 { .. } => DerivationPurpose::Bip45,
+        }
+    }
+
+    pub(crate) fn xpub_child_branch(&self) -> Option<u32> {
+        match self {
+            Self::Bip87 => None,
+            Self::Kaspa45 { cosigner_index } => Some(cosigner_index.unwrap_or(0)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AddressDerivationConfig {
+    account_kind: AccountKind,
+    account_index: u64,
+    multisig_derivation_scheme: Option<MultisigDerivationScheme>,
+}
+
+impl AddressDerivationConfig {
+    pub fn new(
+        account_kind: AccountKind,
+        account_index: u64,
+        multisig_derivation_scheme: Option<MultisigDerivationScheme>,
+    ) -> Result<Self> {
+        match (account_kind.as_ref(), multisig_derivation_scheme) {
+            (MULTISIG_ACCOUNT_KIND, Some(_)) => Ok(Self { account_kind, account_index, multisig_derivation_scheme }),
+            (MULTISIG_ACCOUNT_KIND, None) => Err(Error::Custom("Multisig derivation scheme is required".to_string())),
+            (_, Some(_)) => Err(Error::Custom("Multisig derivation scheme is only valid for multisig accounts".to_string())),
+            (_, None) => Ok(Self { account_kind, account_index, multisig_derivation_scheme }),
+        }
+    }
+
+    pub fn standard(account_kind: AccountKind, account_index: u64) -> Self {
+        Self { account_kind, account_index, multisig_derivation_scheme: None }
+    }
+
+    pub fn multisig(account_index: u64, multisig_derivation_scheme: MultisigDerivationScheme) -> Self {
+        Self {
+            account_kind: MULTISIG_ACCOUNT_KIND.into(),
+            account_index,
+            multisig_derivation_scheme: Some(multisig_derivation_scheme),
+        }
+    }
+
+    pub fn legacy(account_index: u64) -> Self {
+        Self::standard(LEGACY_ACCOUNT_KIND.into(), account_index)
+    }
+
+    pub fn account_kind(&self) -> AccountKind {
+        self.account_kind
+    }
+
+    pub fn account_index(&self) -> u64 {
+        self.account_index
+    }
+
+    pub fn multisig_derivation_scheme(&self) -> Option<MultisigDerivationScheme> {
+        self.multisig_derivation_scheme
+    }
+
+    pub(crate) fn xpub_child_branch(&self) -> Option<u32> {
+        self.multisig_derivation_scheme.and_then(|scheme| scheme.xpub_child_branch())
+    }
+}
 
 #[derive(Default, Clone, Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
 pub struct AddressDerivationMeta([u32; 2]);
@@ -172,9 +277,7 @@ impl AddressManager {
 }
 
 pub struct AddressDerivationManager {
-    pub account_kind: AccountKind,
-    pub account_index: u64,
-    pub cosigner_index: Option<u32>,
+    pub config: AddressDerivationConfig,
     pub derivators: Vec<Arc<dyn WalletDerivationManagerTrait>>,
     #[allow(dead_code)]
     wallet: Arc<Wallet>,
@@ -185,11 +288,9 @@ pub struct AddressDerivationManager {
 impl AddressDerivationManager {
     pub async fn new(
         wallet: &Arc<Wallet>,
-        account_kind: AccountKind,
+        config: AddressDerivationConfig,
         keys: &ExtendedPublicKeys,
         ecdsa: bool,
-        account_index: u64,
-        cosigner_index: Option<u32>,
         minimum_signatures: u16,
         address_derivation_indexes: AddressDerivationMeta,
     ) -> Result<Arc<AddressDerivationManager>> {
@@ -197,17 +298,17 @@ impl AddressDerivationManager {
             return Err("Invalid keys: keys are required for address derivation".to_string().into());
         }
 
+        let account_kind = config.account_kind();
+        let xpub_child_branch = config.xpub_child_branch();
+
         let mut receive_pubkey_managers = vec![];
         let mut change_pubkey_managers = vec![];
         let mut derivators = vec![];
         for xpub in keys.iter() {
             let derivator: Arc<dyn WalletDerivationManagerTrait> = match account_kind.as_ref() {
-                LEGACY_ACCOUNT_KIND => Arc::new(WalletDerivationManagerV0::from_extended_public_key(xpub.clone(), cosigner_index)?),
-                MULTISIG_ACCOUNT_KIND => {
-                    let cosigner_index = cosigner_index.unwrap_or(0);
-                    Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), Some(cosigner_index))?)
-                }
-                _ => Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), cosigner_index)?),
+                LEGACY_ACCOUNT_KIND => Arc::new(WalletDerivationManagerV0::from_extended_public_key(xpub.clone(), xpub_child_branch)?),
+                MULTISIG_ACCOUNT_KIND => Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), xpub_child_branch)?),
+                _ => Arc::new(WalletDerivationManager::from_extended_public_key(xpub.clone(), None)?),
             };
 
             receive_pubkey_managers.push(derivator.receive_pubkey_manager());
@@ -234,9 +335,7 @@ impl AddressDerivationManager {
         )?;
 
         let manager = Self {
-            account_kind,
-            account_index,
-            cosigner_index,
+            config,
             derivators,
             wallet: wallet.clone(),
             receive_address_manager: Arc::new(receive_address_manager),
@@ -273,9 +372,7 @@ impl AddressDerivationManager {
             AddressManager::new(wallet.clone(), account_kind, change_pubkey_managers, false, address_derivation_indexes.change(), 1)?;
 
         let manager = Self {
-            account_kind,
-            account_index,
-            cosigner_index: None,
+            config: AddressDerivationConfig::legacy(account_index),
             derivators: vec![derivator],
             wallet: wallet.clone(),
             receive_address_manager: Arc::new(receive_address_manager),
@@ -329,8 +426,7 @@ impl AddressDerivationManager {
 
         let (receive, change) = if change_address { (vec![], addresses) } else { (addresses, vec![]) };
 
-        let private_keys =
-            create_private_keys(&self.account_kind, self.cosigner_index.unwrap_or(0), self.account_index, xkey, &receive, &change)?;
+        let private_keys = create_private_keys(self.config, xkey, &receive, &change)?;
 
         let mut result = vec![];
         for (address, private_key) in private_keys {
@@ -353,7 +449,7 @@ impl AddressDerivationManager {
             } else if let Some(index) = change_map.get(*address) {
                 change_indexes.push((*address, *index));
             } else {
-                return Err(Error::Custom(format!("Address ({address}) index not found.")));
+                return Err(Error::AddressIndexNotFound(address.to_string()));
             }
         }
 
@@ -371,7 +467,7 @@ impl AddressDerivationManager {
         let map = &manager.inner().address_to_index_map;
         let mut indexes = vec![];
         for address in addresses {
-            let index = map.get(address).ok_or(Error::Custom(format!("Address ({address}) index not found.")))?;
+            let index = map.get(address).ok_or_else(|| Error::AddressIndexNotFound(address.to_string()))?;
             indexes.push(*index);
         }
 
@@ -512,6 +608,7 @@ pub async fn create_xpub_from_mnemonic(
     seed_words: &str,
     account_kind: AccountKind,
     account_index: u64,
+    multisig_derivation_scheme: Option<MultisigDerivationScheme>,
 ) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
     let mnemonic = Mnemonic::new(seed_words, Language::English)?;
     let seed = mnemonic.to_seed("");
@@ -519,8 +616,12 @@ pub async fn create_xpub_from_mnemonic(
 
     let (secret_key, attrs) = match account_kind.as_ref() {
         LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xkey, false, account_index)?,
-        MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xkey, true, account_index)?,
-        _ => WalletDerivationManager::derive_extended_key_from_master_key(xkey, false, account_index)?,
+        MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(
+            xkey,
+            multisig_derivation_scheme.unwrap_or_default().purpose(),
+            account_index,
+        )?,
+        _ => WalletDerivationManager::derive_extended_key_from_master_key(xkey, DerivationPurpose::Bip44, account_index)?,
     };
 
     let xkey = ExtendedPublicKey { public_key: secret_key.get_public_key(), attrs };
@@ -532,11 +633,18 @@ pub async fn create_xpub_from_xprv(
     xprv: ExtendedPrivateKey<secp256k1::SecretKey>,
     account_kind: AccountKind,
     account_index: u64,
+    multisig_derivation_scheme: Option<MultisigDerivationScheme>,
 ) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
     let (secret_key, attrs) = match account_kind.as_ref() {
         LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xprv, false, account_index)?,
-        MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, true, account_index)?,
-        BIP32_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, false, account_index)?,
+        MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(
+            xprv,
+            multisig_derivation_scheme.unwrap_or_default().purpose(),
+            account_index,
+        )?,
+        BIP32_ACCOUNT_KIND => {
+            WalletDerivationManager::derive_extended_key_from_master_key(xprv, DerivationPurpose::Bip44, account_index)?
+        }
         _ => panic!("create_xpub_from_xprv not supported for account kind: {:?}", account_kind),
     };
 
@@ -545,17 +653,32 @@ pub async fn create_xpub_from_xprv(
     Ok(xkey)
 }
 
-pub fn build_derivate_path(
-    account_kind: &AccountKind,
-    account_index: u64,
-    cosigner_index: u32,
-    address_type: AddressType,
-) -> Result<DerivationPath> {
+pub fn build_derivate_path(config: AddressDerivationConfig, address_type: AddressType) -> Result<DerivationPath> {
+    let account_kind = config.account_kind();
+    let account_index = config.account_index();
     match account_kind.as_ref() {
         LEGACY_ACCOUNT_KIND => Ok(WalletDerivationManagerV0::build_derivate_path(account_index, Some(address_type))?),
-        BIP32_ACCOUNT_KIND => Ok(WalletDerivationManager::build_derivate_path(false, account_index, None, Some(address_type))?),
+        BIP32_ACCOUNT_KIND => {
+            Ok(WalletDerivationManager::build_derivate_path(DerivationPurpose::Bip44, account_index, None, Some(address_type))?)
+        }
         MULTISIG_ACCOUNT_KIND => {
-            Ok(WalletDerivationManager::build_derivate_path(true, account_index, Some(cosigner_index), Some(address_type))?)
+            match config
+                .multisig_derivation_scheme()
+                .ok_or_else(|| Error::Custom("Multisig derivation scheme is required".to_string()))?
+            {
+                MultisigDerivationScheme::Bip87 => Ok(WalletDerivationManager::build_derivate_path(
+                    DerivationPurpose::Bip87,
+                    account_index,
+                    None,
+                    Some(address_type),
+                )?),
+                MultisigDerivationScheme::Kaspa45 { cosigner_index } => Ok(WalletDerivationManager::build_derivate_path(
+                    DerivationPurpose::Bip45,
+                    account_index,
+                    Some(cosigner_index.unwrap_or(0)),
+                    Some(address_type),
+                )?),
+            }
         }
         _ => {
             panic!("build derivate path not supported for account kind: {:?}", account_kind);
@@ -563,12 +686,8 @@ pub fn build_derivate_path(
     }
 }
 
-pub fn build_derivate_paths(
-    account_kind: &AccountKind,
-    account_index: u64,
-    cosigner_index: u32,
-) -> Result<(DerivationPath, DerivationPath)> {
-    let receive_path = build_derivate_path(account_kind, account_index, cosigner_index, AddressType::Receive)?;
-    let change_path = build_derivate_path(account_kind, account_index, cosigner_index, AddressType::Change)?;
+pub fn build_derivate_paths(config: AddressDerivationConfig) -> Result<(DerivationPath, DerivationPath)> {
+    let receive_path = build_derivate_path(config, AddressType::Receive)?;
+    let change_path = build_derivate_path(config, AddressType::Change)?;
     Ok((receive_path, change_path))
 }

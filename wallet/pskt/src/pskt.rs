@@ -3,11 +3,20 @@
 //!
 
 use kaspa_bip32::{DerivationPath, KeyFingerprint, secp256k1};
-use kaspa_consensus_core::{Hash, hashing::sighash::SigHashReusedValuesUnsync};
-use kaspa_txscript::EngineCtx;
+use kaspa_consensus_core::{
+    Hash,
+    hashing::sighash::{SigHashReusedValuesUnsync, calc_ecdsa_signature_hash, calc_schnorr_signature_hash},
+};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::{collections::BTreeMap, fmt::Display, fmt::Formatter, future::Future, marker::PhantomData, ops::Deref};
+use std::{
+    collections::BTreeMap,
+    fmt::Display,
+    fmt::Formatter,
+    future::Future,
+    marker::PhantomData,
+    ops::{Add, Deref},
+};
 
 pub use crate::error::Error;
 pub use crate::global::{Global, GlobalBuilder};
@@ -20,9 +29,13 @@ use kaspa_consensus_core::mass::{MassCalculator, NonContextualMasses};
 use kaspa_consensus_core::{
     hashing::sighash_type::SigHashType,
     subnets::SUBNETWORK_ID_NATIVE,
-    tx::{ComputeCommit, MutableTransaction, SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput},
+    tx::{
+        ComputeCommit, MutableTransaction, SignableTransaction, Transaction, TransactionId, TransactionInput, TransactionOutput,
+        VerifiableTransaction,
+    },
 };
-use kaspa_txscript::{TxScriptEngine, caches::Cache};
+use kaspa_txscript::{EngineCtx, TxScriptEngine, caches::Cache};
+pub use kaspa_wallet_keys::signature::SignatureScheme;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -84,6 +97,13 @@ impl Signature {
         match self {
             Signature::ECDSA(s) => s.serialize_compact(),
             Signature::Schnorr(s) => s.serialize(),
+        }
+    }
+
+    pub fn verify(&self, message: &secp256k1::Message, public_key: &secp256k1::PublicKey) -> Result<(), secp256k1::Error> {
+        match self {
+            Signature::ECDSA(signature) => secp256k1::SECP256K1.verify_ecdsa(message, signature, public_key),
+            Signature::Schnorr(signature) => signature.verify(message, &public_key.x_only_public_key().0),
         }
     }
 }
@@ -161,8 +181,13 @@ impl<R> PSKT<R> {
             // Only include payload if version supports it (Version::One or higher)
             if self.global.version >= Version::One { self.global.payload.clone().unwrap_or_default() } else { vec![] },
         );
-        let entries = self.inputs.iter().filter_map(|Input { utxo_entry, .. }| utxo_entry.clone()).collect();
-        SignableTransaction::with_entries(tx, entries)
+
+        let mut tx = SignableTransaction::new(tx);
+        // it is allowed to have missing utxo entries at that stage, this function can be executed by any roles
+        tx.entries.iter_mut().zip(self.inputs.iter()).for_each(|(entry, input)| {
+            *entry = input.utxo_entry.clone();
+        });
+        tx
     }
 
     fn calculate_id_internal(&self) -> TransactionId {
@@ -291,6 +316,41 @@ impl PSKT<Updater> {
         Ok(self)
     }
 
+    pub fn set_input_redeem_script(mut self, input_index: usize, redeem_script: Vec<u8>) -> Result<Self, Error> {
+        let input = self.inner_pskt.inputs.get_mut(input_index).ok_or(Error::OutOfBounds)?;
+        match input.redeem_script.as_ref() {
+            Some(existing) if existing != &redeem_script => Err(Error::Custom("Conflicting redeem script for PSKT input".to_string())),
+            Some(_) => Ok(self),
+            None => {
+                input.redeem_script = Some(redeem_script);
+                Ok(self)
+            }
+        }
+    }
+
+    pub fn set_input_sig_op_count(mut self, input_index: usize, sig_op_count: u8) -> Result<Self, Error> {
+        let input = self.inner_pskt.inputs.get_mut(input_index).ok_or(Error::OutOfBounds)?;
+        match input.sig_op_count {
+            Some(existing) if existing != sig_op_count => Err(Error::Custom("Conflicting sig op count for PSKT input".to_string())),
+            Some(_) => Ok(self),
+            None => {
+                input.sig_op_count = Some(sig_op_count);
+                Ok(self)
+            }
+        }
+    }
+
+    pub fn add_input_bip32_derivation(
+        mut self,
+        input_index: usize,
+        public_key: secp256k1::PublicKey,
+        key_source: Option<KeySource>,
+    ) -> Result<Self, Error> {
+        let input = self.inner_pskt.inputs.get_mut(input_index).ok_or(Error::OutOfBounds)?;
+        insert_bip32_derivation(input, public_key, key_source)?;
+        Ok(self)
+    }
+
     pub fn signer(self) -> PSKT<Signer> {
         PSKT { inner_pskt: self.inner_pskt, role: Default::default() }
     }
@@ -302,24 +362,26 @@ impl PSKT<Updater> {
 
 impl PSKT<Signer> {
     // todo use iterator instead of vector
-    pub fn pass_signature_sync<SignFn, E>(mut self, sign_fn: SignFn) -> Result<Self, E>
+    pub fn pass_signature_sync<SignFn, E>(mut self, sign_fn: SignFn) -> Result<Self, Error>
     where
         E: Display,
         SignFn: FnOnce(SignableTransaction, Vec<SigHashType>) -> Result<Vec<SignInputOk>, E>,
     {
         let unsigned_tx = self.unsigned_tx();
         let sighashes = self.inputs.iter().map(|input| input.sighash_type).collect();
-        self.inner_pskt.inputs.iter_mut().zip(sign_fn(unsigned_tx, sighashes)?).for_each(
-            |(input, SignInputOk { signature, pub_key, key_source })| {
-                input.bip32_derivations.insert(pub_key, key_source);
-                input.partial_sigs.insert(pub_key, signature);
-            },
-        );
+        let signatures = sign_fn(unsigned_tx, sighashes).map_err(|error| Error::Custom(error.to_string()))?;
+        if signatures.len() != self.inputs.len() {
+            return Err(Error::SignatureCountMismatch { expected: self.inputs.len(), actual: signatures.len() });
+        }
+
+        for (input_index, signature) in signatures.into_iter().enumerate() {
+            self.add_partial_signature(input_index, signature)?;
+        }
 
         Ok(self)
     }
     // todo use iterator instead of vector
-    pub async fn pass_signature<SignFn, Fut, E>(mut self, sign_fn: SignFn) -> Result<Self, E>
+    pub async fn pass_signature<SignFn, Fut, E>(mut self, sign_fn: SignFn) -> Result<Self, Error>
     where
         E: Display,
         Fut: Future<Output = Result<Vec<SignInputOk>, E>>,
@@ -327,17 +389,63 @@ impl PSKT<Signer> {
     {
         let unsigned_tx = self.unsigned_tx();
         let sighashes = self.inputs.iter().map(|input| input.sighash_type).collect();
-        self.inner_pskt.inputs.iter_mut().zip(sign_fn(unsigned_tx, sighashes).await?).for_each(
-            |(input, SignInputOk { signature, pub_key, key_source })| {
-                input.bip32_derivations.insert(pub_key, key_source);
-                input.partial_sigs.insert(pub_key, signature);
-            },
-        );
+        let signatures = sign_fn(unsigned_tx, sighashes).await.map_err(|error| Error::Custom(error.to_string()))?;
+        if signatures.len() != self.inputs.len() {
+            return Err(Error::SignatureCountMismatch { expected: self.inputs.len(), actual: signatures.len() });
+        }
+
+        for (input_index, signature) in signatures.into_iter().enumerate() {
+            self.add_partial_signature(input_index, signature)?;
+        }
         Ok(self)
+    }
+
+    pub fn pass_partial_signatures(mut self, signatures: impl IntoIterator<Item = (usize, SignInputOk)>) -> Result<Self, Error> {
+        for (input_index, signature) in signatures {
+            self.add_partial_signature(input_index, signature)?;
+        }
+        Ok(self)
+    }
+
+    fn add_partial_signature(&mut self, input_index: usize, sign_input: SignInputOk) -> Result<(), Error> {
+        let input = self.inner_pskt.inputs.get_mut(input_index).ok_or(Error::OutOfBounds)?;
+        let SignInputOk { signature, pub_key, key_source } = sign_input;
+
+        insert_bip32_derivation(input, pub_key, key_source)?;
+
+        match input.partial_sigs.entry(pub_key) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(signature);
+                Ok(())
+            }
+            std::collections::btree_map::Entry::Occupied(entry) if *entry.get() == signature => Ok(()),
+            std::collections::btree_map::Entry::Occupied(entry) => Err(Error::ConflictingPartialSignature(*entry.key())),
+        }
     }
 
     pub fn calculate_id(&self) -> TransactionId {
         self.calculate_id_internal()
+    }
+
+    pub fn signature_hashes(&self, scheme: SignatureScheme) -> Result<Vec<Hash>, Error> {
+        if self.inputs.iter().any(|input| input.utxo_entry.is_none()) {
+            return Err(Error::MissingUtxoEntry);
+        }
+
+        let tx = self.unsigned_tx();
+        let verifiable_tx = tx.as_verifiable();
+        let reused_values = SigHashReusedValuesUnsync::new();
+        Ok(self
+            .inputs
+            .iter()
+            .enumerate()
+            .map(|(input_index, input)| match scheme {
+                SignatureScheme::ECDSA => calc_ecdsa_signature_hash(&verifiable_tx, input_index, input.sighash_type, &reused_values),
+                SignatureScheme::Schnorr => {
+                    calc_schnorr_signature_hash(&verifiable_tx, input_index, input.sighash_type, &reused_values)
+                }
+            })
+            .collect())
     }
 
     pub fn finalizer(self) -> PSKT<Finalizer> {
@@ -371,10 +479,15 @@ pub struct SignInputOk {
     pub key_source: Option<KeySource>,
 }
 
-impl<R> std::ops::Add<PSKT<R>> for PSKT<Combiner> {
-    type Output = Result<Self, CombineError>;
+impl PSKT<Combiner> {
+    pub fn combine<R>(mut self, mut rhs: PSKT<R>) -> Result<Self, CombineError> {
+        // If both PSKTs describe the same number of inputs and outputs,
+        // they must represent the same unsigned transaction.
+        // Differing shapes are allowed here to support construction-stage extension.
+        if self.has_same_transaction_shape(&rhs) && self.calculate_id_internal() != rhs.calculate_id_internal() {
+            return Err(CombineError::TransactionMismatch);
+        }
 
-    fn add(mut self, mut rhs: PSKT<R>) -> Self::Output {
         self.inner_pskt.global = (self.inner_pskt.global + rhs.inner_pskt.global)?;
         macro_rules! combine {
             ($left:expr, $right:expr, $err: ty) => {
@@ -394,6 +507,7 @@ impl<R> std::ops::Add<PSKT<R>> for PSKT<Combiner> {
             };
         }
         // todo add sort to build deterministic combination
+        // comment: depends on sighash type, otherwise it can break previous signature (outside of construct)
         self.inner_pskt.inputs = combine!(self.inner_pskt.inputs, rhs.inner_pskt.inputs, crate::input::CombineError);
         self.inner_pskt.outputs = combine!(self.inner_pskt.outputs, rhs.inner_pskt.outputs, crate::output::CombineError);
         if self.outputs.iter().any(|output| output.covenant.is_some())
@@ -403,14 +517,25 @@ impl<R> std::ops::Add<PSKT<R>> for PSKT<Combiner> {
         }
         Ok(self)
     }
-}
 
-impl PSKT<Combiner> {
+    fn has_same_transaction_shape<R>(&self, rhs: &PSKT<R>) -> bool {
+        self.inputs.len() == rhs.inputs.len() && self.outputs.len() == rhs.outputs.len()
+    }
+
     pub fn signer(self) -> PSKT<Signer> {
         PSKT { inner_pskt: self.inner_pskt, role: Default::default() }
     }
+
     pub fn finalizer(self) -> PSKT<Finalizer> {
         PSKT { inner_pskt: self.inner_pskt, role: Default::default() }
+    }
+}
+
+impl<R> Add<PSKT<R>> for PSKT<Combiner> {
+    type Output = Result<Self, CombineError>;
+
+    fn add(self, rhs: PSKT<R>) -> Self::Output {
+        self.combine(rhs)
     }
 }
 
@@ -456,6 +581,9 @@ impl PSKT<Finalizer> {
             }
             input.sequence = Some(input.sequence.unwrap_or(u64::MAX)); // todo discussable
             input.final_script_sig = Some(sig);
+            input.partial_sigs.clear();
+            input.redeem_script = None;
+            input.bip32_derivations.clear();
             Ok(())
         })?;
         self.inner_pskt.global.id = Some(self.calculate_id_internal());
@@ -483,7 +611,6 @@ impl PSKT<Extractor> {
 
     pub fn extract_tx(self, params: &Params) -> Result<MutableTransaction<Transaction>, ExtractError> {
         let tx = self.extract_tx_unchecked(params)?;
-        use kaspa_consensus_core::tx::VerifiableTransaction;
         {
             let tx = tx.as_verifiable();
             let cache = Cache::new(10_000);
@@ -499,9 +626,24 @@ impl PSKT<Extractor> {
     }
 }
 
+fn insert_bip32_derivation(input: &mut Input, public_key: secp256k1::PublicKey, key_source: Option<KeySource>) -> Result<(), Error> {
+    match input.bip32_derivations.entry(public_key) {
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(key_source);
+            Ok(())
+        }
+        std::collections::btree_map::Entry::Occupied(entry) if *entry.get() == key_source => Ok(()),
+        std::collections::btree_map::Entry::Occupied(_) => {
+            Err(Error::Custom("Conflicting bip32 derivation for PSKT input".to_string()))
+        }
+    }
+}
+
 /// Error combining pskt.
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum CombineError {
+    #[error("PSKT unsigned transactions do not match")]
+    TransactionMismatch,
     #[error(transparent)]
     Global(#[from] crate::global::CombineError),
     #[error(transparent)]
@@ -519,7 +661,7 @@ pub enum FinalizeError<E> {
     #[error("Signatures at index: {0} is empty")]
     EmptySignature(usize),
     #[error(transparent)]
-    FinalaziCb(#[from] E),
+    FinalizeCb(#[from] E),
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
@@ -536,10 +678,78 @@ pub struct TxNotFinalized {}
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use kaspa_consensus_core::tx::{TransactionOutpoint, UtxoEntry};
+    use kaspa_txscript::{multisig_redeem_script, pay_to_script_hash_script};
+    use secp256k1::{Keypair, rand::thread_rng};
+    use std::str::FromStr;
 
-    // #[test]
-    // fn it_works() {
-    //     let result = add(2, 2);
-    //     assert_eq!(result, 4);
-    // }
+    #[test]
+    fn signature_hashes_require_utxo_entries() {
+        let inner = Inner { inputs: vec![Input::default()], outputs: vec![], ..Default::default() };
+        let pskt = PSKT::<Signer>::from(inner);
+
+        assert!(matches!(pskt.signature_hashes(SignatureScheme::Schnorr), Err(Error::MissingUtxoEntry)));
+    }
+
+    #[test]
+    fn combine_allows_construction_extension() {
+        let left = PSKT::<Combiner>::from(Inner::default());
+        let right = PSKT::<Constructor>::from(Inner { inputs: vec![Input::default()], ..Default::default() });
+
+        let combined = left.combine(right).unwrap();
+
+        assert_eq!(combined.inputs.len(), 1);
+    }
+
+    #[test]
+    fn combine_rejects_same_shape_transaction_mismatch() {
+        let utxo_entry = UtxoEntry::default();
+        let left = PSKT::<Combiner>::from(Inner {
+            inputs: vec![Input { utxo_entry: Some(utxo_entry.clone()), ..Default::default() }],
+            ..Default::default()
+        });
+        let right = PSKT::<Constructor>::from(Inner {
+            inputs: vec![Input {
+                utxo_entry: Some(utxo_entry),
+                previous_outpoint: TransactionOutpoint { index: 1, ..Default::default() },
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+
+        assert!(matches!(left.combine(right), Err(CombineError::TransactionMismatch)));
+    }
+
+    fn multisig_signer_context() -> ([Keypair; 2], PSKT<Signer>) {
+        let kps = [Keypair::new(secp256k1::SECP256K1, &mut thread_rng()), Keypair::new(secp256k1::SECP256K1, &mut thread_rng())];
+        let redeem_script = multisig_redeem_script(kps.iter().map(|kp| kp.x_only_public_key().0.serialize()), 2).unwrap();
+        let input = InputBuilder::default()
+            .utxo_entry(UtxoEntry {
+                amount: 10,
+                script_public_key: pay_to_script_hash_script(&redeem_script),
+                block_daa_score: 1,
+                is_coinbase: false,
+                covenant_id: None,
+            })
+            .previous_outpoint(TransactionOutpoint {
+                transaction_id: TransactionId::from_str("63020db736215f8b1105a9281f7bcbb6473d965ecc45bb2fb5da59bd35e6ff84").unwrap(),
+                index: 0,
+            })
+            .sig_op_count(2)
+            .redeem_script(redeem_script)
+            .build()
+            .unwrap();
+
+        (kps, PSKT::<Signer>::from(Inner { inputs: vec![input], outputs: vec![], ..Default::default() }))
+    }
+
+    #[test]
+    fn pass_signature_sync_rejects_wrong_signature_count() {
+        let (_, pskt) = multisig_signer_context();
+
+        let result = pskt.pass_signature_sync(|_, _| -> Result<Vec<SignInputOk>, String> { Ok(vec![]) });
+
+        assert!(matches!(result, Err(Error::SignatureCountMismatch { expected: 1, actual: 0 })));
+    }
 }

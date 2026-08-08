@@ -96,3 +96,112 @@ pub enum CombineError {
     #[error("Two different proprietary values")]
     NotCompatibleProprietary(crate::utils::Error<String, serde_value::Value>),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kaspa_consensus_core::tx::TransactionId;
+    use secp256k1::{Keypair, rand::thread_rng};
+
+    fn keypair() -> Keypair {
+        Keypair::new(secp256k1::SECP256K1, &mut thread_rng())
+    }
+
+    fn covenant(byte: u8) -> CovenantBinding {
+        CovenantBinding::new(byte as u16, TransactionId::from_bytes([byte; 32]))
+    }
+
+    fn script_public_key(byte: u8) -> ScriptPublicKey {
+        ScriptPublicKey::from_vec(0, vec![byte])
+    }
+
+    fn assert_conflict(left: Output, right: Output, predicate: impl FnOnce(CombineError) -> bool) {
+        match left + right {
+            Ok(_) => panic!("expected combine conflict"),
+            Err(error) => assert!(predicate(error)),
+        }
+    }
+
+    #[test]
+    fn combine_carries_one_sided_mergeable_fields() {
+        let redeem_script = vec![1, 2, 3];
+        let combined = (Output { redeem_script: Some(redeem_script.clone()), ..Default::default() } + Output::default()).unwrap();
+        assert_eq!(combined.redeem_script, Some(redeem_script.clone()));
+        let combined = (Output::default() + Output { redeem_script: Some(redeem_script.clone()), ..Default::default() }).unwrap();
+        assert_eq!(combined.redeem_script, Some(redeem_script));
+
+        let covenant = covenant(1);
+        let combined = (Output { covenant: Some(covenant), ..Default::default() } + Output::default()).unwrap();
+        assert_eq!(combined.covenant, Some(covenant));
+        let combined = (Output::default() + Output { covenant: Some(covenant), ..Default::default() }).unwrap();
+        assert_eq!(combined.covenant, Some(covenant));
+
+        let keypair = keypair();
+        let public_key = keypair.public_key();
+        let bip32_derivations = BTreeMap::from([(public_key, Some(KeySource::new([1, 2, 3, 4], Default::default())))]);
+        let combined = (Output { bip32_derivations: bip32_derivations.clone(), ..Default::default() } + Output::default()).unwrap();
+        assert_eq!(combined.bip32_derivations, bip32_derivations.clone());
+        let combined = (Output::default() + Output { bip32_derivations: bip32_derivations.clone(), ..Default::default() }).unwrap();
+        assert_eq!(combined.bip32_derivations, bip32_derivations);
+
+        let proprietaries = BTreeMap::from([("key".to_string(), serde_value::Value::U8(1))]);
+        let combined = (Output { proprietaries: proprietaries.clone(), ..Default::default() } + Output::default()).unwrap();
+        assert_eq!(combined.proprietaries, proprietaries.clone());
+        let combined = (Output::default() + Output { proprietaries: proprietaries.clone(), ..Default::default() }).unwrap();
+        assert_eq!(combined.proprietaries, proprietaries);
+
+        let unknowns = BTreeMap::from([("key".to_string(), serde_value::Value::U8(1))]);
+        let combined = (Output { unknowns: unknowns.clone(), ..Default::default() } + Output::default()).unwrap();
+        assert_eq!(combined.unknowns, unknowns.clone());
+        let combined = (Output::default() + Output { unknowns: unknowns.clone(), ..Default::default() }).unwrap();
+        assert_eq!(combined.unknowns, unknowns);
+    }
+
+    #[test]
+    fn combine_rejects_conflicting_fields() {
+        assert_conflict(Output { amount: 1, ..Default::default() }, Output { amount: 2, ..Default::default() }, |error| {
+            matches!(error, CombineError::AmountMismatch { this: 1, that: 2 })
+        });
+
+        assert_conflict(
+            Output { script_public_key: script_public_key(1), ..Default::default() },
+            Output { script_public_key: script_public_key(2), ..Default::default() },
+            |error| matches!(error, CombineError::ScriptPubkeyMismatch { .. }),
+        );
+
+        assert_conflict(
+            Output { redeem_script: Some(vec![1]), ..Default::default() },
+            Output { redeem_script: Some(vec![2]), ..Default::default() },
+            |error| matches!(error, CombineError::NotCompatibleRedeemScripts { .. }),
+        );
+
+        assert_conflict(
+            Output { covenant: Some(covenant(1)), ..Default::default() },
+            Output { covenant: Some(covenant(2)), ..Default::default() },
+            |error| matches!(error, CombineError::NotCompatibleCovenants { .. }),
+        );
+
+        let keypair = keypair();
+        let public_key = keypair.public_key();
+        assert_conflict(
+            Output { bip32_derivations: BTreeMap::from([(public_key, None)]), ..Default::default() },
+            Output {
+                bip32_derivations: BTreeMap::from([(public_key, Some(KeySource::new([1, 2, 3, 4], Default::default())))]),
+                ..Default::default()
+            },
+            |error| matches!(error, CombineError::NotCompatibleBip32Derivations(_)),
+        );
+
+        assert_conflict(
+            Output { proprietaries: BTreeMap::from([("key".to_string(), serde_value::Value::U8(1))]), ..Default::default() },
+            Output { proprietaries: BTreeMap::from([("key".to_string(), serde_value::Value::U8(2))]), ..Default::default() },
+            |error| matches!(error, CombineError::NotCompatibleProprietary(_)),
+        );
+
+        assert_conflict(
+            Output { unknowns: BTreeMap::from([("key".to_string(), serde_value::Value::U8(1))]), ..Default::default() },
+            Output { unknowns: BTreeMap::from([("key".to_string(), serde_value::Value::U8(2))]), ..Default::default() },
+            |error| matches!(error, CombineError::NotCompatibleUnknownField(_)),
+        );
+    }
+}

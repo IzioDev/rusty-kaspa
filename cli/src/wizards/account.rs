@@ -3,6 +3,7 @@ use crate::imports::*;
 use crate::result::Result;
 use kaspa_bip32::{Language, Mnemonic, WordCount};
 use kaspa_wallet_core::account::MULTISIG_ACCOUNT_KIND;
+use kaspa_wallet_core::derivation::MultisigDerivationScheme;
 use kaspa_wallet_core::storage::keydata::PrvKeyDataVariantKind;
 // use kaspa_wallet_core::runtime::wallet::AccountCreateArgsBip32;
 // use kaspa_wallet_core::runtime::{PrvKeyDataArgs, PrvKeyDataCreateArgs};
@@ -79,8 +80,16 @@ async fn create_multisig(ctx: &Arc<KaspaCli>, account_name: Option<String>, mnem
         let xpub_key = term.ask(false, &format!("Enter extended public {i} key: ")).await?;
         xpub_keys.push(xpub_key.trim().to_owned());
     }
-    let account =
-        wallet.create_account_multisig(&wallet_secret, prv_key_data_args, xpub_keys, account_name, minimum_signatures).await?;
+    let account = wallet
+        .create_account_multisig(
+            &wallet_secret,
+            prv_key_data_args,
+            xpub_keys,
+            account_name,
+            minimum_signatures,
+            MultisigDerivationScheme::default(),
+        )
+        .await?;
 
     tprintln!(ctx, "\naccount created: {}\n", account.get_list_string()?);
     wallet.select(Some(&account)).await?;
@@ -138,8 +147,16 @@ pub(crate) async fn multisig_watch(ctx: &Arc<KaspaCli>, name: Option<&str>) -> R
         let xpub_key = term.ask(false, &format!("Enter extended public {i} key: ")).await?;
         xpub_keys.push(xpub_key.trim().to_owned());
     }
-    let account =
-        wallet.create_account_multisig(&wallet_secret, prv_key_data_args, xpub_keys, account_name, minimum_signatures).await?;
+    let account = wallet
+        .create_account_multisig(
+            &wallet_secret,
+            prv_key_data_args,
+            xpub_keys,
+            account_name,
+            minimum_signatures,
+            MultisigDerivationScheme::default(),
+        )
+        .await?;
 
     tprintln!(ctx, "\naccount created: {}\n", account.get_list_string()?);
     wallet.select(Some(&account)).await?;

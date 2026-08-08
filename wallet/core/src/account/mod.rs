@@ -16,8 +16,7 @@ use pskb::{
 };
 pub use variants::*;
 
-use crate::derivation::AddressDerivationManagerTrait;
-use crate::derivation::build_derivate_paths;
+use crate::derivation::{AddressDerivationConfig, AddressDerivationManagerTrait, MultisigDerivationScheme, build_derivate_paths};
 use crate::imports::*;
 use crate::storage::AccountMetadata;
 use crate::storage::account::AccountSettings;
@@ -187,12 +186,21 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
         let keydata = self
             .wallet()
-            .store()
-            .as_prv_key_data_store()?
-            .load_key_data(&wallet_secret, prv_key_data_id)
+            .get_prv_key_data(&wallet_secret, prv_key_data_id)
             .await?
             .ok_or(Error::PrivateKeyNotFound(*prv_key_data_id))?;
         Ok(keydata)
+    }
+
+    async fn prv_key_data_list(self: Arc<Self>, wallet_secret: Secret) -> Result<Vec<PrvKeyData>> {
+        let storage = self.to_storage()?;
+        let keys_map = self.wallet().get_prv_key_data_map(&wallet_secret).await?;
+
+        // filter on account-related keys only
+        (&storage.prv_key_data_ids)
+            .into_iter()
+            .map(|prv_key_data_id| keys_map.get(&prv_key_data_id).cloned().ok_or(Error::PrivateKeyNotFound(prv_key_data_id)))
+            .collect()
     }
 
     fn to_storage(&self) -> Result<AccountStorage>;
@@ -435,7 +443,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         let settings =
             GeneratorSettings::try_new_with_account(self.clone().as_dyn_arc(), destination, fee_rate, priority_fee_sompi, payload)?;
         let keydata = self.prv_key_data(wallet_secret).await?;
-        let signer = Arc::new(PSKBSigner::new(self.clone().as_dyn_arc(), keydata, payment_secret));
+        let signer = Arc::new(PSKBSigner::new(self.clone().as_dyn_arc(), vec![keydata], payment_secret));
         let generator = Generator::try_new(settings, None, Some(abortable))?;
         let pskt_generator = PSKTGenerator::new(generator, signer, self.wallet().address_prefix()?);
         bundle_from_pskt_generator(pskt_generator).await
@@ -449,7 +457,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         sign_for_address: Option<&Address>,
     ) -> Result<Bundle, Error> {
         let keydata = self.prv_key_data(wallet_secret).await?;
-        let signer = Arc::new(PSKBSigner::new(self.clone().as_dyn_arc(), keydata.clone(), payment_secret.clone()));
+        let signer = Arc::new(PSKBSigner::new(self.clone().as_dyn_arc(), vec![keydata.clone()], payment_secret.clone()));
 
         let network_id = self.wallet().clone().network_id()?;
         let (derivation_path, key_fingerprint) = if self.account_kind() == KEYPAIR_ACCOUNT_KIND {
@@ -459,8 +467,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         } else {
             let derivation = self.as_derivation_capable()?;
 
-            let (derivation_path, _) =
-                build_derivate_paths(&derivation.account_kind(), derivation.account_index(), derivation.cosigner_index())?;
+            let (derivation_path, _) = build_derivate_paths(derivation.derivation_config()?)?;
 
             let key_fingerprint = keydata.get_xprv(payment_secret.clone().as_ref())?.public_key().fingerprint();
             (Some(derivation_path), Some(key_fingerprint))
@@ -579,6 +586,10 @@ pub trait Account: AnySync + Send + Sync + 'static {
         Err(Error::InvalidAccountKind)
     }
 
+    fn as_signature_scheme_capable(self: Arc<Self>) -> Result<Arc<dyn SignatureSchemeCapableAccount>> {
+        Err(Error::AccountSignatureSchemeCaps)
+    }
+
     fn create_address_private_keys<'l>(
         self: Arc<Self>,
         key_data: &PrvKeyData,
@@ -606,6 +617,17 @@ pub trait AsLegacyAccount: Account {
 
     async fn clear_private_context(&self) -> Result<()>;
 }
+
+/// Account trait used by account types with an explicit signature scheme.
+pub trait SignatureSchemeCapableAccount: Account {
+    fn signature_scheme(&self) -> SignatureScheme;
+
+    fn is_ecdsa(&self) -> bool {
+        self.signature_scheme().is_ecdsa()
+    }
+}
+
+downcast_sync!(dyn SignatureSchemeCapableAccount);
 
 /// Account trait used by derivation capable account types (BIP32, MultiSig, etc.)
 #[allow(clippy::too_many_arguments)]
@@ -806,8 +828,16 @@ pub trait DerivationCapableAccount: Account {
         Ok(address)
     }
 
-    fn cosigner_index(&self) -> u32 {
-        0
+    fn cosigner_index(&self) -> Option<u8> {
+        None
+    }
+
+    fn multisig_derivation_scheme(&self) -> Option<MultisigDerivationScheme> {
+        None
+    }
+
+    fn derivation_config(&self) -> Result<AddressDerivationConfig> {
+        AddressDerivationConfig::new(self.account_kind(), self.account_index(), self.multisig_derivation_scheme())
     }
 
     fn create_private_keys<'l>(
@@ -819,7 +849,7 @@ pub trait DerivationCapableAccount: Account {
     ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
         let payload = key_data.payload.decrypt(payment_secret.as_ref())?;
         let xkey = payload.get_xprv(payment_secret.as_ref())?;
-        create_private_keys(&self.account_kind(), self.cosigner_index(), self.account_index(), &xkey, receive, change)
+        create_private_keys(self.derivation_config()?, &xkey, receive, change)
     }
 
     // Retrieve receive address by index.
@@ -838,16 +868,14 @@ pub trait DerivationCapableAccount: Account {
 downcast_sync!(dyn DerivationCapableAccount);
 
 pub(crate) fn create_private_keys<'l>(
-    account_kind: &AccountKind,
-    cosigner_index: u32,
-    account_index: u64,
+    config: AddressDerivationConfig,
     xkey: &ExtendedPrivateKey<secp256k1::SecretKey>,
     receive: &[(&'l Address, u32)],
     change: &[(&'l Address, u32)],
 ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
-    let paths = build_derivate_paths(account_kind, account_index, cosigner_index)?;
+    let paths = build_derivate_paths(config)?;
     let mut private_keys = vec![];
-    if matches!(account_kind.as_ref(), LEGACY_ACCOUNT_KIND) {
+    if matches!(config.account_kind().as_ref(), LEGACY_ACCOUNT_KIND) {
         let (private_key, attrs) = WalletDerivationManagerV0::derive_key_by_path(xkey, paths.0)?;
         for (address, index) in receive.iter() {
             let (private_key, _) =
@@ -880,7 +908,7 @@ pub(crate) fn create_private_keys<'l>(
 mod tests {
     use super::ExtendedPrivateKey;
     use super::create_private_keys;
-    use crate::imports::LEGACY_ACCOUNT_KIND;
+    use crate::derivation::AddressDerivationConfig;
     use kaspa_addresses::Address;
     use kaspa_addresses::Prefix;
     use kaspa_bip32::PrivateKey;
@@ -1018,14 +1046,14 @@ mod tests {
         let receive_keys = gen0_receive_keys();
         let change_keys = gen0_change_keys();
 
-        let keys = create_private_keys(&LEGACY_ACCOUNT_KIND.into(), 0, 0, &xkey, &receive_addresses, &[]).unwrap();
+        let keys = create_private_keys(AddressDerivationConfig::legacy(0), &xkey, &receive_addresses, &[]).unwrap();
         for (index, (a, key)) in keys.iter().enumerate() {
             let address = PubkeyDerivationManagerV0::create_address(&key.get_public_key(), Prefix::Testnet, false).unwrap();
             assert_eq!(*a, &address, "receive address at {index} failed");
             assert_eq!(bytes_str(&key.to_bytes()), receive_keys[index], "receive key at {index} failed");
         }
 
-        let keys = create_private_keys(&LEGACY_ACCOUNT_KIND.into(), 0, 0, &xkey, &[], &change_addresses).unwrap();
+        let keys = create_private_keys(AddressDerivationConfig::legacy(0), &xkey, &[], &change_addresses).unwrap();
         for (index, (a, key)) in keys.iter().enumerate() {
             let address = PubkeyDerivationManagerV0::create_address(&key.get_public_key(), Prefix::Testnet, false).unwrap();
             assert_eq!(*a, &address, "change address at {index} failed");

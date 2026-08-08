@@ -2,7 +2,7 @@
 //! [`PrivateKeyGenerator`] helper for generating private key derivations from an extended private key (XPrv).
 //!
 
-use crate::derivation::gen1::WalletDerivationManager;
+use crate::derivation::gen1::{DerivationPurpose, WalletDerivationManager};
 use crate::imports::*;
 
 ///
@@ -27,14 +27,15 @@ impl PrivateKeyGenerator {
     pub fn new(xprv: &XPrvT, is_multisig: bool, account_index: u64, cosigner_index: Option<u32>) -> Result<PrivateKeyGenerator> {
         let xprv = XPrv::try_cast_from(xprv)?;
         let xprv = xprv.as_ref().inner();
+        let purpose = if is_multisig { DerivationPurpose::Bip45 } else { DerivationPurpose::Bip44 };
         let receive = xprv.clone().derive_path(&WalletDerivationManager::build_derivate_path(
-            is_multisig,
+            purpose,
             account_index,
             cosigner_index,
             Some(kaspa_bip32::AddressType::Receive),
         )?)?;
         let change = xprv.clone().derive_path(&WalletDerivationManager::build_derivate_path(
-            is_multisig,
+            purpose,
             account_index,
             cosigner_index,
             Some(kaspa_bip32::AddressType::Change),

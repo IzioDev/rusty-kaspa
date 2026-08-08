@@ -5,7 +5,7 @@ use crate::zk_precompiles::{parse_tag, verify_zk};
 use crate::{
     EngineFlags, LOCK_TIME_THRESHOLD, MAX_TX_IN_SEQUENCE_NUM, NO_COST_OPCODE, SEQUENCE_LOCK_TIME_DISABLED, SEQUENCE_LOCK_TIME_MASK,
     ScriptSource, SpkEncoding, TxScriptEngine, TxScriptError,
-    data_stack::{OpcodeData, StackEntry, serialize_i64},
+    data_stack::{OpcodeData, StackEntry, deserialize_i64, serialize_i64},
 };
 use blake2b_simd::Params;
 use kaspa_consensus_core::hashing::sighash::SigHashReusedValues;
@@ -1718,6 +1718,12 @@ opcode_list! {
     opcode OpInvalidOpCode<0xff, 1>(self, vm) Err(TxScriptError::InvalidOpcode(format!("{self:?}")))
 }
 
+#[allow(clippy::borrowed_box)]
+pub fn is_small_int<T: VerifiableTransaction, Reused: SigHashReusedValues>(opcode: &Box<dyn OpCodeImplementation<T, Reused>>) -> bool {
+    let value = opcode.value();
+    value == codes::OpFalse || (codes::OpTrue..=codes::Op16).contains(&value)
+}
+
 // converts an opcode from the list of Op0 to Op16 to its associated value
 #[allow(clippy::borrowed_box)]
 pub fn to_small_int<T: VerifiableTransaction, Reused: SigHashReusedValues>(opcode: &Box<dyn OpCodeImplementation<T, Reused>>) -> u8 {
@@ -1726,8 +1732,24 @@ pub fn to_small_int<T: VerifiableTransaction, Reused: SigHashReusedValues>(opcod
         return 0;
     }
 
-    assert!((codes::OpTrue..codes::Op16).contains(&value), "expected op codes between from the list of Op0 to Op16");
+    assert!(is_small_int(opcode), "expected op codes between from the list of Op0 to Op16");
     value - (codes::OpTrue - 1)
+}
+
+#[allow(clippy::borrowed_box)]
+pub fn to_script_num<T: VerifiableTransaction, Reused: SigHashReusedValues>(
+    opcode: &Box<dyn OpCodeImplementation<T, Reused>>,
+) -> Result<i64, TxScriptError> {
+    if is_small_int(opcode) {
+        return Ok(to_small_int(opcode).into());
+    }
+
+    if !opcode.is_push_opcode() {
+        return Err(TxScriptError::InvalidState("expected script number push".to_string()));
+    }
+
+    // TODO: cross check with Ori especially regarding relaxation: maybe do not keep minimal check
+    deserialize_i64(opcode.get_data(), true)
 }
 
 #[cfg(test)]

@@ -134,6 +134,10 @@ impl Account for Keypair {
         self
     }
 
+    fn as_signature_scheme_capable(self: Arc<Self>) -> Result<Arc<dyn SignatureSchemeCapableAccount>> {
+        Ok(self.clone())
+    }
+
     fn sig_op_count(&self) -> u8 {
         1
     }
@@ -205,5 +209,11 @@ impl Account for Keypair {
             }
         }
         Ok(private_keys)
+    }
+}
+
+impl SignatureSchemeCapableAccount for Keypair {
+    fn signature_scheme(&self) -> SignatureScheme {
+        if self.ecdsa { SignatureScheme::ECDSA } else { SignatureScheme::Schnorr }
     }
 }

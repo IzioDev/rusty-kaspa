@@ -310,9 +310,6 @@ impl WalletDerivationManagerV0 {
         // if let Some(cosigner_index) = cosigner_index {
         //     path = format!("{path}/{}", cosigner_index)
         // }
-        // if let Some(address_type) = address_type {
-        //     path = format!("{path}/{}", address_type.index());
-        // }
         //println!("path: {path}");
         let children = path.split('/');
         for child in children {
@@ -327,7 +324,8 @@ impl WalletDerivationManagerV0 {
         let purpose = 44;
         let mut path = format!("m/{purpose}'/972/{account_index}'");
         if let Some(address_type) = address_type {
-            path = format!("{path}/{}'", address_type.index());
+            let index: u32 = address_type.into();
+            path = format!("{path}/{index}'");
         }
         let path = path.parse::<DerivationPath>()?;
         Ok(path)
@@ -361,7 +359,7 @@ impl WalletDerivationManagerV0 {
         address_type: AddressType,
         attrs: &ExtendedKeyAttrs,
     ) -> Result<(secp256k1::SecretKey, ExtendedKeyAttrs, HmacSha512)> {
-        let (private_key, attrs) = Self::derive_private_key(private_key, attrs, ChildNumber::new(address_type.index(), true)?)?;
+        let (private_key, attrs) = Self::derive_private_key(private_key, attrs, ChildNumber::new(address_type.into(), true)?)?;
         let hmac = Self::create_hmac(&private_key, &attrs, true)?;
 
         Ok((private_key, attrs, hmac))

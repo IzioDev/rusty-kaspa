@@ -5,7 +5,7 @@
 
 pub use crate::account::descriptor::{AccountDescriptor, AccountDescriptorProperty};
 pub use crate::account::variants::*;
-pub use crate::account::{Account, AccountKind, DerivationCapableAccount};
+pub use crate::account::{Account, AccountKind, DerivationCapableAccount, SignatureSchemeCapableAccount};
 pub use crate::deterministic::*;
 pub use crate::encryption::{Encryptable, EncryptionKind};
 pub use crate::error::Error;
@@ -42,6 +42,7 @@ pub use kaspa_metrics_core::{Metric, Metrics, MetricsSnapshot};
 pub use kaspa_utils::hashmap::*;
 pub use kaspa_utils::hex::{FromHex, ToHex};
 pub use kaspa_wallet_keys::secret::Secret;
+pub use kaspa_wallet_keys::signature::SignatureScheme;
 pub use kaspa_wallet_keys::types::*;
 pub use pad::PadStr;
 pub use separator::Separatable;

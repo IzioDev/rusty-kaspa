@@ -499,6 +499,11 @@ impl PrvKeyDataStore for LocalStoreInner {
         Ok(self.cache.read().unwrap().prv_key_data_info.map.get(prv_key_data_id).cloned())
     }
 
+    async fn load_key_data_map(&self, wallet_secret: &Secret) -> Result<Decrypted<PrvKeyDataMap>> {
+        let prv_key_data_map: Decrypted<PrvKeyDataMap> = self.cache.read().unwrap().prv_key_data.decrypt(wallet_secret)?;
+        Ok(prv_key_data_map)
+    }
+
     async fn load_key_data(&self, wallet_secret: &Secret, prv_key_data_id: &PrvKeyDataId) -> Result<Option<PrvKeyData>> {
         let prv_key_data_map: Decrypted<PrvKeyDataMap> = self.cache.read().unwrap().prv_key_data.decrypt(wallet_secret)?;
         Ok(prv_key_data_map.get(prv_key_data_id).cloned())

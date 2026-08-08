@@ -15,7 +15,7 @@ pub struct WalletExportOptions {
 const TS_WALLET_DESCRIPTOR: &'static str = r#"
 /**
  * Wallet storage information.
- * 
+ *
  * @category Wallet API
  */
 export interface IWalletDescriptor {
@@ -77,6 +77,7 @@ pub trait PrvKeyDataStore: Send + Sync {
     async fn is_empty(&self) -> Result<bool>;
     async fn iter(&self) -> Result<StorageStream<Arc<PrvKeyDataInfo>>>;
     async fn load_key_info(&self, id: &PrvKeyDataId) -> Result<Option<Arc<PrvKeyDataInfo>>>;
+    async fn load_key_data_map(&self, wallet_secret: &Secret) -> Result<Decrypted<PrvKeyDataMap>>;
     async fn load_key_data(&self, wallet_secret: &Secret, id: &PrvKeyDataId) -> Result<Option<PrvKeyData>>;
     async fn store(&self, wallet_secret: &Secret, data: PrvKeyData) -> Result<()>;
     async fn remove(&self, wallet_secret: &Secret, id: &PrvKeyDataId) -> Result<()>;

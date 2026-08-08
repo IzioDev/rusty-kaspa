@@ -1,6 +1,6 @@
 use crate::error::Error;
 use crate::prelude::*;
-use crate::pskt::{Inner as PSKTInner, PSKT};
+use crate::pskt::{CombineError, Combiner, Inner as PSKTInner, PSKT};
 // use crate::wasm::result;
 
 use kaspa_addresses::{Address, Prefix};
@@ -19,7 +19,7 @@ use std::ops::Deref;
 /// meant for batch processing and transport as a
 /// single serialized payload.
 ///
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bundle(pub Vec<PSKTInner>);
 
@@ -56,6 +56,47 @@ impl Bundle {
         for inner in other.0 {
             self.0.push(inner);
         }
+    }
+
+    /// Combines two Bundle PSKTs, assumes all T in passed Bundle also are present in this Bundle
+    ///
+    /// Fails if one transaction cannot be combined
+    pub fn combine(self, other: Bundle) -> Result<Bundle, Error> {
+        if self.0.is_empty() {
+            return Ok(other);
+        }
+        if other.0.is_empty() {
+            return Ok(self);
+        }
+
+        let mut combined = self.0;
+
+        for rhs in other.0 {
+            let rhs_pskt = PSKT::<Combiner>::from(rhs);
+            let mut merged = None;
+
+            for (position, lhs) in combined.iter().enumerate() {
+                let lhs = PSKT::<Combiner>::from(lhs.clone());
+                match lhs.combine(rhs_pskt.clone()) {
+                    Ok(pskt) => {
+                        merged = Some((position, pskt.deref().clone()));
+                        break;
+                    }
+                    Err(CombineError::TransactionMismatch) => {}
+                    Err(CombineError::Inputs(crate::input::CombineError::ConflictingPartialSignature { public_key, .. })) => {
+                        return Err(Error::ConflictingPartialSignature(public_key));
+                    }
+                    Err(error) => return Err(Error::PsktCombineError(error.to_string())),
+                }
+            }
+
+            let Some((position, inner)) = merged else {
+                return Err(Error::PskbTransactionMismatch);
+            };
+            combined[position] = inner;
+        }
+
+        Ok(Bundle(combined))
     }
 
     /// Iterator over the inner PSKT instances
@@ -390,5 +431,21 @@ mod tests {
         bundle1.merge(bundle2);
 
         assert_eq!(bundle1.0.len(), 2);
+    }
+
+    #[test]
+    fn test_pskb_combine_partial_signatures() {
+        let (keypairs, _) = mock_context();
+        let mut left = PSKTInner { inputs: vec![Input::default()], ..Default::default() };
+        let mut right = left.clone();
+        let left_sig = Signature::Schnorr(secp256k1::schnorr::Signature::from_slice(&[1u8; 64]).unwrap());
+        let right_sig = Signature::Schnorr(secp256k1::schnorr::Signature::from_slice(&[2u8; 64]).unwrap());
+
+        left.inputs[0].partial_sigs.insert(keypairs[0].public_key(), left_sig);
+        right.inputs[0].partial_sigs.insert(keypairs[1].public_key(), right_sig);
+
+        let combined = Bundle(vec![left]).combine(Bundle(vec![right])).unwrap();
+
+        assert_eq!(combined.0[0].inputs[0].partial_sigs.len(), 2);
     }
 }

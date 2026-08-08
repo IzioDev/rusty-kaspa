@@ -3,7 +3,7 @@
 //!
 
 use crate::account::Inner;
-use crate::derivation::{AddressDerivationManager, AddressDerivationManagerTrait};
+use crate::derivation::{AddressDerivationConfig, AddressDerivationManager, AddressDerivationManagerTrait};
 use crate::imports::*;
 
 pub const BIP32_ACCOUNT_KIND: &str = "kaspa-bip32-standard";
@@ -107,11 +107,9 @@ impl Bip32 {
 
         let derivation = AddressDerivationManager::new(
             wallet,
-            BIP32_ACCOUNT_KIND.into(),
+            AddressDerivationConfig::standard(BIP32_ACCOUNT_KIND.into(), account_index),
             &xpub_keys,
             ecdsa,
-            account_index,
-            None,
             1,
             Default::default(),
         )
@@ -131,11 +129,9 @@ impl Bip32 {
 
         let derivation = AddressDerivationManager::new(
             wallet,
-            BIP32_ACCOUNT_KIND.into(),
+            AddressDerivationConfig::standard(BIP32_ACCOUNT_KIND.into(), account_index),
             &xpub_keys,
             ecdsa,
-            account_index,
-            None,
             1,
             address_derivation_indexes,
         )
@@ -256,6 +252,16 @@ impl Account for Bip32 {
 
     fn as_derivation_capable(self: Arc<Self>) -> Result<Arc<dyn DerivationCapableAccount>> {
         Ok(self.clone())
+    }
+
+    fn as_signature_scheme_capable(self: Arc<Self>) -> Result<Arc<dyn SignatureSchemeCapableAccount>> {
+        Ok(self.clone())
+    }
+}
+
+impl SignatureSchemeCapableAccount for Bip32 {
+    fn signature_scheme(&self) -> SignatureScheme {
+        if self.ecdsa { SignatureScheme::ECDSA } else { SignatureScheme::Schnorr }
     }
 }
 

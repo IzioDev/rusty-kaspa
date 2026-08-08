@@ -71,6 +71,7 @@ use kaspa_consensus_core::subnets::SUBNETWORK_ID_NATIVE;
 use kaspa_consensus_core::tx::{Transaction, TransactionInput, TransactionOutpoint, TransactionOutput};
 use kaspa_hashes::Hash;
 use kaspa_txscript::pay_to_address_script;
+use kaspa_wallet_pskt::prelude::{Bundle, PSKT, Signer};
 use std::collections::VecDeque;
 
 // fee reduction - when a transactions has some storage mass
@@ -576,6 +577,18 @@ impl Generator {
     #[inline(always)]
     pub fn stream(&self) -> impl Stream<Item = Result<PendingTransaction>> + 'static {
         Box::pin(PendingTransactionStream::new(self))
+    }
+
+    /// Generates all pending transactions into a PSKT bundle.
+    pub async fn try_into_pskt_bundle(self) -> Result<Bundle> {
+        let mut bundle = Bundle::new();
+        let mut stream = self.stream();
+
+        while let Some(pending_tx) = stream.try_next().await? {
+            bundle.add_pskt(PSKT::<Signer>::try_from(pending_tx)?);
+        }
+
+        Ok(bundle)
     }
 
     /// Returns an iterator that causes the [Generator] to produce

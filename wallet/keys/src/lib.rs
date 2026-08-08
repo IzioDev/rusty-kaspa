@@ -17,6 +17,7 @@ pub mod pubkeygen;
 pub mod publickey;
 pub mod result;
 pub mod secret;
+pub mod signature;
 pub mod types;
 pub mod xprv;
 pub mod xpub;
