@@ -344,6 +344,8 @@ pub struct AccountsRenameResponse {}
 #[wasm_bindgen]
 pub enum AccountsDiscoveryKind {
     Bip44,
+    Kcc3Schnorr,
+    Kcc3Ecdsa,
 }
 
 impl FromStr for AccountsDiscoveryKind {
@@ -351,6 +353,8 @@ impl FromStr for AccountsDiscoveryKind {
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "bip44" => Ok(Self::Bip44),
+            "kcc3-schnorr" | "kcc3Schnorr" => Ok(Self::Kcc3Schnorr),
+            "kcc3-ecdsa" | "kcc3Ecdsa" => Ok(Self::Kcc3Ecdsa),
             _ => Err(Error::custom(format!("Invalid discovery kind: {s}"))),
         }
     }

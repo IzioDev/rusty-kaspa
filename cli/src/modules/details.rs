@@ -9,7 +9,7 @@ impl Details {
         let ctx = ctx.clone().downcast_arc::<KaspaCli>()?;
         let account = ctx.select_account().await?.as_derivation_capable()?;
 
-        let derivation = account.derivation();
+        let derivation = account.derivation()?;
 
         let manager = derivation.receive_address_manager();
         let index = manager.index() + 1;

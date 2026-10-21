@@ -46,6 +46,30 @@ pub(crate) async fn create(
         }
     }
 
+    let kind = term.ask(false, "Account kind (kcc3/bip32/legacy, default kcc3): ").await?;
+    let account_kind = if kind.trim().is_empty() {
+        kaspa_wallet_core::account::KCC3_ACCOUNT_KIND.into()
+    } else {
+        kind.trim().parse::<AccountKind>()?
+    };
+    if !matches!(
+        account_kind.as_ref(),
+        kaspa_wallet_core::account::KCC3_ACCOUNT_KIND
+            | kaspa_wallet_core::account::BIP32_ACCOUNT_KIND
+            | kaspa_wallet_core::account::LEGACY_ACCOUNT_KIND
+    ) {
+        return Err(Error::custom("Unsupported wallet account kind"));
+    }
+    let signature_scheme = if account_kind == kaspa_wallet_core::account::KCC3_ACCOUNT_KIND {
+        match term.ask(false, "Signature scheme (schnorr/ecdsa, default schnorr): ").await?.trim() {
+            "" | "schnorr" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Schnorr,
+            "ecdsa" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa,
+            _ => return Err(Error::custom("Unsupported signature scheme")),
+        }
+    } else {
+        Default::default()
+    };
+
     let account_name = term.ask(false, "Default account title: ").await?.trim().to_string();
     let account_name = account_name.is_not_empty().then_some(account_name);
 
@@ -145,8 +169,21 @@ pub(crate) async fn create(
     let (_wallet_descriptor, storage_descriptor) = ctx.wallet().create_wallet(&wallet_secret, wallet_args).await?;
     let prv_key_data_id = wallet.create_prv_key_data(&wallet_secret, prv_key_data_args).await?;
 
-    let account_args = AccountCreateArgsBip32::new(account_name, None);
-    let account = wallet.create_account_bip32(&wallet_secret, prv_key_data_id, payment_secret.as_ref(), account_args).await?;
+    let args = match account_kind.as_ref() {
+        kaspa_wallet_core::account::KCC3_ACCOUNT_KIND => AccountCreateArgs::Kcc3 {
+            prv_key_data_args: PrvKeyDataArgs::new(prv_key_data_id, payment_secret.clone()),
+            account_name,
+            network: wallet.network_id()?.network_type,
+            signature_scheme,
+            account_index: None,
+        },
+        kaspa_wallet_core::account::BIP32_ACCOUNT_KIND => {
+            AccountCreateArgs::new_bip32(prv_key_data_id, payment_secret.clone(), account_name, None)
+        }
+        kaspa_wallet_core::account::LEGACY_ACCOUNT_KIND => AccountCreateArgs::new_legacy(prv_key_data_id, account_name),
+        _ => return Err(Error::custom("Unsupported wallet account kind")),
+    };
+    let account = wallet.create_account(&wallet_secret, args, true, &guard).await?;
 
     // flush data to storage
     wallet.store().flush(&wallet_secret).await?;

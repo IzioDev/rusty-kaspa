@@ -273,6 +273,7 @@ struct Inner {
     abortable: Option<Abortable>,
     // Optional signer that is passed on to the [`PendingTransaction`] allowing [`PendingTransaction`] to expose signing functions for convenience.
     signer: Option<Arc<dyn SignerT>>,
+    context_account: Option<Arc<dyn Account>>,
     // Internal mass calculator (pre-configured with network params)
     mass_calculator: MassCalculator,
     // Current network id
@@ -352,6 +353,7 @@ impl Generator {
     /// Create a new [`Generator`] instance using [`GeneratorSettings`].
     pub fn try_new(settings: GeneratorSettings, signer: Option<Arc<dyn SignerT>>, abortable: Option<&Abortable>) -> Result<Self> {
         let GeneratorSettings {
+            context_account,
             version,
             network_id,
             multiplexer,
@@ -477,6 +479,7 @@ impl Generator {
             multiplexer,
             context,
             signer,
+            context_account,
             abortable: abortable.cloned(),
             mass_calculator,
             source_utxo_context: utxo_context,
@@ -1151,7 +1154,14 @@ impl Generator {
     /// an intermediate "batch" transaction sending funds to the change address
     /// or creating a final transaction with the requested set of outputs and the
     /// payload.
+    pub fn context_account(&self) -> Option<&Arc<dyn Account>> {
+        self.inner.context_account.as_ref()
+    }
+
     pub fn generate_transaction(&self) -> Result<Option<PendingTransaction>> {
+        if let Some(account) = self.context_account() {
+            account.ensure_active_context()?;
+        }
         let mut context = self.context();
 
         if context.is_done {

@@ -13,6 +13,8 @@ use kaspa_consensus_core::tx::ComputeCommit;
 use workflow_core::channel::Multiplexer;
 
 pub struct GeneratorSettings {
+    /// Immutable account view for network-sensitive KCC-3 operations.
+    pub context_account: Option<Arc<dyn Account>>,
     // Transaction version
     pub version: u16,
     // Network type
@@ -73,6 +75,7 @@ impl GeneratorSettings {
         final_priority_fee: Fees,
         final_transaction_payload: Option<Vec<u8>>,
     ) -> Result<Self> {
+        account.ensure_active_context()?;
         let network_id = account.utxo_context().processor().network_id()?;
         let change_address = account.change_address()?;
         let multiplexer = account.wallet().multiplexer().clone();
@@ -96,6 +99,7 @@ impl GeneratorSettings {
             final_transaction_destination,
             final_transaction_payload,
             destination_utxo_context: None,
+            context_account: matches!(account.account_kind().as_ref(), KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND).then_some(account),
         };
 
         Ok(settings)
@@ -119,6 +123,7 @@ impl GeneratorSettings {
         let utxo_iterator = UtxoIterator::new(&utxo_context);
 
         let settings = GeneratorSettings {
+            context_account: None,
             version: 0,
             network_id,
             multiplexer,
@@ -154,6 +159,7 @@ impl GeneratorSettings {
         multiplexer: Option<Multiplexer<Box<Events>>>,
     ) -> Result<Self> {
         let settings = GeneratorSettings {
+            context_account: None,
             version: 0,
             network_id,
             multiplexer,

@@ -25,6 +25,8 @@ pub struct RpcCoreMock {
     ctl: RpcCtl,
     core_notifier: Arc<RpcCoreNotifier>,
     _sync_receiver: Receiver<()>,
+    pub utxo_entries: Mutex<Option<Vec<RpcUtxosByAddressesEntry>>>,
+    pub utxo_requests: Mutex<Vec<Vec<Address>>>,
 }
 
 impl RpcCoreMock {
@@ -41,7 +43,13 @@ impl RpcCoreMock {
             policies,
             Some(sync_sender),
         ));
-        Self { core_notifier, _sync_receiver: sync_receiver, ctl: RpcCtl::new() }
+        Self {
+            core_notifier,
+            _sync_receiver: sync_receiver,
+            ctl: RpcCtl::new(),
+            utxo_entries: Mutex::new(None),
+            utxo_requests: Mutex::new(Vec::new()),
+        }
     }
 
     pub fn core_notifier(&self) -> Arc<RpcCoreNotifier> {
@@ -310,9 +318,20 @@ impl RpcApi for RpcCoreMock {
     async fn get_utxos_by_addresses_call(
         &self,
         _connection: Option<&DynRpcConnection>,
-        _request: GetUtxosByAddressesRequest,
+        request: GetUtxosByAddressesRequest,
     ) -> RpcResult<GetUtxosByAddressesResponse> {
-        Err(RpcError::NotImplemented)
+        let configured = self.utxo_entries.lock().unwrap();
+        if let Some(entries) = configured.as_ref() {
+            let entries = entries
+                .iter()
+                .filter(|entry| entry.address.as_ref().is_some_and(|address| request.addresses.contains(address)))
+                .cloned()
+                .collect();
+            self.utxo_requests.lock().unwrap().push(request.addresses);
+            Ok(GetUtxosByAddressesResponse { entries })
+        } else {
+            Err(RpcError::NotImplemented)
+        }
     }
 
     async fn get_utxos_by_addresses_v2_call(

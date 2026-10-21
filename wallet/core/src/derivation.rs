@@ -48,6 +48,25 @@ pub struct Inner {
     pub address_to_index_map: HashMap<Address, u32>,
 }
 
+/// Address-chain operations shared by account derivation and UTXO scanning.
+/// Implementations own their derivation rules and runtime context.
+pub trait AddressManagerTrait: Send + Sync {
+    fn inner(&self) -> MutexGuard<'_, Inner>;
+    fn ensure_active_context(&self) -> Result<()> {
+        Ok(())
+    }
+    fn index(&self) -> u32 {
+        self.inner().index
+    }
+    fn new_address(&self) -> Result<Address>;
+    fn current_address(&self) -> Result<Address>;
+    fn set_index(&self, index: u32) -> Result<()>;
+    fn get_range(&self, indexes: std::ops::Range<u32>) -> Result<Vec<Address>> {
+        self.get_range_with_args(indexes, true)
+    }
+    fn get_range_with_args(&self, indexes: std::ops::Range<u32>, update_indexes: bool) -> Result<Vec<Address>>;
+}
+
 pub struct AddressManager {
     pub wallet: Arc<Wallet>,
     pub account_kind: AccountKind,
@@ -172,6 +191,28 @@ impl AddressManager {
         }
 
         Ok(())
+    }
+}
+
+impl AddressManagerTrait for AddressManager {
+    fn inner(&self) -> MutexGuard<'_, Inner> {
+        self.inner()
+    }
+
+    fn new_address(&self) -> Result<Address> {
+        self.new_address()
+    }
+
+    fn current_address(&self) -> Result<Address> {
+        self.current_address()
+    }
+
+    fn set_index(&self, index: u32) -> Result<()> {
+        self.set_index(index)
+    }
+
+    fn get_range_with_args(&self, indexes: std::ops::Range<u32>, update_indexes: bool) -> Result<Vec<Address>> {
+        self.get_range_with_args(indexes, update_indexes)
     }
 }
 
@@ -346,22 +387,7 @@ impl AddressDerivationManager {
 
     #[allow(clippy::type_complexity)]
     pub fn get_addresses_indexes<'l>(&self, addresses: &[&'l Address]) -> Result<(Vec<(&'l Address, u32)>, Vec<(&'l Address, u32)>)> {
-        let mut receive_indexes = vec![];
-        let mut change_indexes = vec![];
-        let receive_map = &self.receive_address_manager.inner().address_to_index_map;
-        let change_map = &self.change_address_manager.inner().address_to_index_map;
-
-        for address in addresses {
-            if let Some(index) = receive_map.get(*address) {
-                receive_indexes.push((*address, *index));
-            } else if let Some(index) = change_map.get(*address) {
-                change_indexes.push((*address, *index));
-            } else {
-                return Err(Error::Custom(format!("Address ({address}) index not found.")));
-            }
-        }
-
-        Ok((receive_indexes, change_indexes))
+        self.addresses_indexes(addresses)
     }
 
     pub fn receive_indexes_by_addresses(&self, addresses: &Vec<Address>) -> Result<Vec<u32>> {
@@ -404,17 +430,12 @@ impl AddressDerivationManager {
 
 #[async_trait]
 impl AddressDerivationManagerTrait for AddressDerivationManager {
-    fn receive_address_manager(&self) -> Arc<AddressManager> {
+    fn receive_address_manager(&self) -> Arc<dyn AddressManagerTrait> {
         self.receive_address_manager.clone()
     }
 
-    fn change_address_manager(&self) -> Arc<AddressManager> {
+    fn change_address_manager(&self) -> Arc<dyn AddressManagerTrait> {
         self.change_address_manager.clone()
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn addresses_indexes<'l>(&self, addresses: &[&'l Address]) -> Result<(Vec<(&'l Address, u32)>, Vec<(&'l Address, u32)>)> {
-        self.get_addresses_indexes(addresses)
     }
 
     async fn get_range_with_keys(
@@ -430,10 +451,30 @@ impl AddressDerivationManagerTrait for AddressDerivationManager {
 
 #[async_trait]
 pub trait AddressDerivationManagerTrait: AnySync + Send + Sync + 'static {
-    fn receive_address_manager(&self) -> Arc<AddressManager>;
-    fn change_address_manager(&self) -> Arc<AddressManager>;
+    fn receive_address_manager(&self) -> Arc<dyn AddressManagerTrait>;
+    fn change_address_manager(&self) -> Arc<dyn AddressManagerTrait>;
     #[allow(clippy::type_complexity)]
-    fn addresses_indexes<'l>(&self, addresses: &[&'l Address]) -> Result<(Vec<(&'l Address, u32)>, Vec<(&'l Address, u32)>)>;
+    fn addresses_indexes<'l>(&self, addresses: &[&'l Address]) -> Result<(Vec<(&'l Address, u32)>, Vec<(&'l Address, u32)>)> {
+        let mut receive_indexes = vec![];
+        let mut change_indexes = vec![];
+        let receive = self.receive_address_manager();
+        let change = self.change_address_manager();
+        let receive_map = &receive.inner().address_to_index_map;
+        let change_map = &change.inner().address_to_index_map;
+
+        for address in addresses {
+            if let Some(index) = receive_map.get(*address) {
+                receive_indexes.push((*address, *index));
+            } else if let Some(index) = change_map.get(*address) {
+                change_indexes.push((*address, *index));
+            } else {
+                return Err(Error::Custom(format!("Address ({address}) index not found.")));
+            }
+        }
+
+        Ok((receive_indexes, change_indexes))
+    }
+
     async fn get_range_with_keys(
         &self,
         change_address: bool,
@@ -526,6 +567,7 @@ pub async fn create_xpub_from_mnemonic(
     let xkey = ExtendedPrivateKey::<secp256k1::SecretKey>::new(seed)?;
 
     let (secret_key, attrs) = match account_kind.as_ref() {
+        KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND => return Err(Error::custom("KCC-3 requires an explicit validated origin")),
         LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xkey, false, account_index)?,
         MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xkey, true, account_index)?,
         _ => WalletDerivationManager::derive_extended_key_from_master_key(xkey, false, account_index)?,
@@ -542,6 +584,7 @@ pub async fn create_xpub_from_xprv(
     account_index: u64,
 ) -> Result<ExtendedPublicKey<secp256k1::PublicKey>> {
     let (secret_key, attrs) = match account_kind.as_ref() {
+        KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND => return Err(Error::custom("KCC-3 requires an explicit validated origin")),
         LEGACY_ACCOUNT_KIND => WalletDerivationManagerV0::derive_extended_key_from_master_key(xprv, false, account_index)?,
         MULTISIG_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, true, account_index)?,
         BIP32_ACCOUNT_KIND => WalletDerivationManager::derive_extended_key_from_master_key(xprv, false, account_index)?,

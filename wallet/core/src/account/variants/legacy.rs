@@ -246,8 +246,8 @@ impl AsLegacyAccount for Legacy {
 }
 
 impl DerivationCapableAccount for Legacy {
-    fn derivation(&self) -> Arc<dyn AddressDerivationManagerTrait> {
-        self.derivation.clone()
+    fn derivation(&self) -> Result<Arc<dyn AddressDerivationManagerTrait>> {
+        Ok(self.derivation.clone())
     }
 
     // legacy accounts do not support bip44

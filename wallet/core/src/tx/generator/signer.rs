@@ -10,6 +10,63 @@ pub trait SignerT: Send + Sync + 'static {
     fn try_sign(&self, transaction: SignableTransaction, addresses: &[Address]) -> Result<SignableTransaction>;
 }
 
+/// P2PK signer bound to the account's immutable network view.
+pub struct Kcc3Signer {
+    account: Arc<crate::account::kcc3::Kcc3>,
+    keydata: PrvKeyData,
+    payment_secret: Option<Secret>,
+}
+
+impl Kcc3Signer {
+    pub fn new(account: Arc<crate::account::kcc3::Kcc3>, keydata: PrvKeyData, payment_secret: Option<Secret>) -> Self {
+        Self { account, keydata, payment_secret }
+    }
+}
+
+impl SignerT for Kcc3Signer {
+    fn try_sign(&self, mut transaction: SignableTransaction, addresses: &[Address]) -> Result<SignableTransaction> {
+        use kaspa_consensus_core::hashing::{
+            sighash::{SigHashReusedValuesUnsync, calc_ecdsa_signature_hash, calc_schnorr_signature_hash},
+            sighash_type::SIG_HASH_ALL,
+        };
+        use kaspa_wallet_keys::derivation::gen2::SignatureScheme;
+        self.account.ensure_active_context()?;
+        if addresses.len() != transaction.tx.inputs.len() || transaction.entries.len() != addresses.len() {
+            return Err(Error::custom("KCC-3 input/address count mismatch"));
+        }
+        let refs = addresses.iter().collect::<Vec<_>>();
+        let keys = self.account.clone().create_address_private_keys(&self.keydata, &self.payment_secret, &refs)?;
+        let scheme = self.account.public_description()?.key.derivation().signature_scheme();
+        let reused = SigHashReusedValuesUnsync::new();
+        for (index, address) in addresses.iter().enumerate() {
+            let key = &keys.iter().find(|(a, _)| *a == address).ok_or_else(|| Error::custom("Missing KCC-3 input key"))?.1;
+            let public = key.public_key(secp256k1::SECP256K1);
+            let expected = kaspa_wallet_keys::derivation::gen1::PubkeyDerivationManager::create_address(
+                &public,
+                self.account.wallet().address_prefix()?,
+                scheme == SignatureScheme::Ecdsa,
+            )?;
+            let entry = transaction.entries[index].as_ref().ok_or_else(|| Error::custom("KCC-3 input has no UTXO"))?;
+            if expected != *address || entry.script_public_key != kaspa_txscript::pay_to_address_script(&expected) {
+                return Err(Error::custom("KCC-3 input script does not match derived key"));
+            }
+            let hash = match scheme {
+                SignatureScheme::Schnorr => calc_schnorr_signature_hash(&transaction.as_verifiable(), index, SIG_HASH_ALL, &reused),
+                SignatureScheme::Ecdsa => calc_ecdsa_signature_hash(&transaction.as_verifiable(), index, SIG_HASH_ALL, &reused),
+            };
+            let message = secp256k1::Message::from_digest_slice(&hash.as_bytes())?;
+            let signature = match scheme {
+                SignatureScheme::Schnorr => key.keypair(secp256k1::SECP256K1).sign_schnorr(message).serialize(),
+                SignatureScheme::Ecdsa => secp256k1::SECP256K1.sign_ecdsa(&message, key).serialize_compact(),
+            };
+            transaction.tx.inputs[index].signature_script =
+                std::iter::once(65).chain(signature).chain([SIG_HASH_ALL.to_u8()]).collect();
+        }
+        self.account.ensure_active_context()?;
+        Ok(transaction)
+    }
+}
+
 struct Inner {
     keydata: PrvKeyData,
     account: Arc<dyn Account>,

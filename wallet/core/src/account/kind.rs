@@ -72,6 +72,8 @@ impl FromStr for AccountKind {
                 "multisig" => Ok(MULTISIG_ACCOUNT_KIND.into()),
                 "keypair" => Ok(KEYPAIR_ACCOUNT_KIND.into()),
                 "bip32watch" => Ok(BIP32_WATCH_ACCOUNT_KIND.into()),
+                "kcc3" => Ok(KCC3_ACCOUNT_KIND.into()),
+                "kcc3-watch" => Ok(KCC3_WATCH_ACCOUNT_KIND.into()),
                 _ => Err(Error::InvalidAccountKind),
             }
         }

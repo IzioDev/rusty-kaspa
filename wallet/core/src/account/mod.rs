@@ -90,6 +90,10 @@ impl Inner {
 pub trait Account: AnySync + Send + Sync + 'static {
     fn inner(&self) -> &Arc<Inner>;
 
+    fn ensure_active_context(&self) -> Result<()> {
+        Ok(())
+    }
+
     fn context(&self) -> MutexGuard<'_, Context> {
         self.inner().context.lock().unwrap()
     }
@@ -145,6 +149,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
     }
 
     async fn rename(&self, wallet_secret: &Secret, name: Option<&str>) -> Result<()> {
+        let context_guard = self.wallet().context_guard();
+        let _context_guard = context_guard.lock().await;
+        self.ensure_active_context()?;
         {
             let mut context = self.context();
             context.settings.name = name.map(String::from);
@@ -200,6 +207,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
     fn descriptor(&self) -> Result<descriptor::AccountDescriptor>;
 
     async fn scan(self: Arc<Self>, window_size: Option<usize>, extent: Option<u32>) -> Result<()> {
+        self.ensure_active_context()?;
         self.utxo_context().clear().await?;
 
         let current_daa_score = self.wallet().current_daa_score().ok_or(Error::NotConnected)?;
@@ -207,7 +215,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
         match self.clone().as_derivation_capable() {
             Ok(account) => {
-                let derivation = account.derivation();
+                let derivation = account.derivation()?;
 
                 let extent = match extent {
                     Some(depth) => ScanExtent::Depth(depth),
@@ -245,6 +253,14 @@ pub trait Account: AnySync + Send + Sync + 'static {
             }
         }
 
+        let context_guard = self.wallet().context_guard();
+        let _context_guard = context_guard.lock().await;
+        self.ensure_active_context()?;
+        if matches!(self.account_kind().as_ref(), KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND)
+            && let Some(metadata) = self.metadata()?
+        {
+            self.wallet().store().as_account_store()?.update_metadata(vec![metadata]).await?;
+        }
         self.utxo_context().update_balance().await?;
 
         Ok(())
@@ -276,6 +292,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     /// Stop Account service task
     async fn stop(self: Arc<Self>) -> Result<()> {
+        self.ensure_active_context()?;
         self.utxo_context().clear().await?;
         self.disconnect().await?;
         Ok(())
@@ -283,6 +300,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     /// handle connection event
     async fn connect(self: Arc<Self>) -> Result<()> {
+        self.ensure_active_context()?;
         let vacated = self.wallet().active_accounts().insert(self.clone().as_dyn_arc());
         if vacated.is_none() && self.wallet().is_connected() {
             self.scan(None, None).await?;
@@ -292,7 +310,11 @@ pub trait Account: AnySync + Send + Sync + 'static {
 
     /// handle disconnection event
     async fn disconnect(&self) -> Result<()> {
-        self.wallet().active_accounts().remove(self.id());
+        self.ensure_active_context()?;
+        let mut accounts = self.wallet().active_accounts().inner();
+        if accounts.get(self.id()).is_some_and(|account| std::ptr::eq(account.inner().as_ref(), self.inner().as_ref())) {
+            accounts.remove(self.id());
+        }
         Ok(())
     }
 
@@ -308,8 +330,8 @@ pub trait Account: AnySync + Send + Sync + 'static {
         abortable: &Abortable,
         notifier: Option<GenerationNotifier>,
     ) -> Result<(GeneratorSummary, Vec<kaspa_hashes::Hash>)> {
-        let keydata = self.prv_key_data(wallet_secret).await?;
-        let signer = Arc::new(Signer::new(self.clone().as_dyn_arc(), keydata, payment_secret));
+        self.ensure_active_context()?;
+        let signer = self.clone().as_dyn_arc().create_signer(wallet_secret, payment_secret).await?;
         let settings = GeneratorSettings::try_new_with_account(
             self.clone().as_dyn_arc(),
             PaymentDestination::Change,
@@ -323,6 +345,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         let mut ids = vec![];
         while let Some(transaction) = stream.try_next().await? {
             transaction.try_sign()?;
+            self.ensure_active_context()?;
             ids.push(transaction.try_submit(&self.wallet().rpc_api()).await?);
 
             if let Some(notifier) = notifier.as_ref() {
@@ -347,8 +370,8 @@ pub trait Account: AnySync + Send + Sync + 'static {
         abortable: &Abortable,
         notifier: Option<GenerationNotifier>,
     ) -> Result<(GeneratorSummary, Vec<kaspa_hashes::Hash>)> {
-        let keydata = self.prv_key_data(wallet_secret).await?;
-        let signer = Arc::new(Signer::new(self.clone().as_dyn_arc(), keydata, payment_secret));
+        self.ensure_active_context()?;
+        let signer = self.clone().as_dyn_arc().create_signer(wallet_secret, payment_secret).await?;
 
         let settings =
             GeneratorSettings::try_new_with_account(self.clone().as_dyn_arc(), destination, fee_rate, priority_fee_sompi, payload)?;
@@ -359,6 +382,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         let mut ids = vec![];
         while let Some(transaction) = stream.try_next().await? {
             transaction.try_sign()?;
+            self.ensure_active_context()?;
             ids.push(transaction.try_submit(&self.wallet().rpc_api()).await?);
 
             if let Some(notifier) = notifier.as_ref() {
@@ -382,6 +406,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
         payload: Option<Vec<u8>>,
         abortable: &Abortable,
     ) -> Result<Bundle, Error> {
+        if matches!(self.account_kind().as_ref(), KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND) {
+            return Err(Error::custom("Commit/reveal is not supported for KCC-3 accounts"));
+        }
         commit_reveal_batch_bundle(
             pskb::CommitRevealBatchKind::Manual { hop_payment: start_destination, destination_payment: end_destination },
             reveal_fee_sompi,
@@ -408,6 +435,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
         payload: Option<Vec<u8>>,
         abortable: &Abortable,
     ) -> Result<Bundle, Error> {
+        if matches!(self.account_kind().as_ref(), KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND) {
+            return Err(Error::custom("Commit/reveal is not supported for KCC-3 accounts"));
+        }
         commit_reveal_batch_bundle(
             pskb::CommitRevealBatchKind::Parameterized { address, commit_amount_sompi },
             reveal_fee_sompi,
@@ -473,6 +503,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
     }
 
     async fn pskb_broadcast(self: Arc<Self>, bundle: &Bundle) -> Result<Vec<Hash>, Error> {
+        let context_guard = self.wallet().context_guard();
+        let _context_guard = context_guard.lock().await;
+        self.ensure_active_context()?;
         let mut ids = Vec::new();
         let mut stream = bundle_to_finalizer_stream(bundle);
 
@@ -483,10 +516,14 @@ pub trait Account: AnySync + Send + Sync + 'static {
                     let transaction =
                         pskt_to_pending_transaction(pskt, self.wallet().network_id()?, change, self.utxo_context().clone().into())?;
                     log_info!("Submitting to rpc");
+                    self.ensure_active_context()?;
                     ids.push(transaction.try_submit(&self.wallet().rpc_api()).await?);
                     log_info!("Submitted to rpc");
                 }
                 Err(e) => {
+                    if matches!(self.account_kind().as_ref(), KCC3_ACCOUNT_KIND | KCC3_WATCH_ACCOUNT_KIND) {
+                        return Err(e);
+                    }
                     log_info!("Error processing a PSKT from bundle: {:?}", e);
                 }
             }
@@ -512,8 +549,8 @@ pub trait Account: AnySync + Send + Sync + 'static {
         notifier: Option<GenerationNotifier>,
         guard: &WalletGuard,
     ) -> Result<(GeneratorSummary, Vec<kaspa_hashes::Hash>)> {
-        let keydata = self.prv_key_data(wallet_secret).await?;
-        let signer = Arc::new(Signer::new(self.clone().as_dyn_arc(), keydata, payment_secret));
+        self.ensure_active_context()?;
+        let signer = self.clone().as_dyn_arc().create_signer(wallet_secret, payment_secret).await?;
 
         let destination_account = self
             .wallet()
@@ -540,6 +577,7 @@ pub trait Account: AnySync + Send + Sync + 'static {
         let mut ids = vec![];
         while let Some(transaction) = stream.try_next().await? {
             transaction.try_sign()?;
+            self.ensure_active_context()?;
             ids.push(transaction.try_submit(&self.wallet().rpc_api()).await?);
 
             if let Some(notifier) = notifier.as_ref() {
@@ -571,6 +609,17 @@ pub trait Account: AnySync + Send + Sync + 'static {
         Ok(generator.summary())
     }
 
+    async fn create_signer(
+        self: Arc<Self>,
+        wallet_secret: Secret,
+        payment_secret: Option<Secret>,
+    ) -> Result<Arc<dyn crate::tx::SignerT>> {
+        self.ensure_active_context()?;
+        let keydata = self.prv_key_data(wallet_secret).await?;
+        self.ensure_active_context()?;
+        Ok(Arc::new(Signer::new(self.as_dyn_arc(), keydata, payment_secret)))
+    }
+
     fn as_derivation_capable(self: Arc<Self>) -> Result<Arc<dyn DerivationCapableAccount>> {
         Err(Error::AccountAddressDerivationCaps)
     }
@@ -585,8 +634,9 @@ pub trait Account: AnySync + Send + Sync + 'static {
         payment_secret: &Option<Secret>,
         addresses: &[&'l Address],
     ) -> Result<Vec<(&'l Address, secp256k1::SecretKey)>> {
-        let account = self.clone().as_derivation_capable().expect("expecting derivation capable account");
-        let (receive, change) = account.derivation().addresses_indexes(addresses)?;
+        self.ensure_active_context()?;
+        let account = self.clone().as_derivation_capable()?;
+        let (receive, change) = account.derivation()?.addresses_indexes(addresses)?;
         let private_keys = account.create_private_keys(key_data, payment_secret, &receive, &change)?;
         Ok(private_keys)
     }
@@ -611,7 +661,7 @@ pub trait AsLegacyAccount: Account {
 #[allow(clippy::too_many_arguments)]
 #[async_trait]
 pub trait DerivationCapableAccount: Account {
-    fn derivation(&self) -> Arc<dyn AddressDerivationManagerTrait>;
+    fn derivation(&self) -> Result<Arc<dyn AddressDerivationManagerTrait>>;
 
     fn account_index(&self) -> u64;
 
@@ -632,22 +682,47 @@ pub trait DerivationCapableAccount: Account {
             legacy_account.create_private_context(&wallet_secret, payment_secret.as_ref(), None).await?;
         }
 
-        let derivation = self.derivation();
+        let derivation = self.derivation()?;
 
-        let prv_key_data = self.prv_key_data(wallet_secret).await?;
-        let payload = prv_key_data.payload.decrypt(payment_secret.as_ref())?;
-        let xkey = payload.get_xprv(payment_secret.as_ref())?;
-
+        let xkey = if sweep {
+            let prv_key_data = self.prv_key_data(wallet_secret.clone()).await?;
+            Some(prv_key_data.get_xprv(payment_secret.as_ref())?)
+        } else {
+            None
+        };
         let receive_address_manager = derivation.receive_address_manager();
         let change_address_manager = derivation.change_address_manager();
-
         let change_address_index = change_address_manager.index();
-        let change_address_keypair =
-            derivation.get_range_with_keys(true, change_address_index..change_address_index + 1, false, &xkey).await?;
+        let change_address_keypair = if let Some(xkey) = &xkey {
+            Some(
+                derivation
+                    .get_range_with_keys(
+                        true,
+                        change_address_index
+                            ..change_address_index.checked_add(1).ok_or_else(|| Error::custom("Address index exhausted"))?,
+                        false,
+                        xkey,
+                    )
+                    .await?
+                    .into_iter()
+                    .next()
+                    .ok_or(Error::AddressNotFound)?,
+            )
+        } else {
+            None
+        };
+        let kcc3_signer = if sweep && self.account_kind() == KCC3_ACCOUNT_KIND {
+            Some(self.clone().as_dyn_arc().create_signer(wallet_secret, payment_secret.clone()).await?)
+        } else {
+            None
+        };
 
         let rpc = self.wallet().rpc_api();
         let notifier = notifier.as_ref();
 
+        if window == 0 {
+            return Err(Error::custom("Scan window must be nonzero"));
+        }
         let mut index: usize = start;
         let mut last_notification = 0;
         let mut aggregate_balance = 0;
@@ -655,16 +730,31 @@ pub trait DerivationCapableAccount: Account {
         let mut last_change_address_index = change_address_index;
         let mut last_receive_address_index = receive_address_manager.index();
 
-        let change_address = change_address_keypair[0].0.clone();
+        let change_address = self.change_address()?;
 
         while index < extent && !abortable.is_aborted() {
-            let first = index as u32;
-            let last = (index + window) as u32;
+            let first = u32::try_from(index).map_err(|_| Error::custom("Scan range overflow"))?;
+            let last = u32::try_from(index.checked_add(window).ok_or_else(|| Error::custom("Scan range overflow"))?)
+                .map_err(|_| Error::custom("Scan range overflow"))?;
             index = last as usize;
 
             let (mut keys, addresses) = if sweep {
-                let mut keypairs = derivation.get_range_with_keys(false, first..last, true, &xkey).await?;
-                let change_keypairs = derivation.get_range_with_keys(true, first..last, true, &xkey).await?;
+                let mut keypairs = derivation
+                    .get_range_with_keys(
+                        false,
+                        first..last,
+                        true,
+                        xkey.as_ref().ok_or_else(|| Error::custom("Sweep requires a private key"))?,
+                    )
+                    .await?;
+                let change_keypairs = derivation
+                    .get_range_with_keys(
+                        true,
+                        first..last,
+                        true,
+                        xkey.as_ref().ok_or_else(|| Error::custom("Sweep requires a private key"))?,
+                    )
+                    .await?;
                 keypairs.extend(change_keypairs);
                 let mut keys = vec![];
                 let addresses = keypairs
@@ -674,7 +764,9 @@ pub trait DerivationCapableAccount: Account {
                         address.clone()
                     })
                     .collect::<Vec<_>>();
-                keys.push(change_address_keypair[0].1.to_bytes());
+                if let Some((_, key)) = &change_address_keypair {
+                    keys.push(key.to_bytes());
+                }
                 (keys, addresses)
             } else {
                 let mut addresses = receive_address_manager.get_range_with_args(first..last, true)?;
@@ -711,7 +803,7 @@ pub trait DerivationCapableAccount: Account {
             if balance > 0 {
                 aggregate_balance += balance;
                 if sweep {
-                    let settings = GeneratorSettings::try_new_with_iterator(
+                    let mut settings = GeneratorSettings::try_new_with_iterator(
                         self.wallet().network_id()?,
                         Box::new(utxos.into_iter()),
                         None,
@@ -725,11 +817,19 @@ pub trait DerivationCapableAccount: Account {
                         None,
                     )?;
 
-                    let generator = Generator::try_new(settings, None, Some(abortable))?;
+                    if kcc3_signer.is_some() {
+                        settings.context_account = Some(self.clone().as_dyn_arc());
+                    }
+                    let generator = Generator::try_new(settings, kcc3_signer.clone(), Some(abortable))?;
 
                     let mut stream = generator.stream();
                     while let Some(transaction) = stream.try_next().await? {
-                        transaction.try_sign_with_keys(&keys, None)?;
+                        if kcc3_signer.is_some() {
+                            transaction.try_sign()?;
+                        } else {
+                            transaction.try_sign_with_keys(&keys, None)?;
+                        }
+                        self.ensure_active_context()?;
                         let id = transaction.try_submit(&rpc).await?;
                         if let Some(notifier) = notifier {
                             notifier(index, aggregate_utxo_count, balance, Some(id));
@@ -761,14 +861,18 @@ pub trait DerivationCapableAccount: Account {
             notifier(index, aggregate_utxo_count, aggregate_balance, None);
         }
 
-        // update address manager with the last used index
+        // Save counters under the same context lock used by network transitions.
         if update_address_indexes {
-            receive_address_manager.set_index(last_receive_address_index)?;
-            change_address_manager.set_index(last_change_address_index)?;
-
-            let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
-            let store = self.wallet().store().as_account_store()?;
-            store.update_metadata(vec![metadata]).await?;
+            {
+                let context_guard = self.wallet().context_guard();
+                let _context_guard = context_guard.lock().await;
+                self.ensure_active_context()?;
+                receive_address_manager.set_index(last_receive_address_index)?;
+                change_address_manager.set_index(last_change_address_index)?;
+                let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
+                let store = self.wallet().store().as_account_store()?;
+                store.update_metadata(vec![metadata]).await?;
+            }
             self.clone().scan(None, None).await?;
             self.wallet().notify(Events::AccountUpdate { account_descriptor: self.descriptor()? }).await?;
         }
@@ -781,9 +885,13 @@ pub trait DerivationCapableAccount: Account {
     }
 
     async fn new_receive_address(self: Arc<Self>) -> Result<Address> {
-        let address = self.derivation().receive_address_manager().new_address()?;
+        let context_guard = self.wallet().context_guard();
+        let _context_guard = context_guard.lock().await;
+        self.ensure_active_context()?;
+        let address = self.derivation()?.receive_address_manager().new_address()?;
         self.utxo_context().register_addresses(std::slice::from_ref(&address)).await?;
 
+        self.ensure_active_context()?;
         let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
         let store = self.wallet().store().as_account_store()?;
         store.update_metadata(vec![metadata]).await?;
@@ -794,9 +902,13 @@ pub trait DerivationCapableAccount: Account {
     }
 
     async fn new_change_address(self: Arc<Self>) -> Result<Address> {
-        let address = self.derivation().change_address_manager().new_address()?;
+        let context_guard = self.wallet().context_guard();
+        let _context_guard = context_guard.lock().await;
+        self.ensure_active_context()?;
+        let address = self.derivation()?.change_address_manager().new_address()?;
         self.utxo_context().register_addresses(std::slice::from_ref(&address)).await?;
 
+        self.ensure_active_context()?;
         let metadata = self.metadata()?.expect("derivation accounts must provide metadata");
         let store = self.wallet().store().as_account_store()?;
         store.update_metadata(vec![metadata]).await?;
@@ -824,13 +936,17 @@ pub trait DerivationCapableAccount: Account {
 
     // Retrieve receive address by index.
     async fn receive_address_at_index(self: Arc<Self>, index: u32) -> Result<Address> {
-        let address = self.derivation().receive_address_manager().get_range(index..index + 1)?.first().unwrap().clone();
+        let end = index.checked_add(1).ok_or_else(|| Error::custom("Address index exhausted"))?;
+        let address =
+            self.derivation()?.receive_address_manager().get_range(index..end)?.first().cloned().ok_or(Error::AddressNotFound)?;
         Ok(address)
     }
 
     // Retrieve change address by index.
     async fn change_address_at_index(self: Arc<Self>, index: u32) -> Result<Address> {
-        let address = self.derivation().change_address_manager().get_range(index..index + 1)?.first().unwrap().clone();
+        let end = index.checked_add(1).ok_or_else(|| Error::custom("Address index exhausted"))?;
+        let address =
+            self.derivation()?.change_address_manager().get_range(index..end)?.first().cloned().ok_or(Error::AddressNotFound)?;
         Ok(address)
     }
 }

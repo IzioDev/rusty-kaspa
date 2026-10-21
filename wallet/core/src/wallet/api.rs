@@ -93,7 +93,7 @@ impl WalletApi for super::Wallet {
             let options = ConnectOptions { block_async_connect, strategy, url, ..Default::default() };
             wrpc_client.disconnect().await?;
 
-            self.set_network_id(&network_id)?;
+            self.change_network_context(&network_id).await?;
 
             let processor = self.utxo_processor().clone();
             let (sender, receiver) = oneshot();
@@ -125,7 +125,7 @@ impl WalletApi for super::Wallet {
 
     async fn change_network_id_call(self: Arc<Self>, request: ChangeNetworkIdRequest) -> Result<ChangeNetworkIdResponse> {
         let ChangeNetworkIdRequest { network_id } = &request;
-        self.set_network_id(network_id)?;
+        self.change_network_context(network_id).await?;
         Ok(ChangeNetworkIdResponse {})
     }
 
@@ -305,11 +305,29 @@ impl WalletApi for super::Wallet {
     }
 
     async fn accounts_discovery_call(self: Arc<Self>, request: AccountsDiscoveryRequest) -> Result<AccountsDiscoveryResponse> {
-        let AccountsDiscoveryRequest { discovery_kind: _, address_scan_extent, account_scan_extent, bip39_passphrase, bip39_mnemonic } =
+        let AccountsDiscoveryRequest { discovery_kind, address_scan_extent, account_scan_extent, bip39_passphrase, bip39_mnemonic } =
             request;
 
-        let last_account_index_found =
-            self.scan_bip44_accounts(bip39_mnemonic, bip39_passphrase, address_scan_extent, account_scan_extent).await?;
+        let last_account_index_found = match discovery_kind {
+            AccountsDiscoveryKind::Bip44 => {
+                self.scan_bip44_accounts(bip39_mnemonic, bip39_passphrase, address_scan_extent, account_scan_extent).await?
+            }
+            AccountsDiscoveryKind::Kcc3Schnorr | AccountsDiscoveryKind::Kcc3Ecdsa => {
+                kcc3::Kcc3::scan_accounts(
+                    &self,
+                    bip39_mnemonic,
+                    bip39_passphrase,
+                    address_scan_extent,
+                    account_scan_extent,
+                    if matches!(discovery_kind, AccountsDiscoveryKind::Kcc3Ecdsa) {
+                        kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa
+                    } else {
+                        kaspa_wallet_keys::derivation::gen2::SignatureScheme::Schnorr
+                    },
+                )
+                .await?
+            }
+        };
 
         Ok(AccountsDiscoveryResponse { last_account_index_found })
     }

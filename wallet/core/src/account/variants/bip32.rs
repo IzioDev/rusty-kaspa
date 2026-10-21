@@ -260,8 +260,8 @@ impl Account for Bip32 {
 }
 
 impl DerivationCapableAccount for Bip32 {
-    fn derivation(&self) -> Arc<dyn AddressDerivationManagerTrait> {
-        self.derivation.clone()
+    fn derivation(&self) -> Result<Arc<dyn AddressDerivationManagerTrait>> {
+        Ok(self.derivation.clone())
     }
 
     fn account_index(&self) -> u64 {

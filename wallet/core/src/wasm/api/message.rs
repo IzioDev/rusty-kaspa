@@ -1045,7 +1045,30 @@ declare! {
      *  
      * @category Wallet API
      */
+    export interface IKcc3PublicAccountDescription {
+        version: 1;
+        convention: "kcc3";
+        kind: "kcc3" | "kcc3-watch";
+        network: "mainnet" | "testnet" | "simnet" | "devnet";
+        signatureScheme: "schnorr" | "ecdsa";
+        accountIndex: number;
+        key: { origin: string; masterFingerprint?: number[] | null; xpub: string };
+    }
     export type IAccountsCreateRequest = {
+        walletSecret: string;
+        type?: "kcc3";
+        network: "mainnet" | "testnet" | "simnet" | "devnet";
+        signatureScheme?: "schnorr" | "ecdsa";
+        accountName?: string;
+        accountIndex?: number;
+        prvKeyDataId: string;
+        paymentSecret?: string;
+    } | {
+        walletSecret: string;
+        type: "kcc3-watch";
+        accountName?: string;
+        description: IKcc3PublicAccountDescription;
+    } | {
         walletSecret: string;
         type: "bip32";
         accountName:string;
@@ -1075,7 +1098,7 @@ declare! {
 try_from! (args: IAccountsCreateRequest, AccountsCreateRequest, {
     let wallet_secret = args.get_secret("walletSecret")?;
 
-    let kind = AccountKind::try_from(args.try_get_value("type")?.ok_or(Error::custom("type is required"))?)?;
+    let kind = args.try_get_value("type")?.map(AccountKind::try_from).transpose()?.unwrap_or(crate::account::KCC3_ACCOUNT_KIND.into());
 
     let account_create_args = match kind.as_str() {
         crate::account::BIP32_ACCOUNT_KIND => {
@@ -1092,6 +1115,23 @@ try_from! (args: IAccountsCreateRequest, AccountsCreateRequest, {
             AccountCreateArgs::Bip32 { prv_key_data_args, account_args }
 
         }
+        crate::account::KCC3_ACCOUNT_KIND => {
+            let network = args.try_get_string("network")?.ok_or(Error::custom("network is required for KCC-3"))?.parse()?;
+            let signature_scheme = match args.try_get_string("signatureScheme")?.as_deref().unwrap_or("schnorr") {
+                "schnorr" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Schnorr,
+                "ecdsa" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa,
+                _ => return Err(Error::custom("Unsupported KCC-3 signature scheme")),
+            };
+            let account_index = args.try_get_value("accountIndex")?.map(|_| args.get_u64("accountIndex")).transpose()?.map(u32::try_from).transpose().map_err(|_| Error::custom("Invalid KCC-3 account index"))?;
+            AccountCreateArgs::Kcc3 {
+                prv_key_data_args: PrvKeyDataArgs::new(args.try_get_prv_key_data_id("prvKeyDataId")?.ok_or(Error::custom("prvKeyDataId is required"))?, args.try_get_secret("paymentSecret")?),
+                account_name: args.try_get_string("accountName")?, network, signature_scheme, account_index,
+            }
+        }
+        crate::account::KCC3_WATCH_ACCOUNT_KIND => {
+            let description = serde_wasm_bindgen::from_value(args.get_value("description")?)?;
+            AccountCreateArgs::Kcc3Watch { account_name: args.try_get_string("accountName")?, description }
+        }
         crate::account::KEYPAIR_ACCOUNT_KIND => {
             AccountCreateArgs::Keypair {
                 prv_key_data_id: args.try_get_prv_key_data_id("prvKeyDataId")?.ok_or(Error::custom("prvKeyDataId is required"))?,
@@ -1100,7 +1140,7 @@ try_from! (args: IAccountsCreateRequest, AccountsCreateRequest, {
             }
         }
         _ => {
-            return Err(Error::custom("only BIP32/kaspa-keypair-standard accounts are currently supported"));
+            return Err(Error::custom("Unsupported account creation kind"));
         }
     };
 
@@ -1140,7 +1180,7 @@ declare! {
     export interface IAccountsEnsureDefaultRequest {
         walletSecret: string;
         paymentSecret?: string;
-        type : AccountKind | string;
+        type? : AccountKind | string;
         mnemonic? : string;
     }
     "#,
@@ -1149,7 +1189,7 @@ declare! {
 try_from! (args: IAccountsEnsureDefaultRequest, AccountsEnsureDefaultRequest, {
     let wallet_secret = args.get_secret("walletSecret")?;
     let payment_secret = args.try_get_secret("paymentSecret")?;
-    let account_kind = AccountKind::try_from(args.get_value("type")?)?;
+    let account_kind = args.try_get_value("type")?.map(AccountKind::try_from).transpose()?.unwrap_or(crate::account::KCC3_ACCOUNT_KIND.into());
     let mnemonic_phrase = args.try_get_secret("mnemonic")?;
 
     Ok(AccountsEnsureDefaultRequest { wallet_secret, payment_secret, account_kind, mnemonic_phrase })
@@ -1185,16 +1225,14 @@ declare! {
      *  
      * @category Wallet API
      */
-    export interface IAccountsImportRequest {
-        walletSecret: string;
-        // TODO
-    }
+    export type IAccountsImportRequest = IAccountsCreateRequest;
     "#,
 }
 
-try_from! ( _args: IAccountsImportRequest, AccountsImportRequest, {
-    unimplemented!();
-    // Ok(AccountsImportRequest { })
+try_from! (args: IAccountsImportRequest, AccountsImportRequest, {
+    let value: JsValue = args.into();
+    let create = AccountsCreateRequest::try_from(value.unchecked_into::<IAccountsCreateRequest>())?;
+    Ok(AccountsImportRequest { wallet_secret: create.wallet_secret, account_create_args: create.account_create_args })
 });
 
 declare! {

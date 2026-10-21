@@ -267,9 +267,27 @@ impl Wallet {
     }
 
     #[wasm_bindgen(js_name = "setNetworkId")]
-    pub fn set_network_id(&self, network_id: NetworkIdT) -> Result<()> {
-        self.inner.wallet.set_network_id(&network_id.try_into_owned()?)?;
+    pub async fn set_network_id(&self, network_id: NetworkIdT) -> Result<()> {
+        self.inner.wallet.change_network_context(&network_id.try_into_owned()?).await?;
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "provisionKcc3Context")]
+    pub async fn provision_kcc3_context(
+        &self,
+        account_id: String,
+        wallet_secret: String,
+        payment_secret: Option<String>,
+        description_json: Option<String>,
+    ) -> Result<()> {
+        let id = AccountId::from_hex(&account_id)?;
+        let wallet_secret = Secret::from(wallet_secret);
+        let payment_secret = payment_secret.map(Secret::from);
+        let watch_key = description_json
+            .map(|json| -> Result<_> { serde_json::from_str::<crate::account::kcc3::PublicAccountDescription>(&json)?.try_key() })
+            .transpose()?;
+        crate::account::kcc3::Kcc3::provision_context(&self.inner.wallet, &wallet_secret, &id, payment_secret.as_ref(), watch_key)
+            .await
     }
 }
 

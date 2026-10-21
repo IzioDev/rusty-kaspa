@@ -66,6 +66,9 @@ pub enum Error {
 
     #[error("Invalid UTF-8 sequence")]
     Utf8(#[from] std::str::Utf8Error),
+
+    #[error("Invalid BIP32 child at depth {depth}, index {index}")]
+    InvalidChild { depth: u8, index: u32 },
 }
 
 impl Error {

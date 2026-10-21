@@ -112,7 +112,22 @@ async fn export_single_key_account(ctx: Arc<KaspaCli>, account: Arc<dyn Account>
     let prv_key_data = keydata.payload.decrypt(payment_secret.as_ref())?;
     let mnemonic = prv_key_data.as_ref().as_mnemonic()?;
 
-    let xpub_key = keydata.create_xpub(None, BIP32_ACCOUNT_KIND.into(), 0).await?; // todo it can be done concurrently
+    let xpub_key = if let Ok(kcc3) = account.downcast_ref::<kaspa_wallet_core::account::kcc3::Kcc3>() {
+        let description = kcc3.public_description()?;
+        tprintln!(
+            ctx,
+            "signature scheme: {}",
+            match description.signature_scheme {
+                kaspa_wallet_keys::derivation::gen2::SignatureScheme::Schnorr => "schnorr",
+                kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa => "ecdsa",
+            }
+        );
+        tprintln!(ctx, "network: {}", description.network);
+        tprintln!(ctx, "account index: {}", description.account_index);
+        description.key.xpub().clone()
+    } else {
+        keydata.create_xpub(payment_secret.as_ref(), BIP32_ACCOUNT_KIND.into(), 0).await?
+    }; // todo it can be done concurrently
 
     tprintln!(ctx, "extended public key:");
     tprintln!(ctx, "");

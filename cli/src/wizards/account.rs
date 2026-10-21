@@ -46,9 +46,31 @@ pub(crate) async fn create(
         None
     };
 
-    let account_create_args_bip32 = AccountCreateArgsBip32::new(name, None);
-    let account =
-        wallet.create_account_bip32(&wallet_secret, prv_key_data_info.id, payment_secret.as_ref(), account_create_args_bip32).await?;
+    let args = match account_kind.as_ref() {
+        kaspa_wallet_core::account::KCC3_ACCOUNT_KIND => {
+            let scheme = term.ask(false, "Signature scheme (schnorr/ecdsa, default schnorr): ").await?;
+            let signature_scheme = match scheme.trim() {
+                "" | "schnorr" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Schnorr,
+                "ecdsa" => kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa,
+                _ => return Err(Error::custom("Unsupported signature scheme")),
+            };
+            AccountCreateArgs::Kcc3 {
+                prv_key_data_args: PrvKeyDataArgs::new(prv_key_data_info.id, payment_secret),
+                account_name: name,
+                network: wallet.network_id()?.network_type,
+                signature_scheme,
+                account_index: None,
+            }
+        }
+        kaspa_wallet_core::account::BIP32_ACCOUNT_KIND => {
+            AccountCreateArgs::new_bip32(prv_key_data_info.id, payment_secret, name, None)
+        }
+        kaspa_wallet_core::account::LEGACY_ACCOUNT_KIND => AccountCreateArgs::new_legacy(prv_key_data_info.id, name),
+        _ => return Err(Error::custom("Unsupported account creation kind")),
+    };
+    let guard = wallet.guard();
+    let guard = guard.lock().await;
+    let account = wallet.create_account(&wallet_secret, args, true, &guard).await?;
 
     tprintln!(ctx, "\naccount created: {}\n", account.get_list_string()?);
     wallet.select(Some(&account)).await?;
@@ -82,6 +104,25 @@ async fn create_multisig(ctx: &Arc<KaspaCli>, account_name: Option<String>, mnem
     let account =
         wallet.create_account_multisig(&wallet_secret, prv_key_data_args, xpub_keys, account_name, minimum_signatures).await?;
 
+    tprintln!(ctx, "\naccount created: {}\n", account.get_list_string()?);
+    wallet.select(Some(&account)).await?;
+    Ok(())
+}
+
+pub(crate) async fn kcc3_watch(ctx: &Arc<KaspaCli>, name: Option<&str>) -> Result<()> {
+    let wallet = ctx.wallet();
+    let description = crate::wizards::import::prompt_for_kcc3_public_account(
+        &ctx.term(),
+        wallet.network_id()?.network_type,
+        "Enter extended public key: ",
+    )
+    .await?
+    .ok_or(Error::UserAbort)?;
+    let (wallet_secret, _) = ctx.ask_wallet_secret(None).await?;
+    let guard = wallet.guard();
+    let guard = guard.lock().await;
+    let args = AccountCreateArgs::Kcc3Watch { account_name: name.map(str::to_owned), description };
+    let account = wallet.create_account(&wallet_secret, args, true, &guard).await?;
     tprintln!(ctx, "\naccount created: {}\n", account.get_list_string()?);
     wallet.select(Some(&account)).await?;
     Ok(())

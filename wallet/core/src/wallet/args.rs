@@ -80,6 +80,71 @@ impl Zeroize for PrvKeyDataCreateArgs {
     }
 }
 
+/// Account construction requested by a mnemonic import. A missing KCC-3 origin
+/// selects account zero in the current network's default signature subtree.
+#[derive(Clone, Debug)]
+pub enum AccountImportArgs {
+    Bip32,
+    Legacy,
+    Kcc3 { origin: Option<kaspa_wallet_keys::derivation::gen2::AccountDerivation> },
+}
+
+impl TryFrom<AccountKind> for AccountImportArgs {
+    type Error = Error;
+
+    fn try_from(kind: AccountKind) -> Result<Self> {
+        match kind.as_ref() {
+            BIP32_ACCOUNT_KIND => Ok(Self::Bip32),
+            LEGACY_ACCOUNT_KIND => Ok(Self::Legacy),
+            KCC3_ACCOUNT_KIND => Ok(Self::Kcc3 { origin: None }),
+            _ => Err(Error::AccountKindFeature),
+        }
+    }
+}
+
+impl AccountImportArgs {
+    pub(crate) async fn try_create_account(
+        self,
+        wallet: &Arc<Wallet>,
+        keydata: &PrvKeyData,
+        payment_secret: Option<&Secret>,
+        name: Option<String>,
+    ) -> Result<Arc<dyn Account>> {
+        match self {
+            Self::Bip32 => {
+                let xpub_key = keydata.create_xpub(payment_secret, BIP32_ACCOUNT_KIND.into(), 0).await?;
+                Ok(Arc::new(bip32::Bip32::try_new(wallet, name, keydata.id, 0, Arc::new(vec![xpub_key]), false).await?))
+            }
+            Self::Legacy => Ok(Arc::new(legacy::Legacy::try_new(wallet, name, keydata.id).await?)),
+            Self::Kcc3 { origin } => {
+                let origin = match origin {
+                    Some(origin) => origin,
+                    None => kaspa_wallet_keys::derivation::gen2::AccountDerivation::try_new(
+                        wallet.network_id()?.network_type,
+                        Default::default(),
+                        0,
+                    )?,
+                };
+                if origin.network() != wallet.network_id()?.network_type {
+                    return Err(Error::custom("KCC-3 import network mismatch"));
+                }
+                Ok(Arc::new(
+                    kcc3::Kcc3::try_new_from_prv_key_data(
+                        wallet,
+                        name,
+                        keydata,
+                        payment_secret,
+                        origin.network(),
+                        origin.signature_scheme(),
+                        Some(origin.account_index()),
+                    )
+                    .await?,
+                ))
+            }
+        }
+    }
+}
+
 #[wasm_bindgen(typescript_custom_section)]
 const TS_ACCOUNT_CREATE_ARGS: &'static str = r#"
 
@@ -163,6 +228,17 @@ pub enum AccountCreateArgs {
         prv_key_data_id: PrvKeyDataId,
         account_name: Option<String>,
         ecdsa: bool,
+    },
+    Kcc3 {
+        prv_key_data_args: PrvKeyDataArgs,
+        account_name: Option<String>,
+        network: NetworkType,
+        signature_scheme: kaspa_wallet_keys::derivation::gen2::SignatureScheme,
+        account_index: Option<u32>,
+    },
+    Kcc3Watch {
+        account_name: Option<String>,
+        description: crate::account::kcc3::PublicAccountDescription,
     },
 }
 

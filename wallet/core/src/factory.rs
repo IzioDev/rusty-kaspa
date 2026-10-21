@@ -35,6 +35,8 @@ pub fn factories() -> &'static FactoryMap {
             (MULTISIG_ACCOUNT_KIND.into(), Arc::new(multisig::Ctor {})),
             (KEYPAIR_ACCOUNT_KIND.into(), Arc::new(keypair::Ctor {})),
             (BIP32_WATCH_ACCOUNT_KIND.into(), Arc::new(bip32watch::Ctor {})),
+            (KCC3_ACCOUNT_KIND.into(), Arc::new(kcc3::Ctor)),
+            (KCC3_WATCH_ACCOUNT_KIND.into(), Arc::new(kcc3::Ctor)),
         ];
 
         let external = EXTERNAL.get_or_init(|| Mutex::new(AHashMap::new())).lock().unwrap().clone();

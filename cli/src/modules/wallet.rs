@@ -105,10 +105,10 @@ impl Wallet {
         ctx.term().help(
             &[
                 ("list", "List available local wallet files"),
-                ("create [<name>]", "Create a new bip32 wallet"),
+                ("create [<name>]", "Create a new KCC-3 wallet"),
                 (
                     "import [<name>]",
-                    "Create a wallet from an existing mnemonic (bip32 only). \r\n\r\n\
+                    "Create a wallet from an existing mnemonic (select kcc3, bip32 or legacy). \r\n\r\n\
                 To import legacy wallets (KDX or kaspanet) please create \
                 a new bip32 wallet and use the 'account import' command. \
                 Legacy wallets can only be imported as accounts. \

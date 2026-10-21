@@ -196,6 +196,20 @@ pub struct PrvKeyData {
 }
 
 impl PrvKeyData {
+    pub fn create_kcc3_xpub(
+        &self,
+        payment_secret: Option<&Secret>,
+        derivation: &kaspa_wallet_keys::derivation::gen2::AccountDerivation,
+    ) -> Result<kaspa_wallet_keys::derivation::gen2::AccountPublicKey> {
+        let master = self.get_xprv(payment_secret)?;
+        let xpub = derivation.derive_account(&master)?.public_key();
+        Ok(kaspa_wallet_keys::derivation::gen2::AccountPublicKey::try_new(
+            derivation.clone(),
+            Some(master.public_key().fingerprint()),
+            xpub,
+        )?)
+    }
+
     pub async fn create_xpub(
         &self,
         payment_secret: Option<&Secret>,

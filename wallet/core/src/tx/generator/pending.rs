@@ -202,6 +202,15 @@ impl PendingTransaction {
 
     /// Submit the transaction on the supplied rpc
     pub async fn try_submit(&self, rpc: &Arc<DynRpcApi>) -> Result<RpcTransactionId> {
+        let guard = self.inner.generator.context_account().map(|account| account.wallet().context_guard());
+        let _guard = match &guard {
+            Some(guard) => Some(guard.lock().await),
+            None => None,
+        };
+        if let Some(account) = self.inner.generator.context_account() {
+            account.ensure_active_context()?;
+        }
+
         // sanity check to prevent multiple invocations (for API use)
         self.inner.is_submitted.load(Ordering::SeqCst).then(|| {
             panic!("PendingTransaction::try_submit() called multiple times");

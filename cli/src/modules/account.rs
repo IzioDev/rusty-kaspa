@@ -1,4 +1,5 @@
 use kaspa_wallet_core::account::BIP32_ACCOUNT_KIND;
+use kaspa_wallet_core::account::KCC3_ACCOUNT_KIND;
 use kaspa_wallet_core::account::LEGACY_ACCOUNT_KIND;
 use kaspa_wallet_core::account::MULTISIG_ACCOUNT_KIND;
 
@@ -43,7 +44,7 @@ impl Account {
             }
             "create" => {
                 let account_kind = if argv.is_empty() {
-                    BIP32_ACCOUNT_KIND.into()
+                    KCC3_ACCOUNT_KIND.into()
                 } else {
                     let kind = argv.remove(0);
                     kind.parse::<AccountKind>()?
@@ -72,6 +73,7 @@ impl Account {
                     ctx.term().help(
                         &[
                             ("account import legacy-data", "Import KDX keydata file or kaspanet web wallet data on the same domain"),
+                            ("account import mnemonic kcc3", "Import a mnemonic using KCC-3 derivation"),
                             (
                                 "account import mnemonic bip32",
                                 "Import Bip32 (12 or 24 word mnemonics used by kaspawallet, kaspium, onekey, tangem etc.)",
@@ -147,7 +149,7 @@ impl Account {
                     }
                     "mnemonic" => {
                         if argv.is_empty() {
-                            tprintln!(ctx, "usage: 'account import mnemonic <bip32|legacy|multisig>'");
+                            tprintln!(ctx, "usage: 'account import mnemonic <kcc3|bip32|legacy|multisig>'");
                             tprintln!(ctx, "please specify the mnemonic type");
                             tprintln!(ctx, "please use 'legacy' for 12-word KDX and kaspanet web wallet mnemonics\r\n");
                             return Ok(());
@@ -157,7 +159,7 @@ impl Account {
                         let account_kind = account_kind.parse::<AccountKind>()?;
 
                         match account_kind.as_ref() {
-                            LEGACY_ACCOUNT_KIND | BIP32_ACCOUNT_KIND => {
+                            LEGACY_ACCOUNT_KIND | BIP32_ACCOUNT_KIND | KCC3_ACCOUNT_KIND => {
                                 if !argv.is_empty() {
                                     tprintln!(ctx, "too many arguments: {}\r\n", argv.join(" "));
                                     return Ok(());
@@ -190,6 +192,10 @@ impl Account {
                     tprintln!(ctx, "");
                     ctx.term().help(
                         &[
+                            (
+                                "account watch kcc3",
+                                "Import an extended public key and signature scheme for a watch-only KCC-3 account",
+                            ),
                             ("account watch bip32", "Import a extended public key for a watch-only bip32 account"),
                             ("account watch multisig", "Import extended public keys for a watch-only multisig account"),
                         ],
@@ -206,6 +212,9 @@ impl Account {
                 let account_name = account_name.as_deref();
 
                 match watch_kind.as_ref() {
+                    "kcc3" => {
+                        wizards::account::kcc3_watch(&ctx, account_name).await?;
+                    }
                     "bip32" => {
                         wizards::account::bip32_watch(&ctx, account_name).await?;
                     }
@@ -214,7 +223,7 @@ impl Account {
                     }
                     _ => {
                         tprintln!(ctx, "unknown account watch type: '{watch_kind}'");
-                        tprintln!(ctx, "supported watch types are: 'bip32' or 'multisig'\r\n");
+                        tprintln!(ctx, "supported watch types are: 'kcc3', 'bip32' or 'multisig'\r\n");
                         return Ok(());
                     }
                 }
@@ -250,13 +259,14 @@ impl Account {
     async fn display_help(self: Arc<Self>, ctx: Arc<KaspaCli>, _argv: Vec<String>) -> Result<()> {
         ctx.term().help(
             &[
-                ("create [<type>] [<name>]", "Create a new account (types: 'bip32' (default), 'legacy', 'multisig')"),
+                ("create [<type>] [<name>]", "Create a new account (types: 'kcc3' (default), 'bip32', 'legacy', 'multisig')"),
                 (
                     "import <import-type> [<key-type> [extra keys]]",
                     "Import accounts from a private key using 24 or 12 word mnemonic or legacy data \
                 (KDX and kaspanet web wallet). Use 'account import' for additional help.",
                 ),
                 ("name <name>", "Name or rename the selected account (use 'remove' to remove the name"),
+                ("watch <kcc3|bip32|multisig> [<name>]", "Import a watch-only account"),
                 ("scan [<derivations>] or scan [<start>] [<derivations>]", "Scan extended address derivation chain (legacy accounts)"),
                 (
                     "sweep [<derivations>] or sweep [<start>] [<derivations>]",
@@ -280,7 +290,13 @@ impl Account {
         fee_rate: Option<f64>,
     ) -> Result<()> {
         let account = ctx.account().await?;
-        let (wallet_secret, payment_secret) = ctx.ask_wallet_secret(Some(&account)).await?;
+        // Public derivation scans need secrets only for legacy accounts; sweeps always need private keys.
+        let (wallet_secret, payment_secret) = if sweep || account.clone().as_legacy_account().is_ok() {
+            account.prv_key_data_id()?;
+            ctx.ask_wallet_secret(Some(&account)).await?
+        } else {
+            (Secret::from(""), None)
+        };
         let _ = ctx.notifier().show(Notification::Processing).await;
         let abortable = Abortable::new();
         let ctx_ = ctx.clone();

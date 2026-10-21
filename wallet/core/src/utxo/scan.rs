@@ -4,7 +4,7 @@
 //! building corresponding balances.
 //!
 
-use crate::derivation::AddressManager;
+use crate::derivation::AddressManagerTrait;
 use crate::imports::*;
 use crate::utxo::balance::AtomicBalance;
 use crate::utxo::{UtxoContext, UtxoEntryReference, UtxoEntryReferenceExtension};
@@ -22,7 +22,7 @@ pub enum ScanExtent {
 }
 
 enum Provider {
-    AddressManager(Arc<AddressManager>),
+    AddressManager(Arc<dyn AddressManagerTrait>),
     AddressSet(HashSet<Address>),
 }
 
@@ -36,7 +36,7 @@ pub struct Scan {
 
 impl Scan {
     pub fn new_with_address_manager(
-        address_manager: Arc<AddressManager>,
+        address_manager: Arc<dyn AddressManagerTrait>,
         balance: &Arc<AtomicBalance>,
         current_daa_score: u64,
         window_size: Option<usize>,
@@ -64,7 +64,11 @@ impl Scan {
         }
     }
 
-    pub async fn scan_with_address_manager(&self, address_manager: &Arc<AddressManager>, utxo_context: &UtxoContext) -> Result<()> {
+    pub async fn scan_with_address_manager(
+        &self,
+        address_manager: &Arc<dyn AddressManagerTrait>,
+        utxo_context: &UtxoContext,
+    ) -> Result<()> {
         let params = utxo_context.processor().network_params()?;
 
         let window_size = self.window_size.unwrap_or(DEFAULT_WINDOW_SIZE) as u32;
@@ -76,7 +80,11 @@ impl Scan {
         'scan: loop {
             // scan first up to address index, then in window chunks
             let first = cursor;
-            let last = if cursor == 0 { max(last_address_index + 1, window_size) } else { cursor + window_size };
+            let last = if cursor == 0 {
+                max(last_address_index.checked_add(1).ok_or_else(|| Error::custom("Scan index exhausted"))?, window_size)
+            } else {
+                cursor.checked_add(window_size).ok_or_else(|| Error::custom("Scan range exhausted"))?
+            };
             cursor = last;
 
             // generate address derivations
@@ -88,7 +96,9 @@ impl Scan {
             utxo_context.register_addresses(&addresses).await?;
 
             let ts = Instant::now();
+            address_manager.ensure_active_context()?;
             let resp = utxo_context.processor().rpc_api().get_utxos_by_addresses(addresses).await?;
+            address_manager.ensure_active_context()?;
             let elapsed_sec = ts.elapsed().as_secs_f32();
             if elapsed_sec > 1.0 {
                 log_warn!("get_utxos_by_address() fetched {} entries in: {} msec", resp.len(), elapsed_sec);

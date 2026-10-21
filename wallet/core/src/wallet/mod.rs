@@ -107,6 +107,11 @@ struct Inner {
     // Mutex used to protect concurrent access to accounts at the wallet api level
     guard: Arc<AsyncMutex<()>>,
     account_guard: Arc<AsyncMutex<()>>,
+    context_generation: AtomicU64,
+    context_views: AtomicUsize,
+    context_guard: Arc<AsyncMutex<()>>,
+    context_account_ids: Mutex<HashSet<AccountId>>,
+    context_selection: Mutex<Option<AccountId>>,
 }
 
 ///
@@ -173,6 +178,11 @@ impl Wallet {
                 retained_contexts: Mutex::new(HashMap::new()),
                 guard: Arc::new(AsyncMutex::new(())),
                 account_guard: Arc::new(AsyncMutex::new(())),
+                context_generation: AtomicU64::new(0),
+                context_views: AtomicUsize::new(0),
+                context_guard: Arc::new(AsyncMutex::new(())),
+                context_account_ids: Mutex::new(HashSet::new()),
+                context_selection: Mutex::new(None),
             }),
         };
 
@@ -237,8 +247,10 @@ impl Wallet {
     }
 
     pub async fn reset(self: &Arc<Self>, clear_legacy_cache: bool) -> Result<()> {
+        let context_guard = self.context_guard();
+        let _context_guard = context_guard.lock().await;
         self.utxo_processor().cleanup().await?;
-
+        self.inner.context_account_ids.lock().unwrap().clear();
         self.select(None).await?;
 
         let accounts = self.active_accounts().collect();
@@ -248,7 +260,7 @@ impl Wallet {
         if clear_legacy_cache {
             self.legacy_accounts().clear();
         }
-
+        self.inner.context_generation.fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -315,6 +327,8 @@ impl Wallet {
 
             /// Select an account as 'active'. Supply `None` to remove active selection.
             pub async fn select(self: &Arc<Self>, account: Option<&Arc<dyn Account>>) -> Result<()> {
+                if let Some(account) = account { account.ensure_active_context()?; }
+                *self.inner.context_selection.lock().unwrap() = account.map(|a| *a.id());
                 *self.inner.selected_account.lock().unwrap() = account.cloned();
                 if let Some(account) = account {
                     // log_info!("selecting account: {}", account.name_or_id());
@@ -431,7 +445,7 @@ impl Wallet {
             self.inner.store.as_account_store().unwrap().iter(None).await?.try_collect::<Vec<_>>().await?
         };
 
-        let ids = stored_accounts.iter().map(|(account, _)| *account.id()).collect::<Vec<_>>();
+        let mut ids = Vec::new();
 
         for (account_storage, meta) in stored_accounts.into_iter() {
             if account_storage.kind.as_ref() == LEGACY_ACCOUNT_KIND {
@@ -443,9 +457,17 @@ impl Wallet {
                     .as_legacy_account()?;
                 legacy_account.clone().start().await?;
                 legacy_account.clear_private_context().await?;
+                ids.push(*account_storage.id());
             } else if self.active_accounts().get(account_storage.id()).is_none() {
                 let account = try_load_account(self, account_storage, meta).await?;
+                if account.ensure_active_context().is_err() {
+                    self.inner.context_account_ids.lock().unwrap().insert(*account.id());
+                    continue;
+                }
+                ids.push(*account.id());
                 account.clone().start().await?;
+            } else {
+                ids.push(*account_storage.id());
             }
         }
 
@@ -466,17 +488,34 @@ impl Wallet {
     }
 
     pub async fn deactivate_accounts(self: &Arc<Wallet>, ids: Option<&[AccountId]>, _guard: &WalletGuard<'_>) -> Result<()> {
-        let _guard = self.inner.guard.lock().await;
-
-        let (ids, futures) = if let Some(ids) = ids {
-            let accounts =
-                ids.iter().map(|id| self.active_accounts().get(id).ok_or(Error::AccountNotFound(*id))).collect::<Result<Vec<_>>>()?;
-            (ids.to_vec(), accounts.into_iter().map(|account| account.stop()).collect::<Vec<_>>())
+        let mut accounts = Vec::new();
+        let ids = if let Some(ids) = ids {
+            for id in ids {
+                if let Some(account) = self.active_accounts().get(id) {
+                    accounts.push(account);
+                } else if !self.inner.context_account_ids.lock().unwrap().contains(id) {
+                    return Err(Error::AccountNotFound(*id));
+                }
+            }
+            ids.to_vec()
         } else {
-            self.active_accounts().collect().iter().map(|account| (account.id(), account.clone().stop())).unzip()
+            accounts = self.active_accounts().collect();
+            let mut ids = self.inner.context_account_ids.lock().unwrap().clone();
+            ids.extend(accounts.iter().map(|account| *account.id()));
+            ids.into_iter().collect()
         };
 
-        join_all(futures).await.into_iter().collect::<Result<Vec<_>>>()?;
+        join_all(accounts.into_iter().map(|account| account.stop())).await.into_iter().collect::<Result<Vec<_>>>()?;
+        {
+            let mut remembered = self.inner.context_account_ids.lock().unwrap();
+            for id in &ids {
+                remembered.remove(id);
+            }
+            let mut selection = self.inner.context_selection.lock().unwrap();
+            if selection.is_some_and(|id| ids.contains(&id)) {
+                *selection = None;
+            }
+        }
         self.notify(Events::AccountDeactivation { ids }).await?;
 
         Ok(())
@@ -639,13 +678,98 @@ impl Wallet {
     }
 
     pub fn set_network_id(&self, network_id: &NetworkId) -> Result<()> {
+        if self.network_id().ok().is_some_and(|current| current != *network_id)
+            && (self.inner.context_views.load(Ordering::SeqCst) != 0 || !self.inner.context_account_ids.lock().unwrap().is_empty())
+        {
+            return Err(Error::custom("Use change_network_context for a live wallet"));
+        }
+        self.apply_network_id(network_id)
+    }
+
+    fn apply_network_id(&self, network_id: &NetworkId) -> Result<()> {
         if self.is_connected() {
             return Err(Error::NetworkTypeConnected);
         }
-        self.utxo_processor().set_network_id(network_id);
-
         if let Some(wrpc_client) = self.try_wrpc_client() {
             wrpc_client.set_network_id(network_id)?;
+        }
+        if self.network_id().ok() != Some(*network_id) {
+            self.inner.context_generation.fetch_add(1, Ordering::SeqCst);
+        }
+        self.utxo_processor().set_network_id(network_id);
+        Ok(())
+    }
+
+    pub(crate) fn retain_context_view(&self) {
+        self.inner.context_views.fetch_add(1, Ordering::SeqCst);
+    }
+    pub(crate) fn release_context_view(&self) {
+        self.inner.context_views.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    pub(crate) fn context_guard(&self) -> Arc<AsyncMutex<()>> {
+        self.inner.context_guard.clone()
+    }
+
+    pub(crate) fn context_generation(&self) -> u64 {
+        self.inner.context_generation.load(Ordering::SeqCst)
+    }
+
+    pub async fn change_network_context(self: &Arc<Self>, network_id: &NetworkId) -> Result<()> {
+        let guard = self.guard();
+        let _guard = guard.lock().await;
+        let context_guard = self.context_guard();
+        let _context_guard = context_guard.lock().await;
+        if self.is_connected() {
+            return Err(Error::NetworkTypeConnected);
+        }
+        if self.network_id().ok() == Some(*network_id) {
+            return Ok(());
+        }
+        let selected = *self.inner.context_selection.lock().unwrap();
+        let accounts = self.active_accounts().collect();
+        let ids = {
+            let mut ids = self.inner.context_account_ids.lock().unwrap();
+            ids.extend(accounts.iter().map(|a| *a.id()));
+            ids.clone()
+        };
+        let mut metadata = Vec::new();
+        for account in &accounts {
+            if let Some(meta) = account.metadata()? {
+                metadata.push(meta);
+            }
+        }
+        if !metadata.is_empty() {
+            self.store().as_account_store()?.update_metadata(metadata).await?;
+        }
+        for abortable in self.inner.estimation_abortables.lock().unwrap().values() {
+            abortable.abort();
+        }
+        for account in &accounts {
+            account.clone().stop().await?;
+        }
+        self.inner.selected_account.lock().unwrap().take();
+        // Invalidate every previously returned KCC-3 account/manager, including inactive views.
+        self.inner.context_generation.fetch_add(1, Ordering::SeqCst);
+        self.utxo_processor().cleanup().await?;
+        self.apply_network_id(network_id)?;
+        // Activation may scan on a concurrent reconnect; scans take this lock
+        // when committing metadata. The wallet guard still serializes transitions.
+        drop(_context_guard);
+        for id in ids {
+            let (storage, meta) = self.store().as_account_store()?.load_single(&id).await?.ok_or(Error::AccountNotFound(id))?;
+            let account = if let Some(account) = self.legacy_accounts().get(&id) {
+                account
+            } else {
+                try_load_account(self, storage, meta).await?
+            };
+            if account.ensure_active_context().is_ok() {
+                account.clone().start().await?;
+            }
+            self.notify(Events::AccountUpdate { account_descriptor: account.descriptor()? }).await?;
+            if selected == Some(*account.id()) && account.ensure_active_context().is_ok() {
+                self.select(Some(&account)).await?;
+            }
         }
         Ok(())
     }
@@ -692,6 +816,41 @@ impl Wallet {
             AccountCreateArgs::Bip32Watch { account_args } => self.create_account_bip32_watch(wallet_secret, account_args).await?,
             AccountCreateArgs::Keypair { prv_key_data_id, account_name, ecdsa } => {
                 self.create_account_keypair(wallet_secret, None, prv_key_data_id, account_name, ecdsa).await?
+            }
+            AccountCreateArgs::Kcc3 { prv_key_data_args, account_name, network, signature_scheme, account_index } => {
+                let keydata = self
+                    .get_prv_key_data(wallet_secret, &prv_key_data_args.prv_key_data_id)
+                    .await?
+                    .ok_or(Error::PrivateKeyNotFound(prv_key_data_args.prv_key_data_id))?;
+                let account: Arc<dyn Account> = Arc::new(
+                    kcc3::Kcc3::try_new_from_prv_key_data(
+                        self,
+                        account_name,
+                        &keydata,
+                        prv_key_data_args.payment_secret.as_ref(),
+                        network,
+                        signature_scheme,
+                        account_index,
+                    )
+                    .await?,
+                );
+                let store = self.store().as_account_store()?;
+                if store.load_single(account.id()).await?.is_some() {
+                    return Err(Error::AccountAlreadyExists(*account.id()));
+                }
+                store.store_single(&account.to_storage()?, account.metadata()?.as_ref()).await?;
+                self.store().commit(wallet_secret).await?;
+                account
+            }
+            AccountCreateArgs::Kcc3Watch { account_name, description } => {
+                let account: Arc<dyn Account> = Arc::new(kcc3::Kcc3::try_new(self, account_name, None, description.try_key()?)?);
+                let store = self.store().as_account_store()?;
+                if store.load_single(account.id()).await?.is_some() {
+                    return Err(Error::AccountAlreadyExists(*account.id()));
+                }
+                store.store_single(&account.to_storage()?, account.metadata()?.as_ref()).await?;
+                self.store().commit(wallet_secret).await?;
+                account
             }
         };
 
@@ -992,25 +1151,23 @@ impl Wallet {
         mnemonic_phrase_word_count: WordCount,
         payment_secret: Option<Secret>,
     ) -> Result<(WalletDescriptor, StorageDescriptor, Mnemonic, Arc<dyn Account>)> {
+        let account_kind = account_kind.unwrap_or(KCC3_ACCOUNT_KIND.into());
+        if !matches!(account_kind.as_ref(), KCC3_ACCOUNT_KIND | BIP32_ACCOUNT_KIND) {
+            return Err(Error::AccountKindFeature);
+        }
         self.close().await?;
 
         let encryption_kind = wallet_args.encryption_kind;
         let wallet_descriptor = self.inner.store.create(wallet_secret, wallet_args.into()).await?;
         let storage_descriptor = self.inner.store.location()?;
         let mnemonic = Mnemonic::random(mnemonic_phrase_word_count, Default::default())?;
-        let account_index = 0;
         let prv_key_data = PrvKeyData::try_from_mnemonic(mnemonic.clone(), payment_secret.as_ref(), encryption_kind, None)?;
-        let xpub_key = prv_key_data
-            .create_xpub(payment_secret.as_ref(), account_kind.unwrap_or(BIP32_ACCOUNT_KIND.into()), account_index)
-            .await?;
-        let xpub_keys = Arc::new(vec![xpub_key]);
-
-        let account: Arc<dyn Account> =
-            Arc::new(bip32::Bip32::try_new(self, account_name, prv_key_data.id, account_index, xpub_keys, false).await?);
+        let account_args = AccountImportArgs::try_from(account_kind)?;
+        let account = account_args.try_create_account(self, &prv_key_data, payment_secret.as_ref(), account_name).await?;
 
         let prv_key_data_store = self.inner.store.as_prv_key_data_store()?;
         prv_key_data_store.store(wallet_secret, prv_key_data).await?;
-        self.inner.store.clone().as_account_store()?.store_single(&account.to_storage()?, None).await?;
+        self.inner.store.clone().as_account_store()?.store_single(&account.to_storage()?, account.metadata()?.as_ref()).await?;
         self.inner.store.commit(wallet_secret).await?;
 
         self.select(Some(&account)).await?;
@@ -1230,7 +1387,9 @@ impl Wallet {
                     Ok(account)
                 } else {
                     let account = try_load_account(&wallet, stored_account, stored_metadata).await?;
-                    account.clone().start().await?;
+                    if account.ensure_active_context().is_ok() {
+                        account.clone().start().await?;
+                    }
                     Ok(account)
                 }
             }
@@ -1551,30 +1710,39 @@ impl Wallet {
         mnemonic: Mnemonic,
         account_kind: AccountKind,
     ) -> Result<Arc<dyn Account>> {
-        let prv_key_data = storage::PrvKeyData::try_new_from_mnemonic(mnemonic, payment_secret, self.store().encryption_kind()?)?;
+        self.import_mnemonic(wallet_secret, payment_secret, mnemonic, account_kind.try_into()?).await
+    }
+
+    /// Import a mnemonic with explicit account construction arguments.
+    pub async fn import_mnemonic(
+        self: &Arc<Self>,
+        wallet_secret: &Secret,
+        payment_secret: Option<&Secret>,
+        mnemonic: Mnemonic,
+        account_args: AccountImportArgs,
+    ) -> Result<Arc<dyn Account>> {
+        let guard = self.guard();
+        let _guard = guard.lock().await;
+        let mut prv_key_data = storage::PrvKeyData::try_new_from_mnemonic(mnemonic, payment_secret, self.store().encryption_kind()?)?;
         let prv_key_data_store = self.store().as_prv_key_data_store()?;
-        if prv_key_data_store.load_key_data(wallet_secret, &prv_key_data.id).await?.is_some() {
-            return Err(Error::PrivateKeyAlreadyExists(prv_key_data.id));
+        let existing = prv_key_data_store.load_key_data(wallet_secret, &prv_key_data.id).await?;
+        if let Some(existing) = existing.as_ref() {
+            if existing.get_xprv(payment_secret)? != prv_key_data.get_xprv(payment_secret)? {
+                return Err(Error::custom("Existing seed credentials do not match"));
+            }
+            prv_key_data = existing.clone();
         }
-        // let mut is_legacy = false;
-        let account: Arc<dyn Account> = match account_kind.as_ref() {
-            BIP32_ACCOUNT_KIND => {
-                let account_index = 0;
-                let xpub_key = prv_key_data.create_xpub(payment_secret, account_kind, account_index).await?;
-                let xpub_keys = Arc::new(vec![xpub_key]);
-                let ecdsa = false;
-                // ---
-                Arc::new(bip32::Bip32::try_new(self, None, prv_key_data.id, account_index, xpub_keys, ecdsa).await?)
-            }
-            LEGACY_ACCOUNT_KIND => Arc::new(legacy::Legacy::try_new(self, None, prv_key_data.id).await?),
-            _ => {
-                return Err(Error::AccountKindFeature);
-            }
-        };
+        let account = account_args.try_create_account(self, &prv_key_data, payment_secret, None).await?;
 
         let account_store = self.inner.store.as_account_store()?;
+        if account_store.load_single(account.id()).await?.is_some() {
+            return Err(Error::AccountAlreadyExists(*account.id()));
+        }
         self.inner.store.batch().await?;
-        account_store.store_single(&account.to_storage()?, None).await?;
+        if existing.is_none() {
+            prv_key_data_store.store(wallet_secret, prv_key_data).await?;
+        }
+        account_store.store_single(&account.to_storage()?, account.metadata()?.as_ref()).await?;
         self.inner.store.flush(wallet_secret).await?;
 
         if let Ok(legacy_account) = account.clone().as_legacy_account() {
@@ -1725,7 +1893,7 @@ impl Wallet {
         mnemonic_phrase: Option<&Secret>,
         guard: &WalletGuard<'_>,
     ) -> Result<AccountDescriptor> {
-        if kind != BIP32_ACCOUNT_KIND {
+        if !matches!(kind.as_ref(), KCC3_ACCOUNT_KIND | BIP32_ACCOUNT_KIND) {
             return Err(Error::custom("Account kind is not supported"));
         }
 
@@ -1748,7 +1916,16 @@ impl Wallet {
             self.store().batch().await?;
             let prv_key_data_id = self.clone().create_prv_key_data(wallet_secret, prv_key_data_args).await?;
 
-            let account_create_args = AccountCreateArgs::new_bip32(prv_key_data_id, payment_secret.cloned(), None, None);
+            let account_create_args = match kind.as_ref() {
+                KCC3_ACCOUNT_KIND => AccountCreateArgs::Kcc3 {
+                    prv_key_data_args: PrvKeyDataArgs::new(prv_key_data_id, payment_secret.cloned()),
+                    account_name: None,
+                    network: self.network_id()?.network_type,
+                    signature_scheme: Default::default(),
+                    account_index: None,
+                },
+                _ => AccountCreateArgs::new_bip32(prv_key_data_id, payment_secret.cloned(), None, None),
+            };
 
             let account = self.clone().create_account(wallet_secret, account_create_args, false, guard).await?;
 

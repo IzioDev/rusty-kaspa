@@ -453,6 +453,7 @@ where
     let change_address = change_address(network_id.into());
 
     let settings = GeneratorSettings {
+        context_account: None,
         version: 0,
         network_id,
         multiplexer,
@@ -949,6 +950,7 @@ fn test_generator_skips_utxos_with_defined_covenant_id() -> Result<()> {
     let destination = PaymentDestination::PaymentOutputs(PaymentOutputs { outputs: vec![output] });
 
     let settings = GeneratorSettings {
+        context_account: None,
         version: 0,
         network_id,
         multiplexer: None,

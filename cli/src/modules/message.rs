@@ -137,7 +137,7 @@ impl Message {
                 let keydata = account.prv_key_data(wallet_secret).await?;
                 let account = account.clone().as_derivation_capable().expect("expecting derivation capable");
 
-                let (receive, change) = account.derivation().addresses_indexes(&[&kaspa_address])?;
+                let (receive, change) = account.derivation()?.addresses_indexes(&[&kaspa_address])?;
                 let private_keys = account.create_private_keys(&keydata, &payment_secret, &receive, &change)?;
                 for (address, private_key) in private_keys {
                     if kaspa_address == *address {

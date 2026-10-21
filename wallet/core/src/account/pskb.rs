@@ -34,11 +34,25 @@ struct PSKBSignerInner {
     keys: Mutex<AHashMap<Address, [u8; 32]>>,
 }
 
+impl Drop for PSKBSignerInner {
+    fn drop(&mut self) {
+        let keys = self.keys.get_mut().unwrap_or_else(|poisoned| poisoned.into_inner());
+        for key in keys.values_mut() {
+            key.zeroize();
+        }
+    }
+}
+
 pub struct PSKBSigner {
     inner: Arc<PSKBSignerInner>,
 }
 
 impl PSKBSigner {
+    fn sign_ecdsa(&self, address: &Address, message: Message) -> Result<secp256k1::ecdsa::Signature> {
+        let keys = self.inner.keys.lock()?;
+        let key = keys.get(address).ok_or_else(|| Error::custom("PSKBSigner address coverage error"))?;
+        Ok(secp256k1::SECP256K1.sign_ecdsa(&message, &secp256k1::SecretKey::from_slice(key)?))
+    }
     pub fn new(account: Arc<dyn Account>, keydata: PrvKeyData, payment_secret: Option<Secret>) -> Self {
         Self { inner: Arc::new(PSKBSignerInner { keydata, account, payment_secret, keys: Mutex::new(AHashMap::new()) }) }
     }
@@ -89,13 +103,17 @@ impl PSKBSigner {
 
 pub struct PSKTGenerator {
     generator: Generator,
-    signer: Arc<PSKBSigner>,
+    signer: Option<Arc<PSKBSigner>>,
     prefix: Prefix,
 }
 
 impl PSKTGenerator {
     pub fn new(generator: Generator, signer: Arc<PSKBSigner>, prefix: Prefix) -> Self {
-        Self { generator, signer, prefix }
+        Self { generator, signer: Some(signer), prefix }
+    }
+
+    pub fn new_unsigned(generator: Generator, prefix: Prefix) -> Self {
+        Self { generator, signer: None, prefix }
     }
 
     pub fn stream(&self) -> impl Stream<Item = Result<PSKT<Signer>, Error>> {
@@ -105,12 +123,12 @@ impl PSKTGenerator {
 
 struct PSKTStream {
     generator_stream: Pin<Box<dyn Stream<Item = Result<PendingTransaction, Error>> + Send>>,
-    signer: Arc<PSKBSigner>,
+    signer: Option<Arc<PSKBSigner>>,
     prefix: Prefix,
 }
 
 impl PSKTStream {
-    fn new(generator: Generator, signer: Arc<PSKBSigner>, prefix: Prefix) -> Self {
+    fn new(generator: Generator, signer: Option<Arc<PSKBSigner>>, prefix: Prefix) -> Self {
         let generator_stream = generator.stream().map_err(Error::from);
         Self { generator_stream: Box::pin(generator_stream), signer, prefix }
     }
@@ -219,7 +237,27 @@ pub async fn pskb_signer_for_address(
                         .iter()
                         .enumerate()
                         .map(|(input_idx, _input)| {
-                            let hash = calc_schnorr_signature_hash(&tx.as_verifiable(), input_idx, sighash[input_idx], &reused_values);
+                            let kcc3 = signer.inner.account.downcast_ref::<crate::account::kcc3::Kcc3>().ok();
+                            let ecdsa = kcc3
+                                .map(|account| {
+                                    account.public_description().map(|d| {
+                                        d.key.derivation().signature_scheme()
+                                            == kaspa_wallet_keys::derivation::gen2::SignatureScheme::Ecdsa
+                                    })
+                                })
+                                .transpose()
+                                .map_err(|e| e.to_string())?
+                                .unwrap_or(false);
+                            let hash = if ecdsa {
+                                kaspa_consensus_core::hashing::sighash::calc_ecdsa_signature_hash(
+                                    &tx.as_verifiable(),
+                                    input_idx,
+                                    sighash[input_idx],
+                                    &reused_values,
+                                )
+                            } else {
+                                calc_schnorr_signature_hash(&tx.as_verifiable(), input_idx, sighash[input_idx], &reused_values)
+                            };
                             let msg = secp256k1::Message::from_digest_slice(hash.as_bytes().as_slice()).map_err(|e| e.to_string())?;
 
                             // Get the appropriate address for this input
@@ -230,10 +268,31 @@ pub async fn pskb_signer_for_address(
                             };
 
                             let pub_key = signer.public_key(address).map_err(|e| format!("Failed to get public key: {}", e))?;
-
-                            let signature = signer.sign_schnorr(address, msg).map_err(|e| format!("Failed to sign: {}", e))?;
-
-                            Ok(SignInputOk { signature: Signature::Schnorr(signature), pub_key, key_source: key_source.clone() })
+                            let source = if let Some(account) = kcc3 {
+                                account.ensure_active_context().map_err(|e| e.to_string())?;
+                                let expected = kaspa_wallet_keys::derivation::gen1::PubkeyDerivationManager::create_address(
+                                    &pub_key,
+                                    network_id.into(),
+                                    ecdsa,
+                                )
+                                .map_err(|e| e.to_string())?;
+                                if expected != *address
+                                    || tx.entries[input_idx].as_ref().is_none_or(|entry| {
+                                        entry.script_public_key != kaspa_txscript::pay_to_address_script(&expected)
+                                    })
+                                {
+                                    return Err("KCC-3 input script mismatch".into());
+                                }
+                                account.key_source(address).map_err(|e| e.to_string())?.1
+                            } else {
+                                key_source.clone()
+                            };
+                            let signature = if ecdsa {
+                                Signature::ECDSA(signer.sign_ecdsa(address, msg).map_err(|e| e.to_string())?)
+                            } else {
+                                Signature::Schnorr(signer.sign_schnorr(address, msg).map_err(|e| e.to_string())?)
+                            };
+                            Ok(SignInputOk { signature, pub_key, key_source: source })
                         })
                         .collect()
                 })
@@ -362,6 +421,7 @@ pub fn pskt_to_pending_transaction(
     let final_transaction_destination = PaymentDestination::PaymentOutputs(PaymentOutputs::from((recipient, output[0].value)));
 
     let settings = GeneratorSettings {
+        context_account: None,
         // this generator only used for context access, such as
         // network type and UTXO submission bookkeeping, we can hardcode the rest.
         version: 0,

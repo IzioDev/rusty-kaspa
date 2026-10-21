@@ -3,7 +3,9 @@ use crate::error::Error;
 use crate::imports::*;
 use crate::result::Result;
 use kaspa_bip32::{Language, Mnemonic};
-use kaspa_wallet_core::account::{BIP32_ACCOUNT_KIND, LEGACY_ACCOUNT_KIND, MULTISIG_ACCOUNT_KIND};
+use kaspa_wallet_core::account::kcc3::PublicAccountDescription;
+use kaspa_wallet_core::account::{BIP32_ACCOUNT_KIND, KCC3_ACCOUNT_KIND, LEGACY_ACCOUNT_KIND, MULTISIG_ACCOUNT_KIND};
+use kaspa_wallet_keys::derivation::gen2::SignatureScheme;
 use std::sync::Arc;
 
 pub async fn prompt_for_mnemonic(term: &Arc<Terminal>) -> Result<Vec<String>> {
@@ -34,6 +36,24 @@ pub async fn prompt_for_mnemonic(term: &Arc<Terminal>) -> Result<Vec<String>> {
     if words.len() > 24 { Err("Mnemonic must be 12 or 24 words".into()) } else { Ok(words) }
 }
 
+pub(crate) async fn prompt_for_kcc3_public_account(
+    term: &Arc<Terminal>,
+    network: NetworkType,
+    prompt: &str,
+) -> Result<Option<PublicAccountDescription>> {
+    let xpub = term.ask(false, prompt).await?;
+    if xpub.trim().is_empty() {
+        return Ok(None);
+    }
+    let xpub = xpub.trim().parse()?;
+    let signature_scheme = match term.ask(false, "Signature scheme (schnorr/ecdsa, default schnorr): ").await?.trim() {
+        "" | "schnorr" => SignatureScheme::Schnorr,
+        "ecdsa" => SignatureScheme::Ecdsa,
+        _ => return Err(Error::custom("Unsupported signature scheme")),
+    };
+    Ok(Some(PublicAccountDescription::try_from_xpub(network, signature_scheme, xpub)?))
+}
+
 pub(crate) async fn import_with_mnemonic(ctx: &Arc<KaspaCli>, account_kind: AccountKind, additional_xpubs: &[String]) -> Result<()> {
     let wallet = ctx.wallet();
 
@@ -53,9 +73,20 @@ pub(crate) async fn import_with_mnemonic(ctx: &Arc<KaspaCli>, account_kind: Acco
         LEGACY_ACCOUNT_KIND if length != 12 => Err(Error::Custom(format!("wrong mnemonic length ({length})"))),
         BIP32_ACCOUNT_KIND if length != 24 => Err(Error::Custom(format!("wrong mnemonic length ({length})"))),
 
-        LEGACY_ACCOUNT_KIND | BIP32_ACCOUNT_KIND | MULTISIG_ACCOUNT_KIND => Ok(()),
+        LEGACY_ACCOUNT_KIND | BIP32_ACCOUNT_KIND | MULTISIG_ACCOUNT_KIND | KCC3_ACCOUNT_KIND => Ok(()),
         _ => Err(Error::Custom("unsupported account kind".to_owned())),
     }?;
+
+    let origin = if account_kind == KCC3_ACCOUNT_KIND {
+        let signature_scheme = match term.ask(false, "Signature scheme (schnorr/ecdsa, default schnorr): ").await?.trim() {
+            "" | "schnorr" => SignatureScheme::Schnorr,
+            "ecdsa" => SignatureScheme::Ecdsa,
+            _ => return Err(Error::custom("Unsupported signature scheme")),
+        };
+        Some(kaspa_wallet_keys::derivation::gen2::AccountDerivation::try_new(wallet.network_id()?.network_type, signature_scheme, 0)?)
+    } else {
+        None
+    };
 
     let payment_secret = if account_kind == LEGACY_ACCOUNT_KIND {
         None
@@ -84,7 +115,16 @@ pub(crate) async fn import_with_mnemonic(ctx: &Arc<KaspaCli>, account_kind: Acco
     let mnemonic = mnemonic.join(" ");
     let mnemonic = Mnemonic::new(mnemonic.trim(), Language::English)?;
 
-    let account = if account_kind != MULTISIG_ACCOUNT_KIND {
+    let account = if let Some(origin) = origin {
+        wallet
+            .import_mnemonic(
+                &wallet_secret,
+                payment_secret.as_ref(),
+                mnemonic,
+                kaspa_wallet_core::wallet::AccountImportArgs::Kcc3 { origin: Some(origin) },
+            )
+            .await?
+    } else if account_kind != MULTISIG_ACCOUNT_KIND {
         wallet.import_with_mnemonic(&wallet_secret, payment_secret.as_ref(), mnemonic, account_kind).await?
     } else {
         let mut mnemonics_secrets = vec![(mnemonic, payment_secret)];
